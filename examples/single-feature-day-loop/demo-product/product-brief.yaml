@@ -1,0 +1,19 @@
+product_id: demo-hello-world-001
+name: Hello World Demo
+problem: Need a simple demo to verify the async day loop workflow works correctly, producing valid artifacts at each phase
+target_user: Developers testing the amazing-async-dev system
+core_value: Prove the day loop produces complete DailyReviewPack with valid evidence
+constraints:
+  - Single feature only
+  - Mock execution mode
+  - Must produce all 6 core artifacts
+  - Complete in one day loop
+success_signal: DailyReviewPack generated with all fields populated, evidence verified
+
+non_goals:
+  - Production code
+  - Real AI execution
+  - Multi-feature orchestration
+
+initial_feature_candidates:
+  - 001-hello-world-task

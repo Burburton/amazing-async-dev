@@ -1,0 +1,17 @@
+feature_id: 001-hello-world-task
+title: Hello World Task
+goal: Create a simple hello-world.txt file to demonstrate the complete day loop workflow from planning to review
+user_value: Demonstrate that the async dev system can execute a bounded task and produce valid artifacts
+scope:
+  - Create hello-world.txt file
+  - Write "Hello from async dev day loop!" to file
+  - Verify file exists and content is correct
+out_of_scope:
+  - Multiple files
+  - Complex logic
+  - Real AI execution
+acceptance_criteria:
+  - hello-world.txt file created
+  - File contains expected message
+  - ExecutionResult shows success status
+  - DailyReviewPack has valid evidence
