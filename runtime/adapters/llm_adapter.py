@@ -1,7 +1,10 @@
 """LLM adapter interface - defines interface for AI execution."""
 
+import os
 from abc import ABC, abstractmethod
 from typing import Any
+
+from openai import OpenAI
 
 
 class LLMAdapter(ABC):
@@ -23,6 +26,267 @@ class LLMAdapter(ABC):
     def is_available(self) -> bool:
         """Check if adapter is available and configured."""
         pass
+
+
+class BailianLLMAdapter(LLMAdapter):
+    """Real adapter using Alibaba Cloud Bailian API via OpenAI-compatible interface.
+
+    Uses DASHSCOPE_API_KEY environment variable for authentication.
+    Base URL: https://dashscope.aliyuncs.com/compatible-mode/v1
+    Default model: qwen-plus (can be overridden via DASHSCOPE_MODEL env var)
+    """
+
+    def __init__(self) -> None:
+        """Initialize Bailian adapter with OpenAI-compatible client."""
+        self.api_key = os.getenv("DASHSCOPE_API_KEY")
+        self.model = os.getenv("DASHSCOPE_MODEL", "qwen-plus")
+        self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+        if self.api_key:
+            self.client = OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+            )
+        else:
+            self.client = None
+
+    def execute(self, execution_pack: dict[str, Any]) -> dict[str, Any]:
+        """Execute task via Bailian API and return ExecutionResult.
+
+        Args:
+            execution_pack: Bounded task definition with constraints
+
+        Returns:
+            ExecutionResult with completion status and artifacts
+        """
+        if not self.client:
+            return {
+                "execution_id": execution_pack.get("execution_id", "unknown"),
+                "status": "failed",
+                "completed_items": [],
+                "artifacts_created": [],
+                "verification_result": {"passed": 0, "failed": 1, "skipped": 0, "details": []},
+                "issues_found": ["DASHSCOPE_API_KEY not configured"],
+                "blocked_reasons": ["Missing API key"],
+                "decisions_required": [],
+                "recommended_next_step": "Set DASHSCOPE_API_KEY environment variable",
+                "metrics": {"files_read": 0, "files_written": 0, "actions_taken": 0},
+                "notes": "API key not available",
+                "duration": "0h0m",
+            }
+
+        system_prompt = self._build_system_prompt(execution_pack)
+        user_prompt = self._build_user_prompt(execution_pack)
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+
+            llm_output = response.choices[0].message.content or ""
+
+            return self._parse_llm_output(execution_pack, llm_output)
+
+        except Exception as e:
+            return {
+                "execution_id": execution_pack.get("execution_id", "unknown"),
+                "status": "failed",
+                "completed_items": [],
+                "artifacts_created": [],
+                "verification_result": {"passed": 0, "failed": 1, "skipped": 0, "details": []},
+                "issues_found": [str(e)],
+                "blocked_reasons": ["API call failed"],
+                "decisions_required": [],
+                "recommended_next_step": "Check API configuration and retry",
+                "metrics": {"files_read": 0, "files_written": 0, "actions_taken": 0},
+                "notes": f"Error: {e}",
+                "duration": "0h0m",
+            }
+
+    def _build_system_prompt(self, execution_pack: dict[str, Any]) -> str:
+        """Build system prompt from ExecutionPack constraints."""
+        goal = execution_pack.get("goal", "Execute the assigned task")
+        scope = execution_pack.get("task_scope", [])
+        stop_conditions = execution_pack.get("stop_conditions", [])
+        constraints = execution_pack.get("constraints", [])
+
+        prompt_parts = [
+            "You are an AI execution agent within the amazing-async-dev system.",
+            "Your role is to execute bounded tasks and return structured results.",
+            "",
+            f"## Goal\n{goal}",
+        ]
+
+        if scope:
+            prompt_parts.append(f"\n## Task Scope\nYou MUST stay within these boundaries:\n{self._format_list(scope)}")
+
+        if stop_conditions:
+            prompt_parts.append(f"\n## Stop Conditions\nYou MUST stop if any of these occur:\n{self._format_list(stop_conditions)}")
+
+        if constraints:
+            prompt_parts.append(f"\n## Constraints\n{self._format_list(constraints)}")
+
+        prompt_parts.append(
+            "\n## Output Format\n"
+            "After completing your task, provide your results in this format:\n"
+            "```\n"
+            "COMPLETED_ITEMS:\n"
+            "- [list what you completed]\n"
+            "\n"
+            "ARTIFACTS_CREATED:\n"
+            "- name: [artifact name]\n"
+            "- path: [where it would be saved]\n"
+            "- type: file/document/code/etc\n"
+            "\n"
+            "ISSUES_FOUND:\n"
+            "- [any problems encountered]\n"
+            "\n"
+            "BLOCKED_REASONS:\n"
+            "- [if blocked, why]\n"
+            "\n"
+            "DECISIONS_REQUIRED:\n"
+            "- [any decisions needed from human]\n"
+            "\n"
+            "NEXT_STEP:\n"
+            "[recommended next action]\n"
+            "```"
+        )
+
+        return "\n".join(prompt_parts)
+
+    def _build_user_prompt(self, execution_pack: dict[str, Any]) -> str:
+        """Build user prompt with deliverables and verification steps."""
+        deliverables = execution_pack.get("deliverables", [])
+        verification_steps = execution_pack.get("verification_steps", [])
+        must_read = execution_pack.get("must_read", [])
+
+        prompt_parts = ["## Your Task\nExecute the following deliverables:"]
+
+        if deliverables:
+            for d in deliverables:
+                prompt_parts.append(f"- {d.get('item', 'unknown')}: {d.get('path', 'path not specified')}")
+
+        if must_read:
+            prompt_parts.append("\n## Files to Read\nYou should read these files for context:")
+            for f in must_read:
+                prompt_parts.append(f"- {f}")
+
+        if verification_steps:
+            prompt_parts.append("\n## Verification\nAfter completion, verify:")
+            for v in verification_steps:
+                prompt_parts.append(f"- {v}")
+
+        prompt_parts.append("\nPlease execute and provide your results in the specified format.")
+
+        return "\n".join(prompt_parts)
+
+    def _format_list(self, items: list[Any]) -> str:
+        """Format a list for prompt display."""
+        if not items:
+            return "(none specified)"
+        return "\n".join(f"- {item}" for item in items)
+
+    def _parse_llm_output(self, execution_pack: dict[str, Any], llm_output: str) -> dict[str, Any]:
+        """Parse LLM output into ExecutionResult structure."""
+        completed_items = self._extract_section(llm_output, "COMPLETED_ITEMS")
+        artifacts = self._extract_artifacts(llm_output)
+        issues = self._extract_section(llm_output, "ISSUES_FOUND")
+        blocked = self._extract_section(llm_output, "BLOCKED_REASONS")
+        decisions = self._extract_section(llm_output, "DECISIONS_REQUIRED")
+        next_step = self._extract_section(llm_output, "NEXT_STEP", single_line=True)
+
+        status = "success"
+        if blocked and blocked != ["(none)"] and blocked != [""]:
+            status = "blocked"
+        elif issues and issues != ["(none)"] and issues != [""]:
+            status = "partial"
+
+        return {
+            "execution_id": execution_pack.get("execution_id", "unknown"),
+            "status": status,
+            "completed_items": completed_items if completed_items else execution_pack.get("deliverables", []),
+            "artifacts_created": artifacts if artifacts else [],
+            "verification_result": {
+                "passed": len(completed_items) if completed_items else 0,
+                "failed": len(issues) if issues else 0,
+                "skipped": 0,
+                "details": execution_pack.get("verification_steps", []),
+            },
+            "issues_found": issues if issues else [],
+            "blocked_reasons": blocked if blocked else [],
+            "decisions_required": decisions if decisions else [],
+            "recommended_next_step": next_step if next_step else "Continue with next task",
+            "metrics": {
+                "files_read": len(execution_pack.get("must_read", [])),
+                "files_written": len(artifacts) if artifacts else 0,
+                "actions_taken": len(completed_items) if completed_items else 0,
+            },
+            "notes": llm_output[:500] if llm_output else "No LLM output",
+            "duration": "estimated",
+        }
+
+    def _extract_section(self, text: str, section_name: str, single_line: bool = False) -> list[str] | str:
+        """Extract a section from formatted LLM output."""
+        lines = text.split("\n")
+        result: list[str] = []
+        in_section = False
+
+        for line in lines:
+            if line.strip().startswith(section_name):
+                in_section = True
+                continue
+            if in_section:
+                if line.strip() and not line.strip().startswith("-"):
+                    # End of section (next section header)
+                    if single_line:
+                        return " ".join(result) if result else ""
+                    return result if result else []
+                if line.strip().startswith("-"):
+                    result.append(line.strip()[1:].strip())
+
+        if single_line:
+            return " ".join(result) if result else ""
+        return result if result else []
+
+    def _extract_artifacts(self, text: str) -> list[dict[str, str]]:
+        """Extract artifacts section from LLM output."""
+        lines = text.split("\n")
+        artifacts: list[dict[str, str]] = []
+        in_artifacts = False
+        current_artifact: dict[str, str] = {}
+
+        for line in lines:
+            if line.strip().startswith("ARTIFACTS_CREATED"):
+                in_artifacts = True
+                continue
+            if in_artifacts:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                if stripped and not stripped.startswith("-") and not stripped.startswith("name:"):
+                    # End of artifacts section
+                    break
+                if stripped.startswith("- name:"):
+                    if current_artifact:
+                        artifacts.append(current_artifact)
+                    current_artifact = {"name": stripped[7:].strip()}
+                elif stripped.startswith("- path:"):
+                    current_artifact["path"] = stripped[7:].strip()
+                elif stripped.startswith("- type:"):
+                    current_artifact["type"] = stripped[7:].strip()
+
+        if current_artifact:
+            artifacts.append(current_artifact)
+
+        return artifacts
+
+    def is_available(self) -> bool:
+        """Check if Bailian API is configured."""
+        return self.api_key is not None and self.client is not None
 
 
 class MockLLMAdapter(LLMAdapter):
@@ -89,8 +353,8 @@ def get_adapter(mock: bool = False) -> LLMAdapter:
         mock: If True, return MockLLMAdapter for testing
 
     Returns:
-        LLMAdapter instance
+        LLMAdapter instance (BailianLLMAdapter or MockLLMAdapter)
     """
     if mock:
         return MockLLMAdapter()
-    return PlaceholderLLMAdapter()
+    return BailianLLMAdapter()
