@@ -1,0 +1,45 @@
+execution_id: exec-20240115-001
+feature_id: 001-core-object-system
+task_id: task-001-schemas-day1
+goal: Create schema files for ProductBrief, FeatureSpec, and RunState objects with YAML format and JSON Schema equivalents
+task_scope:
+  - Create product-brief.schema.yaml with all required fields
+  - Create feature-spec.schema.yaml with all required fields
+  - Create runstate.schema.yaml with all required fields
+  - Include JSON Schema equivalent section for tooling
+  - Ensure field naming matches terminology.md
+must_read:
+  - docs/infra/amazing-async-dev-feature-001-core-object-system.md
+  - docs/terminology.md
+constraints:
+  - No scope expansion beyond three schemas
+  - Use YAML format with json_schema section
+  - All required fields must be documented
+  - Field descriptions must be at least one sentence
+deliverables:
+  - item: product-brief.schema.yaml
+    path: schemas/product-brief.schema.yaml
+    type: file
+  - item: feature-spec.schema.yaml
+    path: schemas/feature-spec.schema.yaml
+    type: file
+  - item: runstate.schema.yaml
+    path: schemas/runstate.schema.yaml
+    type: file
+verification_steps:
+  - Check all required fields are present in each schema
+  - Verify JSON Schema section is valid structure
+  - Confirm field names use consistent terminology
+  - Check examples are realistic and complete
+stop_conditions:
+  - All three deliverables completed
+  - Blocker encountered requiring human decision
+  - Scope expansion request needed
+  - Unrecoverable error
+allowed_tools:
+  - Read
+  - Write
+  - Bash
+notes: Focus on schema structure first. JSON Schema generation second. Keep fields minimal but sufficient for day loop.
+priority: high
+time_limit: 4h

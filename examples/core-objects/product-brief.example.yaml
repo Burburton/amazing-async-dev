@@ -1,0 +1,27 @@
+product_id: demo-product-001
+name: amazing-async-dev
+problem: Solo builders lack uninterrupted maker time and cannot afford to babysit AI all day, while existing AI coding assistants require continuous human presence and lose context across days
+target_user: Solo builders, part-time makers with many product ideas but little uninterrupted time, builders who want AI to work asynchronously not interactively
+core_value: AI makes bounded progress during the day without human supervision, human reviews and decides in 20-30 minutes at night, work resumes the next day from explicit state
+constraints:
+  - Single builder, not multi-team coordination
+  - Day-sized tasks only, no multi-week sprints
+  - No real-time supervision required
+  - Artifact-first workflow, not conversation-dependent
+  - Explicit boundaries, no scope drift
+success_signal: Human reviews in 30 minutes or less, AI runs 4+ hours autonomously, work resumes from RunState without re-explanation, 3 or fewer decisions per day
+
+non_goals:
+  - Multi-team platform
+  - Complex agent societies
+  - Heavy orchestration frameworks
+  - UI-first product
+  - Plugin marketplace
+  - Real-time collaboration
+
+initial_feature_candidates:
+  - 001-core-object-system
+  - 002-day-loop-cli
+  - 003-single-feature-demo
+
+notes: "First version focuses on proving the core day loop: AI makes bounded progress, human reviews efficiently, work resumes from state. Everything else depends on this working."

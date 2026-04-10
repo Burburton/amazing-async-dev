@@ -1,0 +1,309 @@
+schema_type: execution-result
+version: "1.0"
+description: Structured outcome of a daytime execution run
+
+required:
+  - execution_id
+  - status
+  - completed_items
+  - artifacts_created
+  - verification_result
+  - issues_found
+  - blocked_reasons
+  - decisions_required
+  - recommended_next_step
+
+optional:
+  - metrics
+  - notes
+  - warnings
+  - duration
+
+fields:
+  execution_id:
+    type: string
+    description: Execution run identifier
+    example: "exec-20240115-001"
+    required: true
+
+  status:
+    type: enum
+    description: Overall execution status
+    values:
+      - success
+      - partial
+      - blocked
+      - failed
+      - stopped
+    example: "success"
+    required: true
+
+  completed_items:
+    type: array
+    description: Items successfully completed
+    items_type: string
+    example:
+      - "product-brief.schema.yaml"
+      - "feature-spec.schema.yaml"
+    required: true
+
+  artifacts_created:
+    type: array
+    description: Artifacts produced
+    items_type: object
+    example:
+      - name: "product-brief.schema.yaml"
+        path: "schemas/product-brief.schema.yaml"
+        type: file
+    required: true
+
+  verification_result:
+    type: object
+    description: Verification step results
+    example:
+      passed: 3
+      failed: 0
+      skipped: 0
+      details:
+        - "Required fields: passed"
+        - "JSON Schema: passed"
+        - "Terminology: passed"
+    required: true
+
+  issues_found:
+    type: array
+    description: Issues discovered
+    items_type: object
+    example:
+      - type: warning
+        description: "Minor naming inconsistency"
+        severity: low
+        resolution: fixed
+    required: true
+
+  blocked_reasons:
+    type: array
+    description: Reasons execution blocked
+    items_type: object
+    example: []
+    required: true
+
+  decisions_required:
+    type: array
+    description: Decisions needing human input
+    items_type: object
+    example:
+      - decision: "schema-format-choice"
+        context: "All schema files need format"
+        options:
+          - "YAML"
+          - "JSON"
+        recommendation: "YAML"
+        urgency: high
+    required: true
+
+  recommended_next_step:
+    type: string
+    description: AI recommendation for continuation
+    example: "Continue with RunState and ExecutionPack schemas"
+    required: true
+
+  metrics:
+    type: object
+    description: Execution metrics
+    example:
+      files_read: 5
+      files_written: 2
+      actions_taken: 12
+      decisions_made: 0
+    required: false
+
+  notes:
+    type: string
+    description: Free-form notes
+    example: "Execution proceeded smoothly"
+    required: false
+
+  warnings:
+    type: array
+    description: Non-blocking warnings
+    items_type: string
+    example: []
+    required: false
+
+  duration:
+    type: duration
+    description: Total execution time
+    example: "2h30m"
+    required: false
+
+lifecycle:
+  created_by: run-day workflow
+  update_frequency: never
+  consumed_by:
+    - review-night workflow
+    - resume-next-day workflow
+
+usage_rules:
+  for_runstate:
+    - completed_items maps to completed_outputs
+    - artifacts_created maps to artifacts
+    - blocked_reasons maps to blocked_items
+    - decisions_required maps to decisions_needed
+    - recommended_next_step maps to next_recommended_action
+  for_review_pack:
+    - completed_items maps to what_was_completed
+    - artifacts_created maps to evidence
+    - issues_found maps to problems_found
+    - blocked_reasons maps to blocked_items
+    - decisions_required maps to decisions_needed
+    - recommended_next_step maps to tomorrow_plan
+
+validation:
+  - execution_id must match ExecutionPack
+  - status must be valid enum
+  - if blocked, blocked_reasons must have items
+  - if partial, completed_items must be non-empty
+  - verification_result must have counts
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - execution_id
+    - status
+    - completed_items
+    - artifacts_created
+    - verification_result
+    - issues_found
+    - blocked_reasons
+    - decisions_required
+    - recommended_next_step
+  properties:
+    execution_id:
+      type: string
+    status:
+      enum:
+        - success
+        - partial
+        - blocked
+        - failed
+        - stopped
+    completed_items:
+      type: array
+      items:
+        type: string
+    artifacts_created:
+      type: array
+      items:
+        type: object
+        required:
+          - name
+          - path
+          - type
+        properties:
+          name:
+            type: string
+          path:
+            type: string
+          type:
+            enum:
+              - file
+              - document
+              - log
+              - data
+    verification_result:
+      type: object
+      properties:
+        passed:
+          type: integer
+        failed:
+          type: integer
+        skipped:
+          type: integer
+        details:
+          type: array
+          items:
+            type: string
+    issues_found:
+      type: array
+      items:
+        type: object
+        properties:
+          type:
+            enum:
+              - error
+              - warning
+              - note
+          description:
+            type: string
+          severity:
+            enum:
+              - high
+              - medium
+              - low
+          resolution:
+            enum:
+              - fixed
+              - pending
+              - deferred
+    blocked_reasons:
+      type: array
+      items:
+        type: object
+        required:
+          - reason
+          - impact
+        properties:
+          reason:
+            type: string
+          impact:
+            type: string
+          since:
+            type: string
+            format: date-time
+    decisions_required:
+      type: array
+      items:
+        type: object
+        required:
+          - decision
+          - context
+          - options
+        properties:
+          decision:
+            type: string
+          context:
+            type: string
+          options:
+            type: array
+            items:
+              type: string
+          recommendation:
+            type: string
+          urgency:
+            enum:
+              - high
+              - medium
+              - low
+    recommended_next_step:
+      type: string
+    metrics:
+      type: object
+      properties:
+        files_read:
+          type: integer
+        files_written:
+          type: integer
+        actions_taken:
+          type: integer
+        decisions_made:
+          type: integer
+    notes:
+      type: string
+    warnings:
+      type: array
+      items:
+        type: string
+    duration:
+      type: string

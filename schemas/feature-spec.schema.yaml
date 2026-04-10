@@ -1,0 +1,201 @@
+schema_type: feature-spec
+version: "1.0"
+description: Bounded feature definition with goals, scope, and acceptance criteria
+
+required:
+  - feature_id
+  - title
+  - goal
+  - user_value
+  - scope
+  - out_of_scope
+  - acceptance_criteria
+
+optional:
+  - dependencies
+  - risks
+  - notes_for_ai
+  - estimated_days
+
+fields:
+  feature_id:
+    type: string
+    description: Unique identifier for the feature
+    pattern: "^\\d{3}-[a-z0-9-]+$"
+    example: "001-core-object-system"
+    required: true
+
+  title:
+    type: string
+    description: Human-readable feature title
+    example: "Core Object System"
+    required: true
+
+  goal:
+    type: string
+    description: What this feature aims to achieve
+    min_length: 30
+    example: "Define the foundational object model so all workflows operate on explicit, stable artifacts"
+    required: true
+
+  user_value:
+    type: string
+    description: The value this feature delivers to the user
+    example: "Contributors understand what artifacts exist and how they connect"
+    required: true
+
+  scope:
+    type: array
+    description: What is included in this feature
+    items_type: string
+    min_items: 2
+    example:
+      - "Define required fields for all six objects"
+      - "Create YAML schema files"
+      - "Create Markdown templates"
+      - "Create example instances"
+      - "Document object semantics"
+    required: true
+
+  out_of_scope:
+    type: array
+    description: What is explicitly NOT included
+    items_type: string
+    min_items: 1
+    example:
+      - "Implementing full CLI"
+      - "Durable execution runtime"
+      - "Dashboard or UI"
+      - "External integrations"
+    required: true
+
+  acceptance_criteria:
+    type: array
+    description: Conditions that must be met for feature completion
+    items_type: string
+    min_items: 3
+    example:
+      - "All six object schemas exist"
+      - "All six templates exist"
+      - "All six examples exist"
+      - "Documentation explains object roles"
+      - "RunState clearly supports pause/resume"
+    required: true
+
+  dependencies:
+    type: array
+    description: Other features or resources this depends on
+    items_type: object
+    example:
+      - type: decision
+        id: schema-format-choice
+        status: pending
+    required: false
+
+  risks:
+    type: array
+    description: Potential risks and mitigations
+    items_type: object
+    example:
+      - risk: "Over-design with too many fields"
+        mitigation: "Keep first version minimal"
+    required: false
+
+  notes_for_ai:
+    type: string
+    description: Specific guidance for AI execution
+    example: "Start with terminology.md to ensure consistent naming across all objects"
+    required: false
+
+  estimated_days:
+    type: integer
+    description: Estimated number of day loops to complete
+    min: 1
+    max: 14
+    example: 3
+    required: false
+
+lifecycle:
+  created_by: planning workflow or human
+  update_frequency: medium
+  update_triggers:
+    - "Scope refinement"
+    - "New risk discovered"
+    - "Acceptance criteria adjustment"
+
+validation:
+  - feature_id must follow pattern
+  - scope must have at least 2 items
+  - out_of_scope must have at least 1 item
+  - acceptance_criteria must have at least 3 items
+  - goal must be at least 30 characters
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - feature_id
+    - title
+    - goal
+    - user_value
+    - scope
+    - out_of_scope
+    - acceptance_criteria
+  properties:
+    feature_id:
+      type: string
+      pattern: "^\\d{3}-[a-z0-9-]+$"
+    title:
+      type: string
+    goal:
+      type: string
+      minLength: 30
+    user_value:
+      type: string
+    scope:
+      type: array
+      items:
+        type: string
+      minItems: 2
+    out_of_scope:
+      type: array
+      items:
+        type: string
+      minItems: 1
+    acceptance_criteria:
+      type: array
+      items:
+        type: string
+      minItems: 3
+    dependencies:
+      type: array
+      items:
+        type: object
+        properties:
+          type:
+            enum:
+              - feature
+              - resource
+              - decision
+          id:
+            type: string
+          status:
+            enum:
+              - pending
+              - available
+              - blocked
+    risks:
+      type: array
+      items:
+        type: object
+        properties:
+          risk:
+            type: string
+          mitigation:
+            type: string
+    notes_for_ai:
+      type: string
+    estimated_days:
+      type: integer
+      minimum: 1
+      maximum: 14

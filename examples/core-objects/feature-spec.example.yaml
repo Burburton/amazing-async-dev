@@ -1,0 +1,46 @@
+feature_id: 001-core-object-system
+title: Core Object System
+goal: Define the foundational object model for amazing-async-dev so that all later workflows, CLI, and runtime behaviors operate on explicit, stable, structured artifacts rather than loose conversational context
+user_value: Contributors can understand what artifacts exist, what each means, how they connect, and how the async day loop works by reading these objects
+scope:
+  - Define required fields for all six objects
+  - Define optional fields where useful
+  - Create YAML schema files under schemas/
+  - Create Markdown templates under templates/
+  - Create example instances under examples/
+  - Document object responsibilities and lifecycle
+  - Define update ownership for each object
+  - Define minimum validation expectations
+out_of_scope:
+  - Implementing the full CLI
+  - Durable execution runtime
+  - Dashboard or UI
+  - External integrations
+  - Advanced version migration
+  - Multi-project orchestration
+acceptance_criteria:
+  - All six object schemas exist in schemas/
+  - All six templates exist in templates/
+  - All six examples exist in examples/core-objects/
+  - Documentation explains object roles and relationships
+  - RunState clearly supports pause/resume with explicit fields
+  - ExecutionPack clearly constrains execution scope
+  - DailyReviewPack clearly supports quick nightly review
+  - Terminology is consistent across all artifacts
+
+dependencies:
+  - type: decision
+    id: schema-format-choice
+    status: available
+
+risks:
+  - risk: Over-design with too many fields creating unnecessary complexity
+    mitigation: Keep first version minimal, focus only on day loop needs
+  - risk: Under-specification making objects too vague for automation
+    mitigation: Require strong semantics for ownership, update timing, usage
+  - risk: Inconsistent terminology across files
+    mitigation: Create terminology.md and validate templates against it
+
+notes_for_ai: Start with docs/terminology.md to ensure consistent naming. Follow existing template patterns. Include JSON Schema equivalents for tooling. Focus on semantic clarity over completeness.
+
+estimated_days: 3

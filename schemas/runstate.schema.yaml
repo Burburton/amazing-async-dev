@@ -1,0 +1,278 @@
+schema_type: runstate
+version: "1.0"
+description: Current execution state of a project or feature for pause/resume
+
+required:
+  - project_id
+  - feature_id
+  - current_phase
+  - active_task
+  - task_queue
+  - completed_outputs
+  - open_questions
+  - blocked_items
+  - decisions_needed
+  - last_action
+  - next_recommended_action
+  - updated_at
+
+optional:
+  - artifacts
+  - notes
+  - health_status
+
+fields:
+  project_id:
+    type: string
+    description: Unique identifier for the project
+    example: "demo-product-001"
+    required: true
+
+  feature_id:
+    type: string
+    description: Unique identifier for the active feature
+    example: "001-core-object-system"
+    required: true
+
+  current_phase:
+    type: enum
+    description: Current phase in the day loop
+    values:
+      - planning
+      - executing
+      - reviewing
+      - blocked
+      - completed
+    example: "executing"
+    required: true
+
+  active_task:
+    type: string
+    description: Current task being executed
+    example: "create-product-brief-schema"
+    required: true
+
+  task_queue:
+    type: array
+    description: Tasks waiting to be executed
+    items_type: string
+    example:
+      - "create-feature-spec-schema"
+      - "create-runstate-schema"
+      - "create-templates"
+    required: true
+
+  completed_outputs:
+    type: array
+    description: Outputs that have been completed
+    items_type: string
+    example:
+      - "schemas/product-brief.schema.yaml"
+      - "templates/product-brief.template.md"
+    required: true
+
+  open_questions:
+    type: array
+    description: Questions needing answers
+    items_type: string
+    example:
+      - "Should we add validation tests?"
+    required: true
+
+  blocked_items:
+    type: array
+    description: Items blocking progress
+    items_type: object
+    example:
+      - item: "external-api"
+        reason: "API key pending"
+        since: "2024-01-15T10:00:00Z"
+    required: true
+
+  decisions_needed:
+    type: array
+    description: Decisions requiring human judgment
+    items_type: object
+    example:
+      - decision: "schema-format"
+        options:
+          - "YAML"
+          - "JSON"
+        impact: "all schema files"
+    required: true
+
+  last_action:
+    type: string
+    description: Most recent action taken
+    example: "Created product-brief.schema.yaml"
+    required: true
+
+  next_recommended_action:
+    type: string
+    description: AI recommendation for next step
+    example: "Proceed to feature-spec.schema.yaml"
+    required: true
+
+  updated_at:
+    type: datetime
+    description: Timestamp of last state update
+    example: "2024-01-15T10:30:00Z"
+    required: true
+
+  artifacts:
+    type: object
+    description: Key artifacts produced
+    example:
+      schema_file: "schemas/product-brief.schema.yaml"
+      template_file: "templates/product-brief.template.md"
+    required: false
+
+  notes:
+    type: string
+    description: Free-form notes about current state
+    example: "Schema definitions align with spec. No blockers."
+    required: false
+
+  health_status:
+    type: enum
+    description: Overall execution health
+    values:
+      - healthy
+      - warning
+      - blocked
+      - failed
+    example: "healthy"
+    required: false
+
+lifecycle:
+  created_by: plan-day workflow
+  update_frequency: high
+  update_triggers:
+    - "Task started"
+    - "Output completed"
+    - "Blocker encountered"
+    - "Decision needed"
+    - "Phase change"
+
+update_rules:
+  start_task:
+    set_active_task: true
+    set_phase: executing
+  complete_output:
+    append_completed_outputs: true
+    set_last_action: true
+  hit_blocker:
+    append_blocked_items: true
+    set_phase: blocked
+  resolve_blocker:
+    remove_blocked_items: true
+    set_phase: executing
+  need_decision:
+    append_decisions_needed: true
+  make_decision:
+    remove_decisions_needed: true
+  end_execution:
+    set_phase: reviewing
+    set_next_recommended: true
+
+validation:
+  - project_id must be non-empty
+  - feature_id must be non-empty
+  - current_phase must be valid enum
+  - task_queue must have items if executing
+  - updated_at must be current timestamp
+  - blocked_items must have item, reason, since
+  - decisions_needed must have decision and options
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - project_id
+    - feature_id
+    - current_phase
+    - active_task
+    - task_queue
+    - completed_outputs
+    - open_questions
+    - blocked_items
+    - decisions_needed
+    - last_action
+    - next_recommended_action
+    - updated_at
+  properties:
+    project_id:
+      type: string
+    feature_id:
+      type: string
+    current_phase:
+      enum:
+        - planning
+        - executing
+        - reviewing
+        - blocked
+        - completed
+    active_task:
+      type: string
+    task_queue:
+      type: array
+      items:
+        type: string
+    completed_outputs:
+      type: array
+      items:
+        type: string
+    open_questions:
+      type: array
+      items:
+        type: string
+    blocked_items:
+      type: array
+      items:
+        type: object
+        required:
+          - item
+          - reason
+          - since
+        properties:
+          item:
+            type: string
+          reason:
+            type: string
+          since:
+            type: string
+            format: date-time
+    decisions_needed:
+      type: array
+      items:
+        type: object
+        required:
+          - decision
+          - options
+        properties:
+          decision:
+            type: string
+          options:
+            type: array
+            items:
+              type: string
+          impact:
+            type: string
+    last_action:
+      type: string
+    next_recommended_action:
+      type: string
+    updated_at:
+      type: string
+      format: date-time
+    artifacts:
+      type: object
+      additionalProperties: true
+    notes:
+      type: string
+    health_status:
+      enum:
+        - healthy
+        - warning
+        - blocked
+        - failed

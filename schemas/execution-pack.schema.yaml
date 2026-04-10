@@ -1,0 +1,250 @@
+schema_type: execution-pack
+version: "1.0"
+description: Bounded task definition for daytime AI execution
+
+required:
+  - execution_id
+  - feature_id
+  - task_id
+  - goal
+  - task_scope
+  - must_read
+  - constraints
+  - deliverables
+  - verification_steps
+  - stop_conditions
+
+optional:
+  - allowed_tools
+  - notes
+  - priority
+  - time_limit
+
+fields:
+  execution_id:
+    type: string
+    description: Unique identifier for this execution run
+    pattern: "^exec-[0-9]{8}-[0-9]{3}$"
+    example: "exec-20240115-001"
+    required: true
+
+  feature_id:
+    type: string
+    description: Feature this execution belongs to
+    example: "001-core-object-system"
+    required: true
+
+  task_id:
+    type: string
+    description: Task identifier within feature
+    example: "task-001-schemas"
+    required: true
+
+  goal:
+    type: string
+    description: Specific goal for this execution
+    min_length: 20
+    example: "Create schema files for ProductBrief and FeatureSpec objects"
+    required: true
+
+  task_scope:
+    type: array
+    description: What is explicitly included
+    items_type: string
+    min_items: 1
+    example:
+      - "Create product-brief.schema.yaml"
+      - "Create feature-spec.schema.yaml"
+      - "Ensure field definitions match spec"
+    required: true
+
+  must_read:
+    type: array
+    description: Files that must be read before execution
+    items_type: string
+    example:
+      - "docs/infra/amazing-async-dev-feature-001-core-object-system.md"
+      - "docs/terminology.md"
+    required: true
+
+  constraints:
+    type: array
+    description: Hard constraints that must not be violated
+    items_type: string
+    example:
+      - "No scope expansion without approval"
+      - "Use YAML format for schemas"
+      - "Include JSON Schema equivalent"
+    required: true
+
+  deliverables:
+    type: array
+    description: Expected outputs
+    items_type: object
+    example:
+      - item: "product-brief.schema.yaml"
+        path: "schemas/product-brief.schema.yaml"
+        type: file
+    required: true
+
+  verification_steps:
+    type: array
+    description: Steps to verify deliverables
+    items_type: string
+    example:
+      - "Check all required fields are defined"
+      - "Verify JSON Schema is valid"
+      - "Confirm naming matches terminology"
+    required: true
+
+  stop_conditions:
+    type: array
+    description: Conditions that require stopping
+    items_type: string
+    example:
+      - "All deliverables completed"
+      - "Blocker encountered"
+      - "Decision needed for scope expansion"
+      - "Error that cannot be resolved autonomously"
+    required: true
+
+  allowed_tools:
+    type: array
+    description: Tools AI is permitted to use
+    items_type: string
+    example:
+      - "Read"
+      - "Write"
+      - "Grep"
+      - "Bash"
+    required: false
+
+  notes:
+    type: string
+    description: Additional guidance
+    example: "Focus on schema structure first, JSON Schema generation second"
+    required: false
+
+  priority:
+    type: enum
+    description: Priority level
+    values:
+      - high
+      - medium
+      - low
+    example: "high"
+    required: false
+
+  time_limit:
+    type: duration
+    description: Maximum execution time
+    example: "4h"
+    required: false
+
+lifecycle:
+  created_by: plan-day workflow
+  update_frequency: never
+  consumed_by: run-day workflow
+
+execution_rules:
+  must:
+    - "Stay inside task_scope"
+    - "Read all must_read files first"
+    - "Honor all constraints"
+    - "Complete all deliverables"
+    - "Run all verification_steps"
+    - "Stop at any stop_condition"
+    - "Update RunState after each action"
+    - "Leave evidence"
+  must_not:
+    - "Expand scope without approval"
+    - "Make architectural decisions alone"
+    - "Skip verification"
+    - "Proceed when blocked"
+    - "Continue after stop condition"
+
+validation:
+  - execution_id must follow pattern
+  - goal must be at least 20 characters
+  - task_scope must have at least 1 item
+  - deliverables must have at least 1 item
+  - stop_conditions must include completion
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - execution_id
+    - feature_id
+    - task_id
+    - goal
+    - task_scope
+    - must_read
+    - constraints
+    - deliverables
+    - verification_steps
+    - stop_conditions
+  properties:
+    execution_id:
+      type: string
+      pattern: "^exec-[0-9]{8}-[0-9]{3}$"
+    feature_id:
+      type: string
+    task_id:
+      type: string
+    goal:
+      type: string
+      minLength: 20
+    task_scope:
+      type: array
+      items:
+        type: string
+      minItems: 1
+    must_read:
+      type: array
+      items:
+        type: string
+    constraints:
+      type: array
+      items:
+        type: string
+    deliverables:
+      type: array
+      items:
+        type: object
+        required:
+          - item
+          - path
+          - type
+        properties:
+          item:
+            type: string
+          path:
+            type: string
+          type:
+            enum:
+              - file
+              - artifact
+              - log
+      minItems: 1
+    verification_steps:
+      type: array
+      items:
+        type: string
+    stop_conditions:
+      type: array
+      items:
+        type: string
+    allowed_tools:
+      type: array
+      items:
+        type: string
+    notes:
+      type: string
+    priority:
+      enum:
+        - high
+        - medium
+        - low
+    time_limit:
+      type: string

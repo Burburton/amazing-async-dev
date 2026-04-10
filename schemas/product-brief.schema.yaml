@@ -1,0 +1,147 @@
+schema_type: product-brief
+version: "1.0"
+description: Minimum structured representation of a product idea
+
+required:
+  - product_id
+  - name
+  - problem
+  - target_user
+  - core_value
+  - constraints
+  - success_signal
+
+optional:
+  - non_goals
+  - initial_feature_candidates
+  - notes
+
+fields:
+  product_id:
+    type: string
+    description: Unique identifier for the product
+    pattern: "^[a-z0-9-]+$"
+    example: "demo-product-001"
+    required: true
+
+  name:
+    type: string
+    description: Human-readable product name
+    example: "Async Task Manager"
+    required: true
+
+  problem:
+    type: string
+    description: The problem this product aims to solve
+    min_length: 20
+    example: "Solo builders lack uninterrupted maker time and cannot afford to babysit AI all day"
+    required: true
+
+  target_user:
+    type: string
+    description: Who this product is designed for
+    example: "Solo builders, part-time makers with many ideas but little uninterrupted time"
+    required: true
+
+  core_value:
+    type: string
+    description: The primary value proposition
+    example: "AI makes bounded progress during day, human reviews at night in 20-30 minutes"
+    required: true
+
+  constraints:
+    type: array
+    description: Constraints and non-goals that bound the product scope
+    items_type: string
+    example:
+      - "Single builder, not multi-team"
+      - "Day-sized tasks only"
+      - "No real-time supervision required"
+    required: true
+
+  success_signal:
+    type: string
+    description: What indicates the product is successful
+    example: "Human reviews in ≤30 min, AI runs ≥4 hours autonomously, work resumes from state"
+    required: true
+
+  non_goals:
+    type: array
+    description: Explicitly what this product is NOT trying to do
+    items_type: string
+    example:
+      - "Multi-team coordination"
+      - "Complex agent societies"
+      - "Heavy orchestration engines"
+    required: false
+
+  initial_feature_candidates:
+    type: array
+    description: Initial features that could be implemented first
+    items_type: string
+    example:
+      - "Core Object System"
+      - "Day Loop CLI"
+      - "Single Feature Demo"
+    required: false
+
+  notes:
+    type: string
+    description: Free-form notes about the product vision
+    example: "First version focuses on single builder, single feature, single day loop"
+    required: false
+
+lifecycle:
+  created_by: human or planning workflow
+  update_frequency: infrequent
+  update_triggers:
+    - "Major scope change"
+    - "Success criteria refinement"
+    - "New constraint discovery"
+
+validation:
+  - product_id must be unique within repository
+  - problem must be at least 20 characters
+  - success_signal must be measurable
+  - constraints must not conflict with core_value
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - product_id
+    - name
+    - problem
+    - target_user
+    - core_value
+    - constraints
+    - success_signal
+  properties:
+    product_id:
+      type: string
+      pattern: "^[a-z0-9-]+$"
+    name:
+      type: string
+    problem:
+      type: string
+      minLength: 20
+    target_user:
+      type: string
+    core_value:
+      type: string
+    constraints:
+      type: array
+      items:
+        type: string
+    success_signal:
+      type: string
+    non_goals:
+      type: array
+      items:
+        type: string
+    initial_feature_candidates:
+      type: array
+      items:
+        type: string
+    notes:
+      type: string

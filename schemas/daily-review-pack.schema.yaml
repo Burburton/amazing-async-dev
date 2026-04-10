@@ -1,0 +1,303 @@
+schema_type: daily-review-pack
+version: "1.0"
+description: Nightly summary for fast human review
+
+required:
+  - date
+  - project_id
+  - feature_id
+  - today_goal
+  - what_was_completed
+  - evidence
+  - problems_found
+  - blocked_items
+  - decisions_needed
+  - recommended_options
+  - tomorrow_plan
+
+optional:
+  - risk_summary
+  - confidence_notes
+  - open_followups
+  - metrics_summary
+
+fields:
+  date:
+    type: date
+    description: Date of this review
+    example: "2024-01-15"
+    required: true
+
+  project_id:
+    type: string
+    description: Project being reviewed
+    example: "demo-product-001"
+    required: true
+
+  feature_id:
+    type: string
+    description: Feature being reviewed
+    example: "001-core-object-system"
+    required: true
+
+  today_goal:
+    type: string
+    description: What was planned today
+    example: "Create schema files for ProductBrief and FeatureSpec"
+    required: true
+
+  what_was_completed:
+    type: array
+    description: Items completed today
+    items_type: string
+    example:
+      - "Created product-brief.schema.yaml"
+      - "Created feature-spec.schema.yaml"
+    required: true
+
+  evidence:
+    type: array
+    description: Evidence linking to artifacts
+    items_type: object
+    example:
+      - item: "product-brief.schema.yaml"
+        path: "schemas/product-brief.schema.yaml"
+        verified: true
+    required: true
+
+  problems_found:
+    type: array
+    description: Issues encountered
+    items_type: string
+    example: []
+    required: true
+
+  blocked_items:
+    type: array
+    description: Items still blocked
+    items_type: object
+    example: []
+    required: true
+
+  decisions_needed:
+    type: array
+    description: Decisions requiring human judgment
+    max_items: 3
+    items_type: object
+    example:
+      - decision: "schema-format"
+        options:
+          - "YAML"
+          - "JSON"
+        recommendation: "YAML"
+        impact: "all schema files"
+        urgency: high
+    required: true
+
+  recommended_options:
+    type: array
+    description: AI recommendations with reasoning
+    items_type: object
+    example:
+      - decision: "schema-format"
+        recommended: "YAML"
+        reason: "human-readable, easier editing"
+    required: true
+
+  tomorrow_plan:
+    type: string
+    description: Proposed plan for next day
+    example: "Continue with RunState and ExecutionPack schemas"
+    required: true
+
+  risk_summary:
+    type: string
+    description: Summary of risks
+    example: "No significant risks"
+    required: false
+
+  confidence_notes:
+    type: string
+    description: AI confidence in quality
+    example: "High confidence. All schemas match spec."
+    required: false
+
+  open_followups:
+    type: array
+    description: Items to follow up later
+    items_type: string
+    example:
+      - "Consider validation tests"
+      - "Add update documentation"
+    required: false
+
+  metrics_summary:
+    type: object
+    description: Summary metrics
+    example:
+      execution_time: "2h"
+      files_created: 2
+      decisions_made: 0
+    required: false
+
+lifecycle:
+  created_by: review-night workflow
+  update_frequency: never
+  consumed_by: human reviewer
+
+compression_rules:
+  - "Limit decisions_needed to 3 items"
+  - "Aggregate minor items"
+  - "Focus on impact not details"
+  - "Link to evidence not repeat"
+  - "Target 20-30 min review time"
+
+review_time_targets:
+  completion_scan: "5 min"
+  problems_review: "5 min"
+  decisions: "10-15 min"
+  tomorrow_confirm: "2-3 min"
+  total: "20-30 min"
+
+human_actions:
+  approve: "Accept AI recommendation"
+  revise: "Choose different option"
+  defer: "Postpone, work on alternative"
+  redefine: "Change question or scope"
+
+validation:
+  - date must be today
+  - today_goal must match morning ExecutionPack
+  - decisions_needed must have 3 or fewer
+  - each decision must have options and recommendation
+  - evidence paths should exist
+  - tomorrow_plan must be specific
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - date
+    - project_id
+    - feature_id
+    - today_goal
+    - what_was_completed
+    - evidence
+    - problems_found
+    - blocked_items
+    - decisions_needed
+    - recommended_options
+    - tomorrow_plan
+  properties:
+    date:
+      type: string
+      format: date
+    project_id:
+      type: string
+    feature_id:
+      type: string
+    today_goal:
+      type: string
+    what_was_completed:
+      type: array
+      items:
+        type: string
+    evidence:
+      type: array
+      items:
+        type: object
+        required:
+          - item
+          - path
+          - verified
+        properties:
+          item:
+            type: string
+          path:
+            type: string
+          verified:
+            type: boolean
+          verification_note:
+            type: string
+    problems_found:
+      type: array
+      items:
+        type: string
+    blocked_items:
+      type: array
+      items:
+        type: object
+        required:
+          - item
+          - reason
+          - status
+        properties:
+          item:
+            type: string
+          reason:
+            type: string
+          status:
+            enum:
+              - waiting
+              - escalated
+              - deferred
+    decisions_needed:
+      type: array
+      maxItems: 3
+      items:
+        type: object
+        required:
+          - decision
+          - options
+          - recommendation
+          - impact
+        properties:
+          decision:
+            type: string
+          options:
+            type: array
+            items:
+              type: string
+          recommendation:
+            type: string
+          impact:
+            type: string
+          urgency:
+            enum:
+              - high
+              - medium
+              - low
+    recommended_options:
+      type: array
+      items:
+        type: object
+        required:
+          - decision
+          - recommended
+          - reason
+        properties:
+          decision:
+            type: string
+          recommended:
+            type: string
+          reason:
+            type: string
+    tomorrow_plan:
+      type: string
+    risk_summary:
+      type: string
+    confidence_notes:
+      type: string
+    open_followups:
+      type: array
+      items:
+        type: string
+    metrics_summary:
+      type: object
+      properties:
+        execution_time:
+          type: string
+        files_created:
+          type: integer
+        decisions_made:
+          type: integer
