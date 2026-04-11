@@ -6,7 +6,7 @@ from rich.console import Console
 from cli.commands import plan_day, run_day, review_night, resume_next_day
 from cli.commands import init, new_product, new_feature
 from cli.commands import complete_feature, archive_feature
-from cli.commands import sqlite_status
+from cli.commands import sqlite_status, inspect_stop
 
 app = typer.Typer(
     name="asyncdev",
@@ -33,6 +33,9 @@ app.add_typer(archive_feature.app, name="archive-feature", help="Archive complet
 
 # Register SQLite commands
 app.add_typer(sqlite_status.app, name="sqlite", help="SQLite state store queries")
+
+# Register recovery commands
+app.add_typer(inspect_stop.app, name="inspect-stop", help="Inspect stop point and recovery options")
 
 
 @app.command()
