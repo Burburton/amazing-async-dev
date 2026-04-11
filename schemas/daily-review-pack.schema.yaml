@@ -21,6 +21,7 @@ optional:
   - open_followups
   - metrics_summary
   - historical_context
+  - workflow_feedback
 
 fields:
   date:
@@ -223,6 +224,59 @@ fields:
         description: Lessons from archives that influenced today's work
         items_type: string
         example: ["Keep CLI commands simple from Feature 012"]
+
+  workflow_feedback:
+    type: object
+    description: Workflow/system issues discovered during execution (Feature 019a + 019b)
+    required: false
+    properties:
+      encountered_today:
+        type: integer
+        description: Number of workflow feedback items encountered today
+        example: 2
+      items:
+        type: array
+        description: List of workflow feedback summaries with triage
+        items_type: object
+        example:
+          - feedback_id: "wf-20260411-001"
+            problem_domain: "async_dev"
+            issue_type: "cli_behavior"
+            confidence: "high"
+            escalation_recommendation: "candidate_issue"
+            self_corrected: true
+            requires_followup: true
+            summary: "CLI status showed wrong phase"
+            triaged: true
+            status: "open"
+      followup_needed_count:
+        type: integer
+        description: Number of items still requiring follow-up
+        example: 1
+      self_corrected_count:
+        type: integer
+        description: Number of items that were self-corrected
+        example: 1
+      async_dev_count:
+        type: integer
+        description: Number of items classified as async-dev domain
+        example: 2
+      product_count:
+        type: integer
+        description: Number of items classified as product domain
+        example: 0
+      uncertain_count:
+        type: integer
+        description: Number of items with uncertain domain
+        example: 0
+      candidate_issue_count:
+        type: integer
+        description: Number of items marked as candidate for formal issue
+        example: 1
+      review_needed_count:
+        type: integer
+        description: Number of items needing review
+        example: 1
 
 lifecycle:
   created_by: review-night workflow
@@ -504,3 +558,33 @@ json_schema:
           type: array
           items:
             type: string
+    workflow_feedback:
+      type: object
+      properties:
+        encountered_today:
+          type: integer
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              feedback_id:
+                type: string
+              issue_type:
+                type: string
+              scope:
+                type: string
+              self_corrected:
+                type: boolean
+              requires_followup:
+                type: boolean
+              summary:
+                type: string
+              resolution:
+                type: string
+              status:
+                type: string
+        followup_needed_count:
+          type: integer
+        self_corrected_count:
+          type: integer

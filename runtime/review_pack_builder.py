@@ -2,16 +2,18 @@
 
 Feature 015: Enhanced with structured issues_summary, decision inbox, and next_day_recommendation.
 Feature 016: Integrated decision template matching for consistent decision structure.
+Feature 019a: Integrated workflow_feedback section for workflow/system issues.
 """
 
 from datetime import datetime
 from typing import Any
 
 from runtime.decision_templates import enhance_decision_with_template
+from runtime.workflow_feedback_store import create_workflow_feedback_for_review
 
 
 def build_daily_review_pack(
-    execution_result: dict[str, Any], runstate: dict[str, Any]
+    execution_result: dict[str, Any], runstate: dict[str, Any], workflow_feedbacks: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
     """Build DailyReviewPack from ExecutionResult and RunState."""
     today = datetime.now().strftime("%Y-%m-%d")
@@ -31,6 +33,9 @@ def build_daily_review_pack(
         "next_day_recommendation": _build_next_day_recommendation(execution_result, runstate),
         "tomorrow_plan": _build_tomorrow_plan(execution_result),
     }
+
+    if workflow_feedbacks:
+        review_pack["workflow_feedback"] = create_workflow_feedback_for_review(workflow_feedbacks)
 
     optional_fields = {
         "risk_summary": _build_risk_summary(execution_result),
