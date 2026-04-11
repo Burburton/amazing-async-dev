@@ -1,0 +1,545 @@
+schema_type: workflow-feedback
+version: "2.0"
+description: Lightweight record for workflow/system issues with triage support (Feature 019a + 019b)
+
+required:
+  - feedback_id
+  - problem_domain
+  - issue_type
+  - detected_by
+  - detected_in
+  - description
+  - self_corrected
+  - requires_followup
+  - detected_at
+
+optional:
+  - product_id
+  - feature_id
+  - execution_id
+  - impact
+  - artifact_reference
+  - confidence
+  - escalation_recommendation
+  - triaged_at
+  - triage_note
+  - resolution
+  - resolution_note
+  - status
+  - priority
+
+fields:
+  feedback_id:
+    type: string
+    description: Unique identifier for this feedback record
+    pattern: "^wf-[0-9]{8}-[0-9]{3}$"
+    example: "wf-20260411-001"
+    required: true
+
+  problem_domain:
+    type: enum
+    description: Problem domain classification - who owns this issue
+    values:
+      - async_dev
+      - product
+      - uncertain
+    example: "async_dev"
+    required: true
+    notes: |
+      - async_dev: amazing-async-dev system issues (CLI/runtime/persistence bugs)
+      - product: Product-specific issues exposed during execution
+      - uncertain: Not clearly classifiable yet
+    default_inference:
+      cli_behavior: async_dev
+      persistence: async_dev
+      runtime: async_dev
+      recovery_logic: async_dev
+      planning: async_dev
+      execution_pack: async_dev
+      state_mismatch: async_dev
+      summary_review: async_dev
+      archive_history: async_dev
+      repo_integration: uncertain
+      sequencing: uncertain
+      other: uncertain
+
+  issue_type:
+    type: enum
+    description: Category of the workflow issue
+    values:
+      - sequencing
+      - planning
+      - execution_pack
+      - state_mismatch
+      - summary_review
+      - archive_history
+      - repo_integration
+      - recovery_logic
+      - cli_behavior
+      - persistence
+      - runtime
+      - other
+    example: "execution_pack"
+    required: true
+
+  detected_by:
+    type: enum
+    description: Who/what detected this issue
+    values:
+      - operator
+      - ai_executor
+      - review_process
+      - automated_check
+      - post_analysis
+    example: "operator"
+    required: true
+
+  detected_in:
+    type: string
+    description: Context where issue was detected (workflow phase, command, file)
+    example: "plan-day create command"
+    required: true
+
+  product_id:
+    type: string
+    description: Product ID (required when problem_domain=product or uncertain)
+    example: "skill-pack-advisor"
+    required: false
+    conditional: "required when problem_domain=product or uncertain"
+
+  feature_id:
+    type: string
+    description: Feature ID (optional, for product-related issues)
+    pattern: "^\\d{3}-[a-z0-9-]+$"
+    example: "001-intake-schema"
+    required: false
+
+  execution_id:
+    type: string
+    description: Execution ID if issue occurred during specific execution
+    pattern: "^exec-[0-9]{8}-[0-9]{3}$"
+    example: "exec-20260411-001"
+    required: false
+
+  description:
+    type: string
+    description: Clear description of the workflow issue
+    example: "ExecutionPack referenced wrong feature sequence, pointing to feature 002 instead of 003"
+    required: true
+
+  impact:
+    type: string
+    description: Impact of the issue on workflow
+    example: "Manual correction required, execution proceeded with correct feature"
+    required: false
+
+  self_corrected:
+    type: boolean
+    description: Whether the issue was self-corrected during execution
+    example: true
+    required: true
+    notes: |
+      Critical field - captures issues that were worked around.
+      A self-corrected defect is still useful to track.
+
+  requires_followup:
+    type: boolean
+    description: Whether this issue needs future attention/hardening
+    example: true
+    required: true
+
+  confidence:
+    type: enum
+    description: Confidence level of the problem_domain classification
+    values:
+      - low
+      - medium
+      - high
+    example: "high"
+    required: false
+    default: "medium"
+    notes: |
+      - low: Classification uncertain, needs review
+      - medium: Reasonably confident classification
+      - high: Very confident classification
+
+  escalation_recommendation:
+    type: enum
+    description: Recommended handling level for this feedback
+    values:
+      - ignore
+      - track_only
+      - review_needed
+      - candidate_issue
+    example: "review_needed"
+    required: false
+    default: "track_only"
+    notes: |
+      - ignore: Low-value, not worth action
+      - track_only: Keep recorded, no active action needed
+      - review_needed: Should be checked by operator
+      - candidate_issue: Worth turning into formal async-dev issue
+
+  triaged_at:
+    type: datetime
+    description: When triage was performed
+    example: "2026-04-11T15:00:00"
+    required: false
+    notes: "Set when triage fields are first added/updated"
+
+  triage_note:
+    type: string
+    description: Notes explaining triage decision
+    example: "This appears to be CLI behavior issue, clearly async-dev domain"
+    required: false
+
+  artifact_reference:
+    type: object
+    description: Reference to relevant artifact(s)
+    example:
+      artifact_type: "execution-pack"
+      artifact_path: "projects/skill-pack-advisor/execution-packs/exec-20260411-001.md"
+      artifact_id: "exec-20260411-001"
+    required: false
+    properties:
+      artifact_type:
+        type: string
+        enum: ["execution-pack", "execution-result", "runstate", "daily-review-pack", "feature-spec", "archive-pack", "other"]
+      artifact_path:
+        type: string
+      artifact_id:
+        type: string
+
+  resolution:
+    type: enum
+    description: Resolution status
+    values:
+      - none
+      - workaround
+      - fixed
+      - deferred
+      - escalated
+    example: "workaround"
+    required: false
+    default: "none"
+
+  resolution_note:
+    type: string
+    description: Notes on how issue was handled
+    example: "Manually edited ExecutionPack to correct sequence"
+    required: false
+
+  status:
+    type: enum
+    description: Current tracking status
+    values:
+      - open
+      - investigating
+      - resolved
+      - closed
+      - archived
+    example: "open"
+    required: false
+    default: "open"
+
+  priority:
+    type: enum
+    description: Priority for follow-up
+    values:
+      - high
+      - medium
+      - low
+    example: "medium"
+    required: false
+
+  detected_at:
+    type: datetime
+    description: When this issue was detected
+    example: "2026-04-11T14:30:00"
+    required: true
+
+triage_model:
+  description: |
+    Triage adds classification layer to workflow feedback.
+    Purpose: distinguish async-dev issues from product issues, assess confidence,
+    and recommend follow-up handling.
+
+  problem_domain_meaning:
+    async_dev: "Issue in amazing-async-dev system itself (CLI, runtime, persistence, etc)"
+    product: "Issue in the product being built (may have been exposed by async-dev workflow)"
+    uncertain: "Cannot clearly classify yet - needs operator review"
+
+  confidence_meaning:
+    low: "Classification uncertain - do not rely on it for decisions"
+    medium: "Reasonably confident - can use for prioritization"
+    high: "Very confident - safe to act on"
+
+  escalation_meaning:
+    ignore: "Not worth tracking - low value or noise"
+    track_only: "Keep in system, no active follow-up needed"
+    review_needed: "Operator should review in nightly review"
+    candidate_issue: "Consider creating formal async-dev issue for hardening"
+
+  boundaries:
+    - "escalation_recommendation=candidate_issue does NOT create the issue automatically"
+    - "triage is classification, not issue lifecycle management"
+    - "uncertain domain is allowed and valid"
+
+issue_type_to_domain_inference:
+  description: Default problem_domain inference based on issue_type
+  mapping:
+    cli_behavior: async_dev
+    persistence: async_dev
+    runtime: async_dev
+    recovery_logic: async_dev
+    planning: async_dev
+    execution_pack: async_dev
+    state_mismatch: async_dev
+    summary_review: async_dev
+    archive_history: async_dev
+    repo_integration: uncertain
+    sequencing: uncertain
+    other: uncertain
+  notes: "These are defaults. Operator can override during triage."
+
+issue_type_taxonomy:
+  sequencing:
+    description: "Feature/task sequencing inconsistencies"
+    examples:
+      - "ExecutionPack pointed to wrong feature sequence"
+      - "Task queue order mismatch with actual dependencies"
+
+  planning:
+    description: "Plan-day workflow issues"
+    examples:
+      - "plan-day generated invalid ExecutionPack"
+      - "Missing feature context in planning"
+
+  execution_pack:
+    description: "ExecutionPack content or structure issues"
+    examples:
+      - "ExecutionPack had incorrect scope boundaries"
+      - "Missing stop_conditions in pack"
+
+  state_mismatch:
+    description: "RunState or state tracking inconsistencies"
+    examples:
+      - "RunState phase mismatch with actual execution state"
+      - "SQLite state diverged from file state"
+
+  summary_review:
+    description: "DailyReviewPack or nightly summary issues"
+    examples:
+      - "Nightly summary missed important state"
+      - "Decision inbox missing key options"
+
+  archive_history:
+    description: "Archive or historical query issues"
+    examples:
+      - "Archive query returned incomplete results"
+      - "Backfill created inconsistent archive pack"
+
+  repo_integration:
+    description: "Repository or git integration issues"
+    examples:
+      - "External repo path resolution failed"
+      - "Git adapter returned unexpected state"
+
+  recovery_logic:
+    description: "Recovery or resume workflow issues"
+    examples:
+      - "inspect-stop gave wrong classification"
+      - "Recovery guidance incorrect for stop type"
+
+  cli_behavior:
+    description: "CLI command behavior issues"
+    examples:
+      - "asyncdev status showed wrong phase"
+      - "Command output inconsistent with state"
+
+  persistence:
+    description: "File or SQLite persistence issues"
+    examples:
+      - "YAML block extraction failed"
+      - "SQLite write failed silently"
+
+  runtime:
+    description: "Runtime engine issues"
+    examples:
+      - "Live API engine classification wrong"
+      - "Mock engine produced invalid result"
+
+  other:
+    description: "Uncategorized issues"
+    examples:
+      - "Any issue not fitting above categories"
+
+lifecycle:
+  created_by: operator via CLI (asyncdev feedback record)
+  update_frequency: when triage or resolution changes
+  consumed_by:
+    - nightly review workflow
+    - summary commands
+    - hardening/planning workflows
+
+storage:
+  async_dev:
+    location: ".runtime/workflow-feedback/{feedback_id}.yaml"
+    format: YAML
+    notes: "async_dev domain feedback stored in global runtime directory"
+  product:
+    location: "projects/{product_id}/workflow-feedback/{feedback_id}.yaml"
+    format: YAML
+    notes: "product or uncertain domain feedback stored in project directory"
+  sqlite:
+    table: "workflow_feedback"
+    fields:
+      - feedback_id (primary key)
+      - problem_domain
+      - issue_type
+      - product_id
+      - feature_id
+      - confidence
+      - escalation_recommendation
+      - detected_at
+      - triaged_at
+      - self_corrected
+      - requires_followup
+      - status
+
+integration_points:
+  execution_result:
+    linkage: "Optional execution_id reference"
+    purpose: "Link feedback to specific execution context"
+  daily_review_pack:
+    linkage: "workflow_feedback section with triage info"
+    purpose: "Surface feedback in nightly review with domain/escalation"
+  management_summary:
+    linkage: "summary decisions/issues commands"
+    purpose: "Aggregate feedback for management view"
+
+validation:
+  - feedback_id must match pattern wf-YYYYMMDD-###
+  - problem_domain must be valid enum (async_dev, product, or uncertain)
+  - if problem_domain=product or uncertain, product_id must be provided
+  - issue_type must be valid enum
+  - confidence must be valid enum if provided
+  - escalation_recommendation must be valid enum if provided
+  - self_corrected and requires_followup must be boolean
+  - detected_at must be valid datetime
+  - triaged_at must be valid datetime if provided
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - feedback_id
+    - problem_domain
+    - issue_type
+    - detected_by
+    - detected_in
+    - description
+    - self_corrected
+    - requires_followup
+    - detected_at
+  properties:
+    feedback_id:
+      type: string
+      pattern: "^wf-[0-9]{8}-[0-9]{3}$"
+    problem_domain:
+      type: string
+      enum: ["async_dev", "product", "uncertain"]
+    issue_type:
+      type: string
+      enum:
+        - sequencing
+        - planning
+        - execution_pack
+        - state_mismatch
+        - summary_review
+        - archive_history
+        - repo_integration
+        - recovery_logic
+        - cli_behavior
+        - persistence
+        - runtime
+        - other
+    detected_by:
+      type: string
+      enum:
+        - operator
+        - ai_executor
+        - review_process
+        - automated_check
+        - post_analysis
+    detected_in:
+      type: string
+    product_id:
+      type: string
+    feature_id:
+      type: string
+    execution_id:
+      type: string
+    description:
+      type: string
+    impact:
+      type: string
+    self_corrected:
+      type: boolean
+    requires_followup:
+      type: boolean
+    confidence:
+      type: string
+      enum: ["low", "medium", "high"]
+    escalation_recommendation:
+      type: string
+      enum: ["ignore", "track_only", "review_needed", "candidate_issue"]
+    triaged_at:
+      type: string
+      format: date-time
+    triage_note:
+      type: string
+    artifact_reference:
+      type: object
+      properties:
+        artifact_type:
+          type: string
+          enum:
+            - execution-pack
+            - execution-result
+            - runstate
+            - daily-review-pack
+            - feature-spec
+            - archive-pack
+            - other
+        artifact_path:
+          type: string
+        artifact_id:
+          type: string
+    resolution:
+      type: string
+      enum:
+        - none
+        - workaround
+        - fixed
+        - deferred
+        - escalated
+    resolution_note:
+      type: string
+    status:
+      type: string
+      enum:
+        - open
+        - investigating
+        - resolved
+        - closed
+        - archived
+    priority:
+      type: string
+      enum:
+        - high
+        - medium
+        - low
+    detected_at:
+      type: string
+      format: date-time
