@@ -1,5 +1,7 @@
 """resume-next-day command - Continue from human decisions."""
 
+from pathlib import Path
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -8,16 +10,19 @@ from runtime.state_store import StateStore, generate_execution_id
 
 app = typer.Typer(help="Resume from human decisions, start next day loop")
 console = Console()
-store = StateStore()
 
 
 @app.command()
 def continue_loop(
+    project: str = typer.Option("demo-product-001", help="Project ID"),
     decision: str = typer.Option("approve", help="Human decision: approve/revise/defer/redefine"),
     revise_choice: str = typer.Option(None, help="Choice if decision=revise"),
     dry_run: bool = typer.Option(False, help="Preview without saving"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Process human decision and continue day loop."""
+    project_path = path / project
+    store = StateStore(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:
@@ -76,8 +81,13 @@ def continue_loop(
 
 
 @app.command()
-def status():
+def status(
+    project: str = typer.Option("demo-product-001", help="Project ID"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
     """Show current RunState status for resume."""
+    project_path = path / project
+    store = StateStore(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:
@@ -107,9 +117,11 @@ if __name__ == "__main__":
 
 @app.command()
 def unblock(
+    project: str = typer.Option("demo-product-001", help="Project ID"),
     reason: str = typer.Option(None, help="Resolution note for blocker"),
     retry: bool = typer.Option(False, help="Retry the same task"),
     alternative: str = typer.Option(None, help="Alternative task to try"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Resume from blocked state to executing.
 
@@ -118,6 +130,8 @@ def unblock(
         asyncdev resume-next-day unblock --retry
         asyncdev resume-next-day unblock --alternative "task-002-backup"
     """
+    project_path = path / project
+    store = StateStore(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:
@@ -167,9 +181,11 @@ def unblock(
 
 @app.command()
 def handle_failed(
+    project: str = typer.Option("demo-product-001", help="Project ID"),
     report: bool = typer.Option(False, help="Generate failure report"),
     escalate: bool = typer.Option(False, help="Escalate as decision needed"),
     abandon: bool = typer.Option(False, help="Abandon task and move to next"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Handle failed execution state.
 
@@ -180,6 +196,8 @@ def handle_failed(
         asyncdev resume-next-day handle-failed --escalate
         asyncdev resume-next-day handle-failed --abandon
     """
+    project_path = path / project
+    store = StateStore(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:

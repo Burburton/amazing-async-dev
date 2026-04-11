@@ -1,14 +1,15 @@
 """plan-day command - Generate ExecutionPack for today's bounded task."""
 
+from pathlib import Path
+
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from runtime.state_store import StateStore
+from runtime.state_store import StateStore, generate_execution_id
 
 app = typer.Typer(help="Plan today's bounded execution task")
 console = Console()
-store = StateStore()
 
 
 @app.command()
@@ -17,8 +18,11 @@ def create(
     feature: str = typer.Option("001-core-object-system", help="Feature ID"),
     task: str = typer.Option(None, help="Specific task description"),
     dry_run: bool = typer.Option(False, help="Preview without saving"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Create ExecutionPack for today's bounded task."""
+    project_path = path / project
+    store = StateStore(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:
@@ -47,9 +51,7 @@ def create(
             raise typer.Exit(1)
         runstate["active_task"] = runstate["task_queue"][0]
 
-    from runtime.state_store import generate_execution_id
-
-    execution_id = generate_execution_id()
+    execution_id = generate_execution_id(project_path)
     execution_pack = {
         "execution_id": execution_id,
         "feature_id": runstate["feature_id"],
@@ -93,8 +95,13 @@ def create(
 
 
 @app.command()
-def show():
+def show(
+    project: str = typer.Option("demo-product-001", help="Project ID"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
     """Show current RunState and pending tasks."""
+    project_path = path / project
+    store = StateStore(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:

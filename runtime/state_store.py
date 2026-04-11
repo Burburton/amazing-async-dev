@@ -156,13 +156,13 @@ class StateStore:
         return None
 
 
-def generate_execution_id() -> str:
+def generate_execution_id(project_path: Path | None = None) -> str:
     """Generate unique execution_id following pattern exec-YYYYMMDD-###."""
     date_str = datetime.now().strftime("%Y%m%d")
     counter = 1
 
-    project_path = Path("projects/demo-product")
-    execution_packs_path = project_path / "execution-packs"
+    base_path = project_path or Path("projects/demo-product")
+    execution_packs_path = base_path / "execution-packs"
 
     if execution_packs_path.exists():
         existing = list(execution_packs_path.glob(f"exec-{date_str}-*.md"))

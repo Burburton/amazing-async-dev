@@ -1,5 +1,7 @@
 """review-night command - Generate nightly review pack."""
 
+from pathlib import Path
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -10,15 +12,18 @@ from runtime.review_pack_builder import build_daily_review_pack
 
 app = typer.Typer(help="Generate nightly review pack for human review")
 console = Console()
-store = StateStore()
 
 
 @app.command()
 def generate(
+    project: str = typer.Option("demo-product-001", help="Project ID"),
     execution_id: str = typer.Option(None, help="Execution ID to review"),
     dry_run: bool = typer.Option(False, help="Preview without saving"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Generate DailyReviewPack from ExecutionResult and RunState."""
+    project_path = path / project
+    store = StateStore(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:
@@ -82,8 +87,13 @@ def generate(
 
 
 @app.command()
-def show():
+def show(
+    project: str = typer.Option("demo-product-001", help="Project ID"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
     """Show latest DailyReviewPack."""
+    project_path = path / project
+    store = StateStore(project_path)
     reviews = list(store.reviews_path.glob("*-review.md"))
 
     if not reviews:
