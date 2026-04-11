@@ -50,11 +50,13 @@ def create(
 
 
 @app.command()
-def status():
+def status(
+    path: str = typer.Option("projects", help="Root directory for projects"),
+):
     """Show current project structure status."""
     from pathlib import Path
 
-    root = Path("projects")
+    root = Path(path)
 
     console.print(Panel("Project Structure Status", border_style="blue"))
 
@@ -63,7 +65,6 @@ def status():
         console.print("Run 'asyncdev init create' to initialize")
         return
 
-    # List existing projects
     projects = [p for p in root.iterdir() if p.is_dir()]
     console.print(f"[bold]Root:[/bold] {root}")
     console.print(f"[bold]Projects:[/bold] {len(projects)}")
