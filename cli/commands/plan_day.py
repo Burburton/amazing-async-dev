@@ -7,6 +7,8 @@ from rich.console import Console
 from rich.table import Table
 
 from runtime.state_store import StateStore, generate_execution_id
+from runtime.execution_event_types import ExecutionEventType
+from runtime.execution_logger import get_logger
 
 app = typer.Typer(help="Plan today's bounded execution task")
 console = Console()
@@ -23,6 +25,7 @@ def create(
     """Create ExecutionPack for today's bounded task."""
     project_path = path / project
     store = StateStore(project_path)
+    logger = get_logger(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:
@@ -41,6 +44,17 @@ def create(
             "next_recommended_action": "Create first ExecutionPack",
             "updated_at": "",
         }
+
+    feature_id = runstate.get("feature_id", feature)
+    product_id = runstate.get("project_id", project)
+    previous_phase = runstate.get("current_phase", "planning")
+
+    logger.log_event(
+        ExecutionEventType.PLAN_DAY_STARTED,
+        feature_id=feature_id,
+        product_id=product_id,
+        event_data={"project": project, "feature": feature, "task": task},
+    )
 
     if task:
         runstate["active_task"] = task
@@ -78,11 +92,27 @@ def create(
 
     if dry_run:
         console.print("[yellow]Dry run - not saving[/yellow]")
+        logger.close()
         return
 
     runstate["current_phase"] = "executing"
     store.save_runstate(runstate)
     store.save_execution_pack(execution_pack)
+
+    logger.log_event(
+        ExecutionEventType.PLAN_DAY_COMPLETED,
+        feature_id=feature_id,
+        product_id=product_id,
+        event_data={"execution_id": execution_id, "task": runstate["active_task"]},
+    )
+    logger.log_transition(
+        from_phase=previous_phase,
+        to_phase="executing",
+        feature_id=feature_id,
+        product_id=product_id,
+        reason="Plan-day completed",
+    )
+    logger.close()
 
     console.print(f"[green]ExecutionPack created: {execution_id}[/green]")
     console.print("[bold]Next step:[/bold] Run 'asyncdev run-day' to execute (manual or mock)")

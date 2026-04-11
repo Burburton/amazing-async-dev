@@ -5,8 +5,18 @@ from pathlib import Path
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from runtime.state_store import StateStore, generate_execution_id
+from runtime.execution_event_types import ExecutionEventType
+from runtime.execution_logger import get_logger
+from runtime.recovery_classifier import (
+    classify_recovery,
+    check_resume_eligibility,
+    get_recovery_guidance,
+    RecoveryClassification,
+    ResumeEligibility,
+)
 
 app = typer.Typer(help="Resume from human decisions, start next day loop")
 console = Console()
@@ -19,15 +29,59 @@ def continue_loop(
     revise_choice: str = typer.Option(None, help="Choice if decision=revise"),
     dry_run: bool = typer.Option(False, help="Preview without saving"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
+    force: bool = typer.Option(False, help="Force resume even if eligibility check fails"),
 ):
     """Process human decision and continue day loop."""
     project_path = path / project
     store = StateStore(project_path)
+    logger = get_logger(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:
         console.print("[red]No RunState found[/red]")
+        logger.close()
         raise typer.Exit(1)
+
+    feature_id = runstate.get("feature_id", "")
+    product_id = runstate.get("project_id", "")
+    previous_phase = runstate.get("current_phase", "planning")
+
+    logger.log_event(
+        ExecutionEventType.RESUME_NEXT_DAY_STARTED,
+        feature_id=feature_id,
+        product_id=product_id,
+        event_data={"decision": decision},
+    )
+
+    eligibility = check_resume_eligibility(runstate)
+    classification = classify_recovery(runstate)
+
+    if eligibility not in (ResumeEligibility.ELIGIBLE, ResumeEligibility.NEEDS_DECISION) and not force:
+        guidance = get_recovery_guidance(runstate)
+        console.print(Panel("Resume Blocked", title="Recovery Check", border_style="red"))
+        console.print(f"[yellow]Classification: {classification.value}[/yellow]")
+        console.print(f"[yellow]Eligibility: {eligibility.value}[/yellow]")
+        console.print(f"\n[bold]Recommended Action:[/bold] {guidance['recommended_action']}")
+        console.print(f"[bold]Explanation:[/bold] {guidance['explanation']}")
+        if guidance.get("warnings"):
+            for w in guidance["warnings"]:
+                console.print(f"[red]Warning: {w}[/red]")
+        console.print("\n[cyan]Use --force to override, or follow recommended action above[/cyan]")
+        logger.log_event(
+            ExecutionEventType.RESUME_BLOCKED,
+            feature_id=feature_id,
+            product_id=product_id,
+            event_data={"classification": classification.value, "eligibility": eligibility.value},
+        )
+        logger.close()
+        raise typer.Exit(1)
+
+    logger.log_event(
+        ExecutionEventType.RESUME_VALIDATED,
+        feature_id=feature_id,
+        product_id=product_id,
+        event_data={"classification": classification.value, "force": force},
+    )
 
     decisions_needed = runstate.get("decisions_needed", [])
 
@@ -39,20 +93,45 @@ def continue_loop(
         if decision == "approve":
             runstate["decisions_needed"] = []
             console.print("[green]All decisions approved[/green]")
+            logger.log_event(
+                ExecutionEventType.DECISION_APPROVED,
+                feature_id=feature_id,
+                product_id=product_id,
+                event_data={"decision_count": len(decisions_needed)},
+            )
 
         elif decision == "revise":
             if not revise_choice:
                 console.print("[red]Must specify --revise-choice for revise decision[/red]")
+                logger.close()
                 raise typer.Exit(1)
             console.print(f"[green]Decision revised to: {revise_choice}[/green]")
             runstate["decisions_needed"] = []
+            logger.log_event(
+                ExecutionEventType.DECISION_REVISED,
+                feature_id=feature_id,
+                product_id=product_id,
+                event_data={"choice": revise_choice},
+            )
 
         elif decision == "defer":
             console.print("[yellow]Decision deferred. Moving to alternative task.[/yellow]")
+            logger.log_event(
+                ExecutionEventType.DECISION_DEFERRED,
+                feature_id=feature_id,
+                product_id=product_id,
+                event_data={"deferred_count": len(decisions_needed)},
+            )
 
         elif decision == "redefine":
             console.print("[yellow]Decision redefined. Scope updated.[/yellow]")
             runstate["decisions_needed"] = []
+            logger.log_event(
+                ExecutionEventType.DECISION_ESCALATED,
+                feature_id=feature_id,
+                product_id=product_id,
+                event_data={"action": "redefine"},
+            )
 
     runstate["current_phase"] = "planning"
     runstate["last_action"] = f"Resumed with decision: {decision}"
@@ -72,9 +151,19 @@ def continue_loop(
 
     if dry_run:
         console.print("[yellow]Dry run - not saving[/yellow]")
+        logger.close()
         return
 
     store.save_runstate(runstate)
+
+    logger.log_transition(
+        from_phase=previous_phase,
+        to_phase="planning",
+        feature_id=feature_id,
+        product_id=product_id,
+        reason=f"Resumed with decision: {decision}",
+    )
+    logger.close()
 
     console.print("\n[green]RunState updated. Ready for next day.[/green]")
     console.print("Next: Run 'asyncdev plan-day' to create new ExecutionPack")
@@ -100,11 +189,28 @@ def status(
     console.print(f"Project: {runstate.get('project_id')}")
     console.print(f"Feature: {runstate.get('feature_id')}")
 
+    classification = classify_recovery(runstate)
+    eligibility = check_resume_eligibility(runstate)
+    guidance = get_recovery_guidance(runstate)
+
+    table = Table(title="Recovery Status")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", style="green")
+    table.add_row("Classification", classification.value)
+    table.add_row("Eligibility", eligibility.value)
+    table.add_row("Recommended", guidance["recommended_action"])
+    console.print(table)
+
     if runstate.get("decisions_needed"):
         console.print("\n[bold yellow]Pending Decisions:[/bold yellow]")
         for d in runstate["decisions_needed"]:
             console.print(f"  - {d.get('decision', 'unknown')}")
             console.print(f"    Options: {d.get('options', [])}")
+
+    if runstate.get("blocked_items"):
+        console.print("\n[bold red]Blocked Items:[/bold red]")
+        for b in runstate["blocked_items"]:
+            console.print(f"  - {b.get('reason', 'unknown')}")
 
     console.print(f"\n[bold]Completed Outputs:[/bold] {len(runstate.get('completed_outputs', []))}")
     console.print(f"[bold]Task Queue:[/bold] {len(runstate.get('task_queue', []))} pending")
@@ -123,30 +229,38 @@ def unblock(
     alternative: str = typer.Option(None, help="Alternative task to try"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
-    """Resume from blocked state to executing.
-
-    Usage:
-        asyncdev resume-next-day unblock --reason "Dependency resolved"
-        asyncdev resume-next-day unblock --retry
-        asyncdev resume-next-day unblock --alternative "task-002-backup"
-    """
+    """Resume from blocked state to executing."""
     project_path = path / project
     store = StateStore(project_path)
+    logger = get_logger(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:
         console.print("[red]No RunState found[/red]")
+        logger.close()
         raise typer.Exit(1)
 
     current_phase = runstate.get("current_phase")
+    feature_id = runstate.get("feature_id", "")
+    product_id = runstate.get("project_id", "")
 
-    if current_phase != "blocked":
-        console.print(f"[yellow]Current phase: {current_phase}[/yellow]")
+    classification = classify_recovery(runstate)
+    if classification != RecoveryClassification.BLOCKED:
+        console.print(f"[yellow]Current classification: {classification.value}[/yellow]")
+        guidance = get_recovery_guidance(runstate)
+        console.print(f"[bold]Recommended:[/bold] {guidance['recommended_action']}")
         console.print("This command is only for blocked state.")
-        console.print("Use 'asyncdev resume-next-day continue-loop' for other phases.")
+        logger.close()
         raise typer.Exit(1)
 
     blocked_items = runstate.get("blocked_items", [])
+
+    logger.log_event(
+        ExecutionEventType.BLOCKED_ENTERED,
+        feature_id=feature_id,
+        product_id=product_id,
+        event_data={"blocked_count": len(blocked_items), "phase": current_phase},
+    )
 
     console.print(Panel("Unblock State", title="resume-next-day unblock", border_style="green"))
 
@@ -162,6 +276,13 @@ def unblock(
     runstate["blocked_items"] = []
     runstate["last_action"] = f"Unblocked: {resolution_note}"
 
+    logger.log_event(
+        ExecutionEventType.BLOCKED_RESOLVED,
+        feature_id=feature_id,
+        product_id=product_id,
+        event_data={"resolution": resolution_note, "retry": retry, "alternative": alternative},
+    )
+
     if retry:
         console.print("[green]Will retry same task[/green]")
         runstate["next_recommended_action"] = f"Retry: {runstate.get('active_task', 'unknown')}"
@@ -175,6 +296,15 @@ def unblock(
 
     store.save_runstate(runstate)
 
+    logger.log_transition(
+        from_phase="blocked",
+        to_phase="planning",
+        feature_id=feature_id,
+        product_id=product_id,
+        reason=f"Unblock: {resolution_note}",
+    )
+    logger.close()
+
     console.print("\n[green]Blocker resolved. Ready to continue.[/green]")
     console.print("Next: Run 'asyncdev plan-day' to create new ExecutionPack")
 
@@ -187,27 +317,32 @@ def handle_failed(
     abandon: bool = typer.Option(False, help="Abandon task and move to next"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
-    """Handle failed execution state.
-
-    Failed state transitions to blocked for human intervention.
-
-    Usage:
-        asyncdev resume-next-day handle-failed --report
-        asyncdev resume-next-day handle-failed --escalate
-        asyncdev resume-next-day handle-failed --abandon
-    """
+    """Handle failed execution state."""
     project_path = path / project
     store = StateStore(project_path)
+    logger = get_logger(project_path)
     runstate = store.load_runstate()
 
     if runstate is None:
         console.print("[red]No RunState found[/red]")
+        logger.close()
         raise typer.Exit(1)
+
+    feature_id = runstate.get("feature_id", "")
+    product_id = runstate.get("project_id", "")
+    previous_phase = runstate.get("current_phase", "executing")
 
     console.print(Panel("Handle Failed State", title="resume-next-day handle-failed", border_style="yellow"))
 
     console.print("[yellow]Failed execution detected[/yellow]")
     console.print("Converting to blocked state for human intervention...")
+
+    logger.log_event(
+        ExecutionEventType.FAILED_ENTERED,
+        feature_id=feature_id,
+        product_id=product_id,
+        event_data={"active_task": runstate.get("active_task", "")},
+    )
 
     if escalate:
         decision_item = {
@@ -220,6 +355,12 @@ def handle_failed(
         runstate["decisions_needed"] = [decision_item]
         runstate["current_phase"] = "reviewing"
         console.print("[cyan]Escalated to decision needed[/cyan]")
+        logger.log_event(
+            ExecutionEventType.DECISION_ESCALATED,
+            feature_id=feature_id,
+            product_id=product_id,
+            event_data={"action": "escalate", "decision": decision_item["decision"]},
+        )
 
     elif abandon:
         runstate["blocked_items"] = []
@@ -228,6 +369,12 @@ def handle_failed(
             runstate["active_task"] = runstate["task_queue"][0]
             runstate["task_queue"] = runstate["task_queue"][1:]
         console.print("[green]Task abandoned. Moving to next[/green]")
+        logger.log_event(
+            ExecutionEventType.FAILED_HANDLED,
+            feature_id=feature_id,
+            product_id=product_id,
+            event_data={"action": "abandon"},
+        )
 
     else:
         runstate["current_phase"] = "blocked"
@@ -238,10 +385,25 @@ def handle_failed(
         }]
         console.print("[yellow]State set to blocked[/yellow]")
         console.print("Use 'asyncdev resume-next-day unblock' to resolve")
+        logger.log_event(
+            ExecutionEventType.FAILED_HANDLED,
+            feature_id=feature_id,
+            product_id=product_id,
+            event_data={"action": "blocked"},
+        )
 
     runstate["last_action"] = f"Handled failed state: {escalate or abandon or 'blocked'}"
 
     store.save_runstate(runstate)
+
+    logger.log_transition(
+        from_phase=previous_phase,
+        to_phase=runstate["current_phase"],
+        feature_id=feature_id,
+        product_id=product_id,
+        reason="Failed state handled",
+    )
+    logger.close()
 
     console.print("\nNext action depends on choice:")
     if escalate:
