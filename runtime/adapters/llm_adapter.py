@@ -190,19 +190,24 @@ class BailianLLMAdapter(LLMAdapter):
             return "(none specified)"
         return "\n".join(f"- {item}" for item in items)
 
+    def _filter_empty(self, items: list[str]) -> list[str]:
+        """Filter out empty/placeholder values like 'None', '(none)', ''."""
+        empty_values = {"none", "(none)", "", "-", "n/a", "null"}
+        return [i for i in items if i.lower().strip() not in empty_values]
+
     def _parse_llm_output(self, execution_pack: dict[str, Any], llm_output: str) -> dict[str, Any]:
         """Parse LLM output into ExecutionResult structure."""
         completed_items = self._extract_section(llm_output, "COMPLETED_ITEMS")
         artifacts = self._extract_artifacts(llm_output)
-        issues = self._extract_section(llm_output, "ISSUES_FOUND")
-        blocked = self._extract_section(llm_output, "BLOCKED_REASONS")
-        decisions = self._extract_section(llm_output, "DECISIONS_REQUIRED")
+        issues = self._filter_empty(self._extract_section(llm_output, "ISSUES_FOUND"))
+        blocked = self._filter_empty(self._extract_section(llm_output, "BLOCKED_REASONS"))
+        decisions = self._filter_empty(self._extract_section(llm_output, "DECISIONS_REQUIRED"))
         next_step = self._extract_section(llm_output, "NEXT_STEP", single_line=True)
 
         status = "success"
-        if blocked and blocked != ["(none)"] and blocked != [""]:
+        if blocked:
             status = "blocked"
-        elif issues and issues != ["(none)"] and issues != [""]:
+        elif issues:
             status = "partial"
 
         return {
