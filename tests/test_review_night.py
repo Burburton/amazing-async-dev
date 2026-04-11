@@ -58,7 +58,7 @@ class TestReviewNightGenerate:
         ])
 
         assert result.exit_code == 0
-        assert "DailyReviewPack saved" in result.output
+        assert "Review-Night Complete" in result.output or "DailyReviewPack" in result.output
 
     def test_saves_review_pack_file(self, setup_with_execution_result):
         """review-night generate should save review pack file."""

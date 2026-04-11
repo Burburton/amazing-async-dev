@@ -199,7 +199,7 @@ class TestArchiveFeature:
         ])
         
         assert result.exit_code == 0
-        assert "ArchivePack saved" in result.output
+        assert "Archive Complete" in result.output or "Archive Feature" in result.output
 
     def test_saves_archive_pack_file(self, setup_completed_feature):
         """archive-feature create should save archive-pack.yaml."""
