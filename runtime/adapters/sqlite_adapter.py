@@ -99,10 +99,38 @@ class SQLiteAdapter:
                 FOREIGN KEY (feature_id) REFERENCES features(feature_id)
             );
 
+            CREATE TABLE IF NOT EXISTS workflow_feedback (
+                feedback_id TEXT PRIMARY KEY,
+                problem_domain TEXT NOT NULL,
+                issue_type TEXT NOT NULL,
+                detected_by TEXT NOT NULL,
+                detected_in TEXT NOT NULL,
+                product_id TEXT,
+                feature_id TEXT,
+                description TEXT NOT NULL,
+                self_corrected INTEGER NOT NULL DEFAULT 0,
+                requires_followup INTEGER NOT NULL DEFAULT 0,
+                confidence TEXT,
+                escalation_recommendation TEXT,
+                triage_note TEXT,
+                triaged_at TEXT,
+                resolution TEXT DEFAULT 'none',
+                status TEXT DEFAULT 'open',
+                priority TEXT,
+                detected_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_events_feature ON execution_events(feature_id);
             CREATE INDEX IF NOT EXISTS idx_events_time ON execution_events(occurred_at);
             CREATE INDEX IF NOT EXISTS idx_transitions_feature ON lifecycle_transitions(feature_id);
             CREATE INDEX IF NOT EXISTS idx_snapshots_feature ON runstate_snapshots(feature_id);
+            CREATE INDEX IF NOT EXISTS idx_feedback_date ON workflow_feedback(detected_at);
+            CREATE INDEX IF NOT EXISTS idx_feedback_product ON workflow_feedback(product_id);
+            CREATE INDEX IF NOT EXISTS idx_feedback_domain ON workflow_feedback(problem_domain);
+            CREATE INDEX IF NOT EXISTS idx_feedback_followup ON workflow_feedback(requires_followup);
+            CREATE INDEX IF NOT EXISTS idx_feedback_escalation ON workflow_feedback(escalation_recommendation);
         """)
         conn.commit()
 
@@ -359,3 +387,150 @@ class SQLiteAdapter:
         )
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
+
+    def save_workflow_feedback(self, feedback: dict[str, Any]) -> None:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        now = datetime.now().isoformat()
+
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO workflow_feedback
+            (feedback_id, problem_domain, issue_type, detected_by, detected_in, product_id, feature_id,
+             description, self_corrected, requires_followup, confidence, escalation_recommendation, triage_note, triaged_at,
+             resolution, status, priority, detected_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                feedback.get("feedback_id"),
+                feedback.get("problem_domain"),
+                feedback.get("issue_type"),
+                feedback.get("detected_by"),
+                feedback.get("detected_in"),
+                feedback.get("product_id"),
+                feedback.get("feature_id"),
+                feedback.get("description"),
+                1 if feedback.get("self_corrected") else 0,
+                1 if feedback.get("requires_followup") else 0,
+                feedback.get("confidence"),
+                feedback.get("escalation_recommendation"),
+                feedback.get("triage_note"),
+                feedback.get("triaged_at"),
+                feedback.get("resolution", "none"),
+                feedback.get("status", "open"),
+                feedback.get("priority"),
+                feedback.get("detected_at"),
+                now,
+                now,
+            ),
+        )
+        conn.commit()
+
+    def load_workflow_feedback(self, feedback_id: str) -> dict[str, Any] | None:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM workflow_feedback WHERE feedback_id = ?", (feedback_id,))
+        row = cursor.fetchone()
+        if row:
+            data = dict(row)
+            data["self_corrected"] = bool(data.get("self_corrected", 0))
+            data["requires_followup"] = bool(data.get("requires_followup", 0))
+            return data
+        return None
+
+    def list_workflow_feedback(
+        self,
+        problem_domain: str | None = None,
+        product_id: str | None = None,
+        issue_type: str | None = None,
+        confidence: str | None = None,
+        escalation_recommendation: str | None = None,
+        requires_followup: bool | None = None,
+        self_corrected: bool | None = None,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM workflow_feedback WHERE 1=1"
+        params: list[Any] = []
+
+        if problem_domain:
+            query += " AND problem_domain = ?"
+            params.append(problem_domain)
+        if product_id:
+            query += " AND product_id = ?"
+            params.append(product_id)
+        if issue_type:
+            query += " AND issue_type = ?"
+            params.append(issue_type)
+        if confidence:
+            query += " AND confidence = ?"
+            params.append(confidence)
+        if escalation_recommendation:
+            query += " AND escalation_recommendation = ?"
+            params.append(escalation_recommendation)
+        if requires_followup is not None:
+            query += " AND requires_followup = ?"
+            params.append(1 if requires_followup else 0)
+        if self_corrected is not None:
+            query += " AND self_corrected = ?"
+            params.append(1 if self_corrected else 0)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+
+        query += " ORDER BY detected_at DESC LIMIT ?"
+        params.append(limit)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        results = []
+        for row in rows:
+            data = dict(row)
+            data["self_corrected"] = bool(data.get("self_corrected", 0))
+            data["requires_followup"] = bool(data.get("requires_followup", 0))
+            results.append(data)
+        return results
+
+    def count_workflow_feedback_by_date(self, date_str: str) -> int:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM workflow_feedback WHERE feedback_id LIKE ?",
+            (f"wf-{date_str}-%",),
+        )
+        result = cursor.fetchone()
+        return result[0] if result else 0
+
+    def get_workflow_feedback_by_date(
+        self,
+        date: str,
+        product_id: str | None = None,
+        problem_domain: str | None = None,
+    ) -> list[dict[str, Any]]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM workflow_feedback WHERE detected_at LIKE ?"
+        params: list[Any] = [f"{date}%"]
+
+        if product_id:
+            query += " AND product_id = ?"
+            params.append(product_id)
+        if problem_domain:
+            query += " AND problem_domain = ?"
+            params.append(problem_domain)
+
+        query += " ORDER BY detected_at DESC"
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        results = []
+        for row in rows:
+            data = dict(row)
+            data["self_corrected"] = bool(data.get("self_corrected", 0))
+            data["requires_followup"] = bool(data.get("requires_followup", 0))
+            results.append(data)
+        return results

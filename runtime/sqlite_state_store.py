@@ -170,6 +170,49 @@ class SQLiteStateStore:
     def close(self) -> None:
         self.sqlite.close()
 
+    def save_workflow_feedback(self, feedback: dict[str, Any]) -> None:
+        self.sqlite.save_workflow_feedback(feedback)
+
+    def load_workflow_feedback(self, feedback_id: str) -> dict[str, Any] | None:
+        return self.sqlite.load_workflow_feedback(feedback_id)
+
+    def list_workflow_feedback(
+        self,
+        problem_domain: str | None = None,
+        product_id: str | None = None,
+        issue_type: str | None = None,
+        confidence: str | None = None,
+        escalation_recommendation: str | None = None,
+        requires_followup: bool | None = None,
+        self_corrected: bool | None = None,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        return self.sqlite.list_workflow_feedback(
+            problem_domain=problem_domain,
+            product_id=product_id,
+            issue_type=issue_type,
+            confidence=confidence,
+            escalation_recommendation=escalation_recommendation,
+            requires_followup=requires_followup,
+            self_corrected=self_corrected,
+            status=status,
+            limit=limit,
+        )
+
+    def count_workflow_feedback_by_date(self, date_str: str) -> int:
+        return self.sqlite.count_workflow_feedback_by_date(date_str)
+
+    def get_workflow_feedback_by_date(
+        self,
+        date: str,
+        product_id: str | None = None,
+        problem_domain: str | None = None,
+    ) -> list[dict[str, Any]]:
+        return self.sqlite.get_workflow_feedback_by_date(
+            date, product_id=product_id, problem_domain=problem_domain
+        )
+
 
 def get_sqlite_state_store(project_path: Path | None = None) -> SQLiteStateStore:
     return SQLiteStateStore(project_path)
