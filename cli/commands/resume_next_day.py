@@ -103,3 +103,132 @@ def status():
 
 if __name__ == "__main__":
     app()
+
+
+@app.command()
+def unblock(
+    reason: str = typer.Option(None, help="Resolution note for blocker"),
+    retry: bool = typer.Option(False, help="Retry the same task"),
+    alternative: str = typer.Option(None, help="Alternative task to try"),
+):
+    """Resume from blocked state to executing.
+
+    Usage:
+        asyncdev resume-next-day unblock --reason "Dependency resolved"
+        asyncdev resume-next-day unblock --retry
+        asyncdev resume-next-day unblock --alternative "task-002-backup"
+    """
+    runstate = store.load_runstate()
+
+    if runstate is None:
+        console.print("[red]No RunState found[/red]")
+        raise typer.Exit(1)
+
+    current_phase = runstate.get("current_phase")
+
+    if current_phase != "blocked":
+        console.print(f"[yellow]Current phase: {current_phase}[/yellow]")
+        console.print("This command is only for blocked state.")
+        console.print("Use 'asyncdev resume-next-day continue-loop' for other phases.")
+        raise typer.Exit(1)
+
+    blocked_items = runstate.get("blocked_items", [])
+
+    console.print(Panel("Unblock State", title="resume-next-day unblock", border_style="green"))
+
+    console.print(f"[bold]Blocked Items:[/bold] {len(blocked_items)}")
+    if blocked_items:
+        for item in blocked_items[:3]:
+            console.print(f"  - {item.get('reason', 'unknown')}")
+
+    resolution_note = reason or "Manual unblock"
+    console.print(f"\n[cyan]Resolution:[/cyan] {resolution_note}")
+
+    runstate["current_phase"] = "planning"
+    runstate["blocked_items"] = []
+    runstate["last_action"] = f"Unblocked: {resolution_note}"
+
+    if retry:
+        console.print("[green]Will retry same task[/green]")
+        runstate["next_recommended_action"] = f"Retry: {runstate.get('active_task', 'unknown')}"
+    elif alternative:
+        console.print(f"[green]Will try alternative: {alternative}[/green]")
+        runstate["active_task"] = alternative
+        runstate["next_recommended_action"] = f"Execute: {alternative}"
+    else:
+        console.print("[yellow]Choose next action: --retry or --alternative[/yellow]")
+        runstate["next_recommended_action"] = "Review blocker resolution, plan next task"
+
+    store.save_runstate(runstate)
+
+    console.print("\n[green]Blocker resolved. Ready to continue.[/green]")
+    console.print("Next: Run 'asyncdev plan-day' to create new ExecutionPack")
+
+
+@app.command()
+def handle_failed(
+    report: bool = typer.Option(False, help="Generate failure report"),
+    escalate: bool = typer.Option(False, help="Escalate as decision needed"),
+    abandon: bool = typer.Option(False, help="Abandon task and move to next"),
+):
+    """Handle failed execution state.
+
+    Failed state transitions to blocked for human intervention.
+
+    Usage:
+        asyncdev resume-next-day handle-failed --report
+        asyncdev resume-next-day handle-failed --escalate
+        asyncdev resume-next-day handle-failed --abandon
+    """
+    runstate = store.load_runstate()
+
+    if runstate is None:
+        console.print("[red]No RunState found[/red]")
+        raise typer.Exit(1)
+
+    console.print(Panel("Handle Failed State", title="resume-next-day handle-failed", border_style="yellow"))
+
+    console.print("[yellow]Failed execution detected[/yellow]")
+    console.print("Converting to blocked state for human intervention...")
+
+    if escalate:
+        decision_item = {
+            "decision": f"Task {runstate.get('active_task', 'unknown')} failed",
+            "options": ["retry", "alternative approach", "abandon"],
+            "recommendation": "Retry with adjusted parameters",
+            "impact": "Feature progress blocked",
+            "urgency": "high",
+        }
+        runstate["decisions_needed"] = [decision_item]
+        runstate["current_phase"] = "reviewing"
+        console.print("[cyan]Escalated to decision needed[/cyan]")
+
+    elif abandon:
+        runstate["blocked_items"] = []
+        runstate["current_phase"] = "planning"
+        if runstate.get("task_queue"):
+            runstate["active_task"] = runstate["task_queue"][0]
+            runstate["task_queue"] = runstate["task_queue"][1:]
+        console.print("[green]Task abandoned. Moving to next[/green]")
+
+    else:
+        runstate["current_phase"] = "blocked"
+        runstate["blocked_items"] = [{
+            "reason": "Execution failed",
+            "resolution": "Needs human intervention",
+            "options": ["Retry", "Change approach", "Abandon"],
+        }]
+        console.print("[yellow]State set to blocked[/yellow]")
+        console.print("Use 'asyncdev resume-next-day unblock' to resolve")
+
+    runstate["last_action"] = f"Handled failed state: {escalate or abandon or 'blocked'}"
+
+    store.save_runstate(runstate)
+
+    console.print("\nNext action depends on choice:")
+    if escalate:
+        console.print("  Run 'asyncdev review-night' to see decision options")
+    elif abandon:
+        console.print("  Run 'asyncdev plan-day' to plan next task")
+    else:
+        console.print("  Run 'asyncdev resume-next-day unblock' to resolve blocker")

@@ -9,12 +9,14 @@ from runtime.engines.live_api_engine import LiveAPIEngine
 from runtime.engines.mock_engine import MockEngine
 
 
-def get_engine(mode: str = "external") -> ExecutionEngine:
+def get_engine(mode: str = "external", simulate: str = "success") -> ExecutionEngine:
     """Get execution engine for specified mode.
 
     Args:
         mode: Execution mode - 'external', 'live', or 'mock'
               Defaults to 'external' (primary mode per design doc)
+        simulate: Simulation scenario for mock mode
+              'success' (default), 'blocked', 'failed', 'decision'
 
     Returns:
         ExecutionEngine instance for the mode
@@ -25,19 +27,20 @@ def get_engine(mode: str = "external") -> ExecutionEngine:
     Example:
         engine = get_engine("external")
         result = engine.prepare(execution_pack)
-        # For external mode, run() returns None
-        # Execution happens via external tool
 
         engine = get_engine("live")
         result = engine.run(execution_pack)
-        # For live mode, returns ExecutionResult directly
+
+        # Mock with scenarios for testing
+        engine = get_engine("mock", simulate="blocked")
+        result = engine.run(execution_pack)
     """
     if mode == "external":
         return ExternalToolEngine()
     elif mode == "live":
         return LiveAPIEngine()
     elif mode == "mock":
-        return MockEngine()
+        return MockEngine(simulate=simulate)
     else:
         raise ValueError(
             f"Unknown execution mode: {mode}. "
