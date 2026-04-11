@@ -120,7 +120,61 @@ reviewing → planning (next day resume)
 
 ---
 
-## 7. Anti-Patterns (FORBIDDEN)
+## 7. ExecutionResult Convention (External Tool Mode)
+
+When executing via external tools (OpenCode, Claude Code, etc.), **MUST** write ExecutionResult to the agreed path.
+
+### Write Path
+```
+projects/{project_id}/execution-results/{execution_id}.md
+```
+
+Or in demo mode:
+```
+examples/single-feature-day-loop/execution-results/{execution_id}.md
+```
+
+### Required Format
+```yaml
+execution_id: "{execution_id}"
+status: success|partial|blocked|failed|stopped
+completed_items:
+  - "[item_1]"
+  - "[item_2]"
+artifacts_created:
+  - name: "[artifact_name]"
+    path: "[file_path]"
+    type: file|artifact|log
+verification_result:
+  passed: N
+  failed: M
+  skipped: K
+  details:
+    - "[detail_1]"
+issues_found:
+  - "[issue_1]"
+blocked_reasons:
+  - "[reason_1]"
+decisions_required:
+  - "[decision_1]"
+recommended_next_step: "[next_action]"
+metrics:
+  files_read: N
+  files_written: M
+  actions_taken: K
+notes: "[execution_notes]"
+duration: "[estimated_duration]"
+```
+
+### After Writing ExecutionResult
+1. User runs: `asyncdev resume-next-day`
+2. System detects ExecutionResult at agreed path
+3. RunState updated, DailyReviewPack generated
+4. Day loop continues
+
+---
+
+## 8. Anti-Patterns (FORBIDDEN)
 
 | Anti-Pattern | Consequence |
 |--------------|-------------|
