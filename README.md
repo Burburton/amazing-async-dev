@@ -178,7 +178,8 @@ python -m pytest tests/ -v
 | `test_error_handling.py` | 21 | Error handling |
 | `test_complete_archive.py` | 16 | Completion & archive flow |
 | `test_sqlite_state_store.py` | 20 | SQLite persistence layer |
-| **Total** | **160** | |
+| `test_execution_logging.py` | 23 | Execution logging & recovery |
+| **Total** | **183** | |
 
 ### Test categories
 
@@ -187,6 +188,7 @@ python -m pytest tests/ -v
 - **Artifact format**: YAML block extraction and markdown generation
 - **Error handling**: Missing state, invalid inputs, corrupted files
 - **SQLite persistence**: Structured state store with recovery queries
+- **Recovery classification**: Stop-point classification and resume eligibility
 
 ---
 
@@ -200,9 +202,10 @@ python -m pytest tests/ -v
 | 004 | ✅ Complete | Dual Execution Mode - external tool + live API |
 | 005 | ✅ Complete | Failure/Blocker/Decision Flow |
 | 006 | ✅ Complete | Initialization Commands - init, new-product, new-feature |
-| 007 | ✅ Complete | Tests & Stability - 160 tests passing |
+| 007 | ✅ Complete | Tests & Stability - 183 tests passing |
 | 008 | ✅ Complete | Completion & Archive Flow - complete-feature, archive-feature |
 | 009 | ✅ Complete | SQLite State Store - structured persistence layer |
+| 010 | ✅ Complete | Execution Logging & Recovery Hardening - recovery classification, inspect-stop |
 
 ---
 
@@ -259,6 +262,9 @@ asyncdev sqlite transitions --project {id}
 asyncdev sqlite recovery --project {id} --feature {id}
 asyncdev sqlite features --project {id}
 asyncdev sqlite snapshot --project {id}
+asyncdev inspect-stop show --project {id}
+asyncdev inspect-stop history --project {id}
+asyncdev inspect-stop guidance --project {id}
 ```
 
 ---

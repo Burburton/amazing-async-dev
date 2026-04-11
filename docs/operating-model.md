@@ -298,6 +298,103 @@ Day 3: (Human corrects scope) Restart feature X only
 
 ---
 
+## Recovery Semantics
+
+### Stop Types
+
+The system distinguishes different stop conditions for appropriate recovery:
+
+| Stop Type | Classification | Recovery Action |
+|-----------|---------------|-----------------|
+| Normal pause | `normal_pause` | Ready to resume next day |
+| Blocked | `blocked` | Requires `unblock` command |
+| Failed | `failed` | Requires `handle-failed` command |
+| Awaiting decision | `awaiting_decision` | Requires `continue-loop` with decision |
+| Ready to resume | `ready_to_resume` | Safe to proceed |
+| Unsafe to resume | `unsafe_to_resume` | Manual inspection required |
+| Already completed | `already_completed` | Can archive |
+| Already archived | `already_archived` | Cannot resume |
+
+### Resume Eligibility
+
+Before resuming, the system checks eligibility:
+
+| Eligibility | Meaning | Allowed Command |
+|-------------|---------|-----------------|
+| `eligible` | Safe to resume | Any resume command |
+| `needs_decision` | Pending decisions | `continue-loop` only |
+| `needs_unblock` | Blockers present | `unblock` only |
+| `needs_failure_handling` | Failed state | `handle-failed` only |
+| `inconsistent_state` | State corrupted | `inspect-stop` first |
+| `not_resumable` | Completed/archived | No resume |
+
+### Execution Lifecycle Logging
+
+Key workflow events are logged to SQLite for recovery diagnosis:
+
+| Event | When Logged |
+|-------|-------------|
+| `plan-day-started` | Planning phase begins |
+| `plan-day-completed` | ExecutionPack created |
+| `run-day-started` | Execution begins |
+| `blocked-entered` | Workflow enters blocked state |
+| `blocked-resolved` | Blocker resolved |
+| `failed-entered` | Execution failed |
+| `decision-approved` | Human approves decision |
+| `normal-stop` | Workflow stops normally |
+
+### Recovery Commands
+
+```bash
+# Inspect current stop state
+asyncdev inspect-stop show --project {id}
+
+# View execution history
+asyncdev inspect-stop history --project {id} --limit 20
+
+# Get recovery guidance
+asyncdev inspect-stop guidance --project {id}
+
+# Resume from blocked state
+asyncdev resume-next-day unblock --reason "Dependency resolved"
+
+# Handle failed execution
+asyncdev resume-next-day handle-failed --escalate
+asyncdev resume-next-day handle-failed --abandon
+
+# Continue after decision
+asyncdev resume-next-day continue-loop --decision approve
+
+# Force resume (unsafe cases)
+asyncdev resume-next-day continue-loop --force
+```
+
+### Recovery Flow
+
+```
+Workflow stopped → inspect-stop → diagnose → choose recovery action
+
+┌─────────────────┐
+│ inspect-stop    │  Determine classification
+└─────────────────┘
+        ↓
+┌─────────────────┐
+│ guidance        │  Get recommended action
+└─────────────────┘
+        ↓
+┌─────────────────────────────────────────────────────┐
+│                     RECOVERY ACTION                  │
+├─────────────────────────────────────────────────────┤
+│ blocked      → unblock --reason                      │
+│ failed       → handle-failed --<option>              │
+│ decision     → continue-loop --decision              │
+│ normal_pause → plan-day create                       │
+│ unsafe       → manual inspection + --force           │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Artifact Lifecycle
 
 | Artifact | Created | Updated | Read |
