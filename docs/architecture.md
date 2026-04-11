@@ -498,6 +498,129 @@ info = store.get_recovery_info("001-auth")
 
 ---
 
+## Live API Mode
+
+Feature 011 introduced Live API Mode hardening for resilient AI-driven execution.
+
+### Overview
+
+Live API Mode allows AI to execute tasks directly through LLM API calls, enabling autonomous progress without external tool integration. This mode requires robust error handling to survive transient failures.
+
+### API Failure Classification
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     API FAILURE CLASSIFICATION                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   RETRYABLE (Auto-retry with backoff)                               │
+│   ─────────────────────────────────────                             │
+│   • PROVIDER_NETWORK_FAILURE   → Network/connection issues           │
+│   • TIMEOUT_FAILURE            → Request timeout                     │
+│   • RATE_LIMIT_FAILURE         → Provider rate limit hit             │
+│   • MODEL_ERROR                → Transient model errors              │
+│                                                                      │
+│   NON-RETRYABLE (Stop and report)                                   │
+│   ─────────────────────────────────────                             │
+│   • AUTH_CONFIG_FAILURE        → Missing/invalid API key             │
+│   • MALFORMED_RESPONSE         → Invalid JSON from provider          │
+│   • VALIDATION_FAILURE         → Response schema mismatch            │
+│   • UNSAFE_RESUME              → Unknown error (default)             │
+│   • CONTENT_FILTER_FAILURE     → Content policy violation            │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Retry Behavior
+
+```
+BailianLLMAdapter Retry Flow:
+
+1. API call attempted
+2. Failure detected
+3. Classify error → APIFailureClassification
+4. Check retryable?
+   ── YES → Retry with exponential backoff (max_retries=3, delay=1s→2s→4s)
+   ── NO  → Stop, report failure in ExecutionResult
+5. All retries exhausted → Report as non-retryable failure
+```
+
+### ExecutionLogger Integration
+
+LiveAPIEngine integrates with ExecutionLogger for structured event recording:
+
+```python
+# LiveAPIEngine initialization
+engine = LiveAPIEngine(
+    project_path=project_path,  # Required for SQLite logging
+    execution_pack=pack,
+    adapter=BailianLLMAdapter()
+)
+
+# Events logged to SQLite:
+# - execution_start
+# - api_call_attempt (each retry)
+# - api_call_success / api_call_failure
+# - execution_complete / execution_error
+
+# Engine close ensures events flushed
+engine.close()
+```
+
+### ExecutionResult Enhancement
+
+Live API execution results include `api_failure_classification`:
+
+```yaml
+execution_id: "2025-01-15-001"
+status: "failed"
+api_failure_classification: "RATE_LIMIT_FAILURE"  # NEW field
+completed_items: []
+issues_found:
+  - "API rate limit exceeded after 3 retries"
+recommended_next_step: "Wait 60s and retry, or switch to external tool mode"
+```
+
+### Recovery Integration
+
+Failed API calls are classified and stored for recovery guidance:
+
+```python
+# Recovery info includes API failure context
+info = store.get_recovery_info("001-auth")
+
+# Returns:
+{
+    "latest_snapshot": {...},
+    "recent_events": [
+        {"event_type": "api_call_failure", "classification": "RATE_LIMIT_FAILURE"},
+        ...
+    ],
+    "can_resume": True,  # Retryable failures allow resume
+    "recovery_hint": "Wait and retry, or use external tool mode"
+}
+```
+
+### Error Handling Patterns
+
+| Failure Type | Handling |
+|--------------|----------|
+| `RATE_LIMIT_FAILURE` | Wait + retry (up to 3), report if exhausted |
+| `NETWORK_FAILURE` | Immediate retry with backoff |
+| `AUTH_CONFIG_FAILURE` | Stop immediately, request config fix |
+| `CONTENT_FILTER_FAILURE` | Stop immediately, review prompt content |
+
+### When to Use Live API Mode
+
+| Scenario | Recommended Mode |
+|----------|------------------|
+| Simple bounded tasks | Live API (autonomous) |
+| Complex multi-file work | External tool (human-guided) |
+| API unstable/rate-limited | External tool (more control) |
+| Quick iteration/experiment | Live API (fast feedback) |
+
+---
+
 ## Next Steps
 
 After understanding this architecture:

@@ -179,7 +179,8 @@ python -m pytest tests/ -v
 | `test_complete_archive.py` | 16 | Completion & archive flow |
 | `test_sqlite_state_store.py` | 20 | SQLite persistence layer |
 | `test_execution_logging.py` | 23 | Execution logging & recovery |
-| **Total** | **183** | |
+| `test_live_api_hardening.py` | 27 | Live API error handling & retry |
+| **Total** | **210** | |
 
 ### Test categories
 
@@ -202,10 +203,11 @@ python -m pytest tests/ -v
 | 004 | ✅ Complete | Dual Execution Mode - external tool + live API |
 | 005 | ✅ Complete | Failure/Blocker/Decision Flow |
 | 006 | ✅ Complete | Initialization Commands - init, new-product, new-feature |
-| 007 | ✅ Complete | Tests & Stability - 183 tests passing |
+| 007 | ✅ Complete | Tests & Stability - 210 tests passing |
 | 008 | ✅ Complete | Completion & Archive Flow - complete-feature, archive-feature |
 | 009 | ✅ Complete | SQLite State Store - structured persistence layer |
 | 010 | ✅ Complete | Execution Logging & Recovery Hardening - recovery classification, inspect-stop |
+| 011 | ✅ Complete | Live API Mode Hardening - API failure classification, retry logic, error handling |
 
 ---
 
