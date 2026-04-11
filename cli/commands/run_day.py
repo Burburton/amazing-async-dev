@@ -56,7 +56,7 @@ def execute(
         logger.close()
         raise typer.Exit(1)
 
-    engine = get_engine(mode)
+    engine = get_engine(mode, project_path=store.project_path)
     console.print(Panel(
         f"Mode: {mode}\nEngine: {engine.get_mode_name()}",
         title="Run-Day",
@@ -200,6 +200,7 @@ def _run_live_mode(
         product_id=product_id,
         event_data={"phase": "reviewing"},
     )
+    engine.close()
     logger.close()
 
     console.print("\n[green]Live execution complete![/green]")
