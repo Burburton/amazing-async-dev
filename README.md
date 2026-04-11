@@ -181,7 +181,8 @@ python -m pytest tests/ -v
 | `test_execution_logging.py` | 23 | Execution logging & recovery |
 | `test_live_api_hardening.py` | 27 | Live API error handling & retry |
 | `test_ux_improvements.py` | 13 | UX improvements (status, paths, next-step) |
-| **Total** | **223** | |
+| `test_backfill.py` | 17 | Historical archive backfill |
+| **Total** | **240** | |
 
 ### Test categories
 
@@ -204,12 +205,13 @@ python -m pytest tests/ -v
 | 004 | ✅ Complete | Dual Execution Mode - external tool + live API |
 | 005 | ✅ Complete | Failure/Blocker/Decision Flow |
 | 006 | ✅ Complete | Initialization Commands - init, new-product, new-feature |
-| 007 | ✅ Complete | Tests & Stability - 223 tests passing |
+| 007 | ✅ Complete | Tests & Stability - 240 tests passing |
 | 008 | ✅ Complete | Completion & Archive Flow - complete-feature, archive-feature |
 | 009 | ✅ Complete | SQLite State Store - structured persistence layer |
 | 010 | ✅ Complete | Execution Logging & Recovery Hardening - recovery classification, inspect-stop |
 | 011 | ✅ Complete | Live API Mode Hardening - API failure classification, retry logic, error handling |
 | 012 | ✅ Complete | UX/Ergonomics Improvements - enhanced status, path display, next-step guidance |
+| 013 | ✅ Complete | Historical Archive Backfill - backfill historical features into archive system |
 
 ---
 
