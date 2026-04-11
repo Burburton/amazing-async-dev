@@ -197,7 +197,34 @@ python -m pytest tests/ -v
 | 004 | ✅ Complete | Dual Execution Mode - external tool + live API |
 | 005 | ✅ Complete | Failure/Blocker/Decision Flow |
 | 006 | ✅ Complete | Initialization Commands - init, new-product, new-feature |
-| 007 | ✅ Complete | Tests & Stability - 124 tests passing |
+| 007 | ✅ Complete | Tests & Stability - 140 tests passing |
+| 008 | ✅ Complete | Completion & Archive Flow - complete-feature, archive-feature |
+
+---
+
+## Feature Lifecycle
+
+### Active Phases
+- `planning` → `executing` → `reviewing` → `blocked`
+- Blocked features: use `asyncdev resume-next-day unblock`
+
+### Completion Phase
+- `completed` - Feature marked as finished
+- Use: `asyncdev complete-feature mark`
+- Validates: no blockers, no pending decisions
+
+### Archive Phase
+- `archived` - Feature preserved for future reference
+- Use: `asyncdev archive-feature create`
+- Archives stored in: `projects/{product}/archive/{feature}/archive-pack.yaml`
+
+### ArchivePack captures
+- `delivered_outputs` - What was actually delivered
+- `acceptance_result` - Were criteria satisfied?
+- `lessons_learned` - What worked / what to improve
+- `reusable_patterns` - Patterns for future features
+- `decisions_made` - Key decisions during implementation
+- `unresolved_followups` - Items still open
 
 ---
 
@@ -207,6 +234,7 @@ python -m pytest tests/ -v
 2. Nightly review takes about 20–30 minutes
 3. Human handles only a small number of meaningful decisions
 4. Next day resumes from state instead of repeated explanation
+5. Completed features archived with lessons for future work
 
 ---
 
@@ -220,6 +248,8 @@ asyncdev plan-day
 asyncdev run-day
 asyncdev review-night
 asyncdev resume-next-day
+asyncdev complete-feature mark
+asyncdev archive-feature create
 ```
 
 ---
