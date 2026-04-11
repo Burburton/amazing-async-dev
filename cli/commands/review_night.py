@@ -9,6 +9,8 @@ from rich.table import Table
 
 from runtime.state_store import StateStore
 from runtime.review_pack_builder import build_daily_review_pack
+from cli.utils.output_formatter import print_next_step, print_success_panel
+from cli.utils.path_formatter import get_relative_path
 
 app = typer.Typer(help="Generate nightly review pack for human review")
 console = Console()
@@ -25,6 +27,7 @@ def generate(
     project_path = path / project
     store = StateStore(project_path)
     runstate = store.load_runstate()
+    root = Path.cwd() if path == Path("projects") else path
 
     if runstate is None:
         console.print("[red]No RunState found[/red]")
@@ -77,13 +80,30 @@ def generate(
     runstate["current_phase"] = "reviewing"
     store.save_runstate(runstate)
 
-    console.print(f"\n[green]DailyReviewPack saved: reviews/{review_pack['date']}-review.md[/green]")
+    review_path = store.reviews_path / f"{review_pack['date']}-review.md"
+
+    print_success_panel(
+        message=f"DailyReviewPack generated: {review_pack['date']}",
+        title="Review-Night Complete",
+        paths=[
+            {"label": "DailyReviewPack", "path": str(review_path)},
+        ],
+        root=root,
+    )
+
     console.print("\n[bold]Human Review Actions:[/bold]")
     console.print("  approve - Accept AI recommendation")
     console.print("  revise - Choose different option")
     console.print("  defer - Postpone decision, work on alternative")
     console.print("  redefine - Change question or scope")
-    console.print("\nAfter review, run: asyncdev resume-next-day")
+
+    print_next_step(
+        action="Review the DailyReviewPack and make decisions",
+        command="asyncdev resume-next-day continue-loop --decision <choice>",
+        artifact_path=review_path,
+        root=root,
+        hints=["Use --decision approve/revise/defer/redefine"],
+    )
 
 
 @app.command()

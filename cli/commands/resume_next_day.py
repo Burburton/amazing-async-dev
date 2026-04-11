@@ -17,6 +17,8 @@ from runtime.recovery_classifier import (
     RecoveryClassification,
     ResumeEligibility,
 )
+from cli.utils.output_formatter import print_next_step, print_success_panel
+from cli.utils.path_formatter import get_relative_path
 
 app = typer.Typer(help="Resume from human decisions, start next day loop")
 console = Console()
@@ -36,6 +38,7 @@ def continue_loop(
     store = StateStore(project_path)
     logger = get_logger(project_path)
     runstate = store.load_runstate()
+    root = Path.cwd() if path == Path("projects") else path
 
     if runstate is None:
         console.print("[red]No RunState found[/red]")
@@ -165,8 +168,23 @@ def continue_loop(
     )
     logger.close()
 
-    console.print("\n[green]RunState updated. Ready for next day.[/green]")
-    console.print("Next: Run 'asyncdev plan-day' to create new ExecutionPack")
+    runstate_path = store.project_path / "runstate.md"
+
+    print_success_panel(
+        message=f"RunState updated with decision: {decision}",
+        title="Resume Complete",
+        paths=[
+            {"label": "RunState", "path": str(runstate_path)},
+        ],
+        root=root,
+    )
+
+    print_next_step(
+        action="Plan next execution cycle",
+        command="asyncdev plan-day create",
+        artifact_path=runstate_path,
+        root=root,
+    )
 
 
 @app.command()

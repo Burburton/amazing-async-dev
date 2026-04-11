@@ -16,6 +16,8 @@ from runtime.state_store import StateStore
 from runtime.engines.factory import get_engine, get_available_modes
 from runtime.execution_event_types import ExecutionEventType
 from runtime.execution_logger import get_logger
+from cli.utils.output_formatter import print_next_step, print_success_panel
+from cli.utils.path_formatter import get_relative_path
 
 app = typer.Typer(help="Run today's execution task")
 console = Console()
@@ -81,6 +83,8 @@ def _run_external_mode(
     product_id: str,
 ) -> None:
     """Execute in external tool mode."""
+    root = Path.cwd()
+    
     if execution_id is None:
         packs = list(store.execution_packs_path.glob("exec-*.md"))
         if not packs:
@@ -106,9 +110,18 @@ def _run_external_mode(
         event_data={"execution_id": execution_id, "yaml_path": str(prep_result.get("yaml_path", ""))},
     )
 
-    console.print("\n[green]ExecutionPack prepared:[/green]")
-    console.print(f"  YAML: {prep_result['yaml_path']}")
-    console.print(f"  Markdown: {prep_result['md_path']}")
+    yaml_path = Path(prep_result.get("yaml_path", ""))
+    md_path = Path(prep_result.get("md_path", ""))
+
+    print_success_panel(
+        message="ExecutionPack prepared for external execution",
+        title="Run-Day Ready",
+        paths=[
+            {"label": "YAML Pack", "path": str(yaml_path)},
+            {"label": "Markdown Pack", "path": str(md_path)},
+        ],
+        root=root,
+    )
 
     console.print(f"\n[cyan]{prep_result['instructions']}[/cyan]")
 
@@ -124,6 +137,15 @@ def _run_external_mode(
     if dry_run:
         console.print("[yellow]Dry run - external mode does not modify state[/yellow]")
         logger.close()
+        return
+
+    print_next_step(
+        action="Execute the ExecutionPack with external tool",
+        command="asyncdev resume-next-day",
+        artifact_path=md_path,
+        root=root,
+        hints=["After execution, run resume-next-day to continue"],
+    )
 
 
 def _run_live_mode(
@@ -135,6 +157,8 @@ def _run_live_mode(
     product_id: str,
 ) -> None:
     """Execute in live API mode."""
+    root = Path.cwd()
+    
     runstate = store.load_runstate()
     if runstate is None:
         console.print("[red]No RunState found. Run 'asyncdev plan-day' first.[/red]")
@@ -203,8 +227,24 @@ def _run_live_mode(
     engine.close()
     logger.close()
 
-    console.print("\n[green]Live execution complete![/green]")
-    console.print("Next: Run 'asyncdev review-night' to generate DailyReviewPack")
+    result_path = store.execution_results_path / f"{execution_id}.md"
+
+    print_success_panel(
+        message=f"Live execution completed: {result['status']}",
+        title="Run-Day Complete",
+        paths=[
+            {"label": "ExecutionResult", "path": str(result_path)},
+            {"label": "RunState", "path": str(store.project_path / "runstate.md")},
+        ],
+        root=root,
+    )
+
+    print_next_step(
+        action="Generate DailyReviewPack for human review",
+        command="asyncdev review-night generate",
+        artifact_path=result_path,
+        root=root,
+    )
 
 
 def _run_mock_mode(
@@ -216,6 +256,8 @@ def _run_mock_mode(
     product_id: str,
 ) -> None:
     """Execute in mock mode for testing."""
+    root = Path.cwd()
+    
     runstate = store.load_runstate()
     if runstate is None:
         console.print("[yellow]Creating minimal RunState for test[/yellow]")
@@ -289,8 +331,21 @@ def _run_mock_mode(
     )
     logger.close()
 
-    console.print("\n[green]Mock execution complete![/green]")
-    console.print("Next: Run 'asyncdev review-night' to generate DailyReviewPack")
+    result_path = store.execution_results_path / f"{execution_id}.md"
+
+    print_success_panel(
+        message=f"Mock execution completed: {result['status']}",
+        title="Run-Day Mock Complete",
+        paths=[
+            {"label": "ExecutionResult", "path": str(result_path)},
+        ],
+        root=root,
+    )
+
+    print_next_step(
+        action="Generate DailyReviewPack for review",
+        command="asyncdev review-night generate",
+    )
 
 
 def _trigger_external_tool(pack_path: str) -> None:

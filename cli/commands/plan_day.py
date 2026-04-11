@@ -9,6 +9,8 @@ from rich.table import Table
 from runtime.state_store import StateStore, generate_execution_id
 from runtime.execution_event_types import ExecutionEventType
 from runtime.execution_logger import get_logger
+from cli.utils.output_formatter import print_next_step, print_success_panel
+from cli.utils.path_formatter import get_relative_path
 
 app = typer.Typer(help="Plan today's bounded execution task")
 console = Console()
@@ -27,6 +29,7 @@ def create(
     store = StateStore(project_path)
     logger = get_logger(project_path)
     runstate = store.load_runstate()
+    root = Path.cwd() if path == Path("projects") else path
 
     if runstate is None:
         console.print("[yellow]No existing RunState found. Creating new one.[/yellow]")
@@ -62,6 +65,7 @@ def create(
     else:
         if not runstate.get("task_queue"):
             console.print("[red]No tasks in queue. Specify --task or update RunState.[/red]")
+            logger.close()
             raise typer.Exit(1)
         runstate["active_task"] = runstate["task_queue"][0]
 
@@ -114,14 +118,31 @@ def create(
     )
     logger.close()
 
-    console.print(f"[green]ExecutionPack created: {execution_id}[/green]")
-    console.print("[bold]Next step:[/bold] Run 'asyncdev run-day' to execute (manual or mock)")
+    pack_path = store.execution_packs_path / f"{execution_id}.md"
+    relative_pack = get_relative_path(pack_path, root)
+    relative_runstate = get_relative_path(store.project_path / "runstate.md", root)
 
-    console.print("\n[bold]Manual Execution Mode:[/bold]")
-    console.print("1. AI reads ExecutionPack from execution-packs/{execution_id}.md")
-    console.print("2. AI executes within task_scope")
-    console.print("3. AI produces ExecutionResult")
-    console.print("4. Run 'asyncdev resume-next-day' to continue")
+    print_success_panel(
+        message=f"ExecutionPack created: {execution_id}",
+        title="Plan-Day Complete",
+        paths=[
+            {"label": "ExecutionPack", "path": str(pack_path)},
+            {"label": "RunState", "path": str(store.project_path / "runstate.md")},
+        ],
+        root=root,
+    )
+
+    print_next_step(
+        action="Run the ExecutionPack with selected mode",
+        command="asyncdev run-day execute",
+        artifact_path=pack_path,
+        root=root,
+        hints=[
+            "External mode: AI reads pack, manual execution",
+            "Live mode: Direct API execution (requires DASHSCOPE_API_KEY)",
+            "Mock mode: Test the flow without real execution",
+        ],
+    )
 
 
 @app.command()
@@ -133,6 +154,7 @@ def show(
     project_path = path / project
     store = StateStore(project_path)
     runstate = store.load_runstate()
+    root = Path.cwd() if path == Path("projects") else path
 
     if runstate is None:
         console.print("[yellow]No RunState found[/yellow]")
@@ -152,6 +174,10 @@ def show(
     table.add_row("decisions_needed", str(len(runstate.get("decisions_needed", []))))
 
     console.print(table)
+
+    runstate_path = store.project_path / "runstate.md"
+    console.print(f"\n[dim]RunState: {get_relative_path(runstate_path, root)}[/dim]")
+    console.print(f"[dim]root: {root}[/dim]")
 
 
 if __name__ == "__main__":
