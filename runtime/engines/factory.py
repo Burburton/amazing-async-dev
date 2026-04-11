@@ -3,13 +3,19 @@
 Provides get_engine() function to select appropriate engine.
 """
 
+from pathlib import Path
+
 from runtime.engines.base import ExecutionEngine
 from runtime.engines.external_tool_engine import ExternalToolEngine
 from runtime.engines.live_api_engine import LiveAPIEngine
 from runtime.engines.mock_engine import MockEngine
 
 
-def get_engine(mode: str = "external", simulate: str = "success") -> ExecutionEngine:
+def get_engine(
+    mode: str = "external",
+    simulate: str = "success",
+    project_path: Path | None = None,
+) -> ExecutionEngine:
     """Get execution engine for specified mode.
 
     Args:
@@ -17,28 +23,18 @@ def get_engine(mode: str = "external", simulate: str = "success") -> ExecutionEn
               Defaults to 'external' (primary mode per design doc)
         simulate: Simulation scenario for mock mode
               'success' (default), 'blocked', 'failed', 'decision'
+        project_path: Project path for persistence (live mode)
 
     Returns:
         ExecutionEngine instance for the mode
 
     Raises:
         ValueError: If mode is not recognized
-
-    Example:
-        engine = get_engine("external")
-        result = engine.prepare(execution_pack)
-
-        engine = get_engine("live")
-        result = engine.run(execution_pack)
-
-        # Mock with scenarios for testing
-        engine = get_engine("mock", simulate="blocked")
-        result = engine.run(execution_pack)
     """
     if mode == "external":
         return ExternalToolEngine()
     elif mode == "live":
-        return LiveAPIEngine()
+        return LiveAPIEngine(project_path)
     elif mode == "mock":
         return MockEngine(simulate=simulate)
     else:
@@ -48,7 +44,7 @@ def get_engine(mode: str = "external", simulate: str = "success") -> ExecutionEn
         )
 
 
-def get_available_modes() -> dict[str, bool]:
+def get_available_modes(project_path: Path | None = None) -> dict[str, bool]:
     """Check availability of all execution modes.
 
     Returns:
@@ -56,6 +52,6 @@ def get_available_modes() -> dict[str, bool]:
     """
     return {
         "external": ExternalToolEngine().is_available(),
-        "live": LiveAPIEngine().is_available(),
+        "live": LiveAPIEngine(project_path).is_available(),
         "mock": MockEngine().is_available(),
     }

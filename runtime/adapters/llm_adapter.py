@@ -1,10 +1,18 @@
 """LLM adapter interface - defines interface for AI execution."""
 
 import os
+import time
 from abc import ABC, abstractmethod
 from typing import Any
 
 from openai import OpenAI
+
+from runtime.api_failure_types import (
+    APIFailureClassification,
+    classify_api_error,
+    is_retryable,
+    get_recovery_hint,
+)
 
 
 class LLMAdapter(ABC):
@@ -36,44 +44,45 @@ class BailianLLMAdapter(LLMAdapter):
     Default model: qwen-plus (can be overridden via DASHSCOPE_MODEL env var)
     """
 
-    def __init__(self) -> None:
+    DEFAULT_TIMEOUT = 120
+    DEFAULT_MAX_RETRIES = 2
+    DEFAULT_RETRY_DELAY = 30
+
+    def __init__(
+        self,
+        timeout: int | None = None,
+        max_retries: int | None = None,
+        retry_delay: int | None = None,
+    ) -> None:
         """Initialize Bailian adapter with OpenAI-compatible client."""
         self.api_key = os.getenv("DASHSCOPE_API_KEY")
         self.model = os.getenv("DASHSCOPE_MODEL", "qwen-plus")
         self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        self.timeout = timeout or self.DEFAULT_TIMEOUT
+        self.max_retries = max_retries or self.DEFAULT_MAX_RETRIES
+        self.retry_delay = retry_delay or self.DEFAULT_RETRY_DELAY
 
         if self.api_key:
             self.client = OpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url,
+                timeout=self.timeout,
             )
         else:
             self.client = None
 
-    def execute(self, execution_pack: dict[str, Any]) -> dict[str, Any]:
-        """Execute task via Bailian API and return ExecutionResult.
-
-        Args:
-            execution_pack: Bounded task definition with constraints
-
-        Returns:
-            ExecutionResult with completion status and artifacts
-        """
+    def execute(
+        self,
+        execution_pack: dict[str, Any],
+        retry_count: int = 0,
+    ) -> dict[str, Any]:
+        """Execute task via Bailian API with retry logic."""
         if not self.client:
-            return {
-                "execution_id": execution_pack.get("execution_id", "unknown"),
-                "status": "failed",
-                "completed_items": [],
-                "artifacts_created": [],
-                "verification_result": {"passed": 0, "failed": 1, "skipped": 0, "details": []},
-                "issues_found": ["DASHSCOPE_API_KEY not configured"],
-                "blocked_reasons": ["Missing API key"],
-                "decisions_required": [],
-                "recommended_next_step": "Set DASHSCOPE_API_KEY environment variable",
-                "metrics": {"files_read": 0, "files_written": 0, "actions_taken": 0},
-                "notes": "API key not available",
-                "duration": "0h0m",
-            }
+            return self._create_failure_result(
+                execution_pack,
+                APIFailureClassification.AUTH_CONFIG_FAILURE,
+                "DASHSCOPE_API_KEY not configured",
+            )
 
         system_prompt = self._build_system_prompt(execution_pack)
         user_prompt = self._build_user_prompt(execution_pack)
@@ -88,24 +97,52 @@ class BailianLLMAdapter(LLMAdapter):
             )
 
             llm_output = response.choices[0].message.content or ""
-
             return self._parse_llm_output(execution_pack, llm_output)
 
         except Exception as e:
-            return {
-                "execution_id": execution_pack.get("execution_id", "unknown"),
-                "status": "failed",
-                "completed_items": [],
-                "artifacts_created": [],
-                "verification_result": {"passed": 0, "failed": 1, "skipped": 0, "details": []},
-                "issues_found": [str(e)],
-                "blocked_reasons": ["API call failed"],
-                "decisions_required": [],
-                "recommended_next_step": "Check API configuration and retry",
-                "metrics": {"files_read": 0, "files_written": 0, "actions_taken": 0},
-                "notes": f"Error: {e}",
-                "duration": "0h0m",
-            }
+            failure = classify_api_error(e)
+
+            if is_retryable(failure) and retry_count < self.max_retries:
+                time.sleep(self.retry_delay)
+                return self.execute(execution_pack, retry_count + 1)
+
+            return self._create_failure_result(
+                execution_pack,
+                failure,
+                str(e),
+                retry_count,
+            )
+
+    def _create_failure_result(
+        self,
+        execution_pack: dict[str, Any],
+        failure: APIFailureClassification,
+        error_message: str,
+        retry_count: int = 0,
+    ) -> dict[str, Any]:
+        """Create ExecutionResult for API failure."""
+        recovery_hint = get_recovery_hint(failure)
+
+        return {
+            "execution_id": execution_pack.get("execution_id", "unknown"),
+            "status": "failed",
+            "completed_items": [],
+            "artifacts_created": [],
+            "verification_result": {"passed": 0, "failed": 1, "skipped": 0, "details": []},
+            "issues_found": [error_message],
+            "blocked_reasons": [],
+            "decisions_required": [],
+            "recommended_next_step": recovery_hint,
+            "metrics": {
+                "files_read": 0,
+                "files_written": 0,
+                "actions_taken": 0,
+                "api_retries": retry_count,
+            },
+            "notes": f"API failure: {failure.value}",
+            "duration": "0h0m",
+            "api_failure_classification": failure.value,
+        }
 
     def _build_system_prompt(self, execution_pack: dict[str, Any]) -> str:
         """Build system prompt from ExecutionPack constraints."""
