@@ -11,6 +11,7 @@ from cli.commands import plan_day, run_day, review_night, resume_next_day
 from cli.commands import init, new_product, new_feature
 from cli.commands import complete_feature, archive_feature
 from cli.commands import sqlite_status, inspect_stop
+from cli.commands import backfill
 from cli.utils.output_formatter import print_next_step, print_phase_indicator
 from cli.utils.path_formatter import get_relative_path
 
@@ -36,6 +37,9 @@ app.add_typer(resume_next_day.app, name="resume-next-day", help="Resume from dec
 # Register lifecycle completion commands
 app.add_typer(complete_feature.app, name="complete-feature", help="Mark feature as completed")
 app.add_typer(archive_feature.app, name="archive-feature", help="Archive completed feature")
+
+# Register historical backfill command
+app.add_typer(backfill.app, name="backfill", help="Backfill historical features into archive")
 
 # Register SQLite commands
 app.add_typer(sqlite_status.app, name="sqlite", help="SQLite state store queries")
