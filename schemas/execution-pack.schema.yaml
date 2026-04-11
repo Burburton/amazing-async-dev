@@ -19,6 +19,15 @@ optional:
   - notes
   - priority
   - time_limit
+  - planning_context
+  - rationale
+  - safe_to_execute
+  - preconditions
+  - archive_references
+  - decision_constraints
+  - blocker_constraints
+  - alternatives
+  - estimated_scope
 
 fields:
   execution_id:
@@ -141,6 +150,134 @@ fields:
     example: "4h"
     required: false
 
+  planning_context:
+    type: object
+    description: Archive-aware planning context (Feature 017)
+    required: false
+    properties:
+      archive_summary:
+        type: object
+        description: Summary of archive data used
+      decision_summary:
+        type: object
+        description: Summary of decision constraints
+      blocker_summary:
+        type: object
+        description: Summary of blocker constraints
+    example:
+      archive_summary:
+        total_archives: 5
+        lessons_available: 12
+      decision_summary:
+        blocking_count: 0
+      blocker_summary:
+        classification: "ready_to_resume"
+
+  rationale:
+    type: object
+    description: Explanation for why this task was recommended (Feature 017)
+    required: false
+    properties:
+      primary_reason:
+        type: string
+        description: Main reason for this recommendation
+      factors:
+        type: array
+        description: Factors considered in recommendation
+        items_type: object
+      lessons_applied:
+        type: array
+        description: Lessons from archives that influenced decision
+        items_type: object
+      patterns_applied:
+        type: array
+        description: Patterns from archives that influenced decision
+        items_type: object
+      warnings:
+        type: array
+        description: Warnings about this plan
+        items_type: object
+      confidence:
+        type: enum
+        description: Confidence level in recommendation
+        values:
+          - high
+          - medium
+          - low
+    example:
+      primary_reason: "Task recommended based on historical patterns"
+      confidence: "high"
+      lessons_applied:
+        - lesson: "Small tasks work better"
+          source: "001-core-objects"
+
+  safe_to_execute:
+    type: boolean
+    description: Whether task is safe to execute without human intervention (Feature 017)
+    example: true
+    required: false
+
+  preconditions:
+    type: array
+    description: Required conditions before execution (Feature 017)
+    items_type: string
+    example:
+      - "Resolve decision: schema format"
+      - "Verify tests pass"
+    required: false
+
+  archive_references:
+    type: array
+    description: Archive records referenced in planning (Feature 017)
+    items_type: object
+    example:
+      - feature_id: "001-core-objects"
+        lessons_count: 3
+        patterns_count: 2
+    required: false
+
+  decision_constraints:
+    type: object
+    description: Decision constraints affecting execution (Feature 017)
+    properties:
+      blocking_decisions:
+        type: array
+        items_type: object
+      pending_count:
+        type: integer
+    required: false
+
+  blocker_constraints:
+    type: object
+    description: Blocker constraints affecting execution (Feature 017)
+    properties:
+      active_blockers:
+        type: array
+        items_type: object
+      recovery_state:
+        type: string
+    required: false
+
+  alternatives:
+    type: array
+    description: Alternative tasks if current blocked (Feature 017)
+    items_type: string
+    example:
+      - "Alternative task 1"
+      - "Alternative task 2"
+    required: false
+
+  estimated_scope:
+    type: enum
+    description: Estimated effort level (Feature 017)
+    values:
+      - quick
+      - half-day
+      - full-day
+      - multi-day
+    example: "half-day"
+    required: false
+
 lifecycle:
   created_by: plan-day workflow
   update_frequency: never
@@ -248,3 +385,83 @@ json_schema:
         - low
     time_limit:
       type: string
+    planning_context:
+      type: object
+      properties:
+        archive_summary:
+          type: object
+        decision_summary:
+          type: object
+        blocker_summary:
+          type: object
+    rationale:
+      type: object
+      properties:
+        primary_reason:
+          type: string
+        factors:
+          type: array
+          items:
+            type: object
+        lessons_applied:
+          type: array
+          items:
+            type: object
+        patterns_applied:
+          type: array
+          items:
+            type: object
+        warnings:
+          type: array
+          items:
+            type: object
+        confidence:
+          enum:
+            - high
+            - medium
+            - low
+    safe_to_execute:
+      type: boolean
+    preconditions:
+      type: array
+      items:
+        type: string
+    archive_references:
+      type: array
+      items:
+        type: object
+        properties:
+          feature_id:
+            type: string
+          lessons_count:
+            type: integer
+          patterns_count:
+            type: integer
+    decision_constraints:
+      type: object
+      properties:
+        blocking_decisions:
+          type: array
+          items:
+            type: object
+        pending_count:
+          type: integer
+    blocker_constraints:
+      type: object
+      properties:
+        active_blockers:
+          type: array
+          items:
+            type: object
+        recovery_state:
+          type: string
+    alternatives:
+      type: array
+      items:
+        type: string
+    estimated_scope:
+      enum:
+        - quick
+        - half-day
+        - full-day
+        - multi-day
