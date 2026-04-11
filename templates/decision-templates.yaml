@@ -1,0 +1,114 @@
+# Decision Templates - Feature 016
+# Reusable decision patterns for common nightly decision scenarios
+
+templates:
+  # Template 1: Continue or change approach
+  - template_id: continue-or-change
+    name: "Continue Current Path or Change Approach"
+    decision_type: technical
+    description: "Decide whether to continue with current implementation path or switch to alternative"
+    question_pattern: "continue with current"
+    question_keywords:
+      - "continue"
+      - "change approach"
+      - "alternative"
+      - "current path"
+    standard_options:
+      - id: continue
+        label: "Continue with current approach"
+        typical_impact: "Minimal disruption, maintain progress"
+      - id: change
+        label: "Change to alternative approach"
+        typical_impact: "May require rework, different timeline"
+      - id: defer
+        label: "Defer decision, gather more information"
+        typical_impact: "Proceed with current path temporarily"
+    default_recommendation: "Continue with current approach"
+    recommendation_logic: "continue_if_progress_good"
+    default_blocking: false
+    default_defer_impact: "Can proceed with current path while decision pending"
+    default_urgency: medium
+
+  # Template 2: Accept partial or continue
+  - template_id: accept-partial-or-continue
+    name: "Accept Partial Result or Continue Execution"
+    decision_type: scope
+    description: "Decide whether to accept partial deliverable or continue to full completion"
+    question_pattern: "accept partial"
+    question_keywords:
+      - "partial"
+      - "accept"
+      - "continue"
+      - "incomplete"
+      - "partial result"
+    standard_options:
+      - id: accept
+        label: "Accept partial result as sufficient"
+        typical_impact: "Faster delivery, may need follow-up later"
+      - id: continue
+        label: "Continue execution for full completion"
+        typical_impact: "Complete delivery, longer timeline"
+      - id: escalate
+        label: "Escalate to stakeholder decision"
+        typical_impact: "External input required"
+    default_recommendation: "Continue for full completion if timeline allows"
+    recommendation_logic: "continue_if_timeline_ok"
+    default_blocking: false
+    default_defer_impact: "Partial result can be used while pending"
+    default_urgency: medium
+
+  # Template 3: Retry or defer
+  - template_id: retry-or-defer
+    name: "Retry Blocked Task or Defer"
+    decision_type: technical
+    description: "Decide whether to retry a blocked/failed task or defer to later"
+    question_pattern: "retry or defer"
+    question_keywords:
+      - "retry"
+      - "defer"
+      - "blocked"
+      - "failed"
+      - "alternative"
+    standard_options:
+      - id: retry
+        label: "Retry same approach"
+        typical_impact: "Same risk profile, may succeed this time"
+      - id: alternative
+        label: "Try alternative approach"
+        typical_impact: "Different risk, may avoid blocker"
+      - id: defer
+        label: "Defer and work on other tasks"
+        typical_impact: "Progress on parallel work, revisit later"
+    default_recommendation: "Try alternative approach if blocker persists"
+    recommendation_logic: "alternative_if_blocked_twice"
+    default_blocking: true
+    default_defer_impact: "Blocked task cannot proceed without decision"
+    default_urgency: high
+
+  # Template 4: Choose priority
+  - template_id: choose-priority
+    name: "Choose Next Priority Task"
+    decision_type: priority
+    description: "Decide which task or feature should take priority next"
+    question_pattern: "which priority"
+    question_keywords:
+      - "priority"
+      - "next task"
+      - "which feature"
+      - "order"
+      - "first"
+    standard_options:
+      - id: original
+        label: "Follow original planned order"
+        typical_impact: "Maintain planned sequence"
+      - id: urgent
+        label: "Prioritize urgent task"
+        typical_impact: "Address immediate needs"
+      - id: dependency
+        label: "Prioritize dependency-blocking task"
+        typical_impact: "Unblock dependent work"
+    default_recommendation: "Follow original planned order"
+    recommendation_logic: "original_if_no_urgent"
+    default_blocking: false
+    default_defer_impact: "Can proceed with any option while pending"
+    default_urgency: low

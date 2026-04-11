@@ -1,0 +1,171 @@
+schema_type: decision-template
+version: "1.0"
+description: Reusable decision template for structured decision handling (Feature 016)
+
+required:
+  - template_id
+  - name
+  - decision_type
+  - description
+  - standard_options
+
+optional:
+  - question_pattern
+  - question_keywords
+  - default_recommendation
+  - recommendation_logic
+  - default_blocking
+  - default_defer_impact
+  - default_urgency
+
+fields:
+  template_id:
+    type: string
+    description: Unique identifier for this template
+    example: "continue-or-change"
+    required: true
+
+  name:
+    type: string
+    description: Human-readable template name
+    example: "Continue Current Path or Change Approach"
+    required: true
+
+  decision_type:
+    type: enum
+    description: Category of decision
+    values:
+      - technical
+      - scope
+      - priority
+      - design
+    example: "technical"
+    required: true
+
+  description:
+    type: string
+    description: What this template is for
+    example: "Decide whether to continue with current implementation path or switch to alternative"
+    required: true
+
+  question_pattern:
+    type: string
+    description: Pattern to match in decision question
+    example: "continue with current"
+    required: false
+
+  question_keywords:
+    type: array
+    description: Keywords to match in decision content
+    items_type: string
+    example: ["continue", "change", "alternative"]
+    required: false
+
+  standard_options:
+    type: array
+    description: Standard options for this decision type
+    items_type: object
+    example:
+      - id: "continue"
+        label: "Continue current approach"
+        typical_impact: "Minimal disruption"
+    required: true
+
+  default_recommendation:
+    type: string
+    description: Default recommendation if no specific context
+    example: "Continue with current approach"
+    required: false
+
+  recommendation_logic:
+    type: string
+    description: Logic hint for recommendation engine
+    example: "continue_if_progress_good"
+    required: false
+
+  default_blocking:
+    type: boolean
+    description: Whether this decision typically blocks tomorrow
+    example: false
+    required: false
+
+  default_defer_impact:
+    type: string
+    description: Default impact of deferring this decision
+    example: "Can proceed with current path while pending"
+    required: false
+
+  default_urgency:
+    type: enum
+    description: Default urgency level
+    values:
+      - high
+      - medium
+      - low
+    example: "medium"
+    required: false
+
+lifecycle:
+  created_by: template author
+  update_frequency: when new decision patterns identified
+  consumed_by: decision template registry, review pack builder
+
+validation:
+  - template_id must be unique
+  - decision_type must be valid enum
+  - standard_options must have at least 2 options
+  - each option must have id or label
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - template_id
+    - name
+    - decision_type
+    - description
+    - standard_options
+  properties:
+    template_id:
+      type: string
+    name:
+      type: string
+    decision_type:
+      enum:
+        - technical
+        - scope
+        - priority
+        - design
+    description:
+      type: string
+    question_pattern:
+      type: string
+    question_keywords:
+      type: array
+      items:
+        type: string
+    standard_options:
+      type: array
+      minItems: 2
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          label:
+            type: string
+          typical_impact:
+            type: string
+    default_recommendation:
+      type: string
+    recommendation_logic:
+      type: string
+    default_blocking:
+      type: boolean
+    default_defer_impact:
+      type: string
+    default_urgency:
+      enum:
+        - high
+        - medium
+        - low

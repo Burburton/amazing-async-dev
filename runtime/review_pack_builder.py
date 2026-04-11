@@ -1,10 +1,13 @@
 """Review pack builder - generates DailyReviewPack from ExecutionResult and RunState.
 
 Feature 015: Enhanced with structured issues_summary, decision inbox, and next_day_recommendation.
+Feature 016: Integrated decision template matching for consistent decision structure.
 """
 
 from datetime import datetime
 from typing import Any
+
+from runtime.decision_templates import enhance_decision_with_template
 
 
 def build_daily_review_pack(
@@ -214,13 +217,14 @@ def _convert_blocked_items(execution_result: dict[str, Any]) -> list[dict[str, A
 
 
 def _convert_decisions(execution_result: dict[str, Any]) -> list[dict[str, Any]]:
-    """Convert decisions_required to enhanced decision inbox format."""
+    """Convert decisions_required to enhanced decision inbox format with template matching."""
     decisions_required = execution_result.get("decisions_required", [])
     decisions_needed = []
     
     for i, decision in enumerate(decisions_required):
         decision_id = f"dec-{i+1:03d}"
-        decisions_needed.append({
+        
+        base_decision = {
             "decision_id": decision_id,
             "decision": decision.get("decision", ""),
             "decision_type": _infer_decision_type(decision),
@@ -231,7 +235,16 @@ def _convert_decisions(execution_result: dict[str, Any]) -> list[dict[str, Any]]
             "blocking_tomorrow": _is_blocking_tomorrow(decision),
             "defer_impact": _infer_defer_impact(decision),
             "urgency": decision.get("urgency", "medium"),
-        })
+        }
+        
+        enhanced = enhance_decision_with_template(base_decision)
+        
+        if "template_id" not in enhanced:
+            enhanced["is_template_based"] = False
+        else:
+            enhanced["is_template_based"] = True
+        
+        decisions_needed.append(enhanced)
     
     return decisions_needed
 

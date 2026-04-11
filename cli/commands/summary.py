@@ -229,9 +229,23 @@ def _display_management_summary(review_pack: dict, root: Path) -> None:
     console.print(f"  Unresolved: {len(unresolved)}")
     
     decisions = review_pack.get('decisions_needed', [])
+    template_count = sum(1 for d in decisions if d.get('is_template_based'))
+    adhoc_count = len(decisions) - template_count
+    
     console.print(f"\n[bold magenta]Decisions Needed: {len(decisions)}[/bold magenta]")
+    if template_count > 0:
+        console.print(f"  [dim]{template_count} template-based, {adhoc_count} ad hoc[/dim]")
+    
     for d in decisions[:3]:
-        console.print(f"  [{d.get('decision_id', '')}] {d.get('decision', '')[:40]}")
+        decision_id = d.get('decision_id', '')
+        template_id = d.get('template_id', '')
+        decision_text = d.get('decision', '')[:40]
+        
+        label = f"[{decision_id}]"
+        if template_id:
+            label += f" [{template_id}]"
+        
+        console.print(f"  {label} {decision_text}")
         if d.get('blocking_tomorrow'):
             console.print(f"    [red]BLOCKING[/red]")
     
@@ -268,9 +282,22 @@ def _display_decision_inbox(review_pack: dict, root: Path) -> None:
         return
     
     for i, d in enumerate(decisions, 1):
-        console.print(f"\n[bold]Decision {i}: {d.get('decision_id', '')}[/bold]")
+        decision_id = d.get('decision_id', '')
+        template_id = d.get('template_id', '')
+        is_template = d.get('is_template_based', False)
+        
+        console.print(f"\n[bold]Decision {i}: {decision_id}[/bold]")
+        
+        if template_id:
+            console.print(f"  [magenta]Template:[/magenta] {template_id}")
+        elif is_template:
+            console.print(f"  [dim](ad hoc decision)[/dim]")
+        
         console.print(f"  [cyan]Question:[/cyan] {d.get('decision', '')}")
         console.print(f"  [cyan]Type:[/cyan] {d.get('decision_type', 'technical')}")
+        
+        if d.get('template_name'):
+            console.print(f"  [dim]Template: {d.get('template_name')}[/dim]")
         
         console.print(f"  [green]Options:[/green]")
         for opt in d.get('options', []):
