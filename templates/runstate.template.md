@@ -30,7 +30,7 @@
 ### current_phase
 - **Type**: string (enum)
 - **Description**: Current phase in the day loop
-- **Allowed values**: `planning`, `executing`, `reviewing`, `blocked`, `completed`
+- **Allowed values**: `planning`, `executing`, `reviewing`, `blocked`, `completed`, `archived`
 - **Example**: `executing`
 
 ### active_task

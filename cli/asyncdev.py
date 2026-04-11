@@ -5,6 +5,7 @@ from rich.console import Console
 
 from cli.commands import plan_day, run_day, review_night, resume_next_day
 from cli.commands import init, new_product, new_feature
+from cli.commands import complete_feature, archive_feature
 
 app = typer.Typer(
     name="asyncdev",
@@ -24,6 +25,10 @@ app.add_typer(plan_day.app, name="plan-day", help="Plan today's bounded task")
 app.add_typer(run_day.app, name="run-day", help="Run today's execution (manual or mock)")
 app.add_typer(review_night.app, name="review-night", help="Generate nightly review pack")
 app.add_typer(resume_next_day.app, name="resume-next-day", help="Resume from decisions")
+
+# Register lifecycle completion commands
+app.add_typer(complete_feature.app, name="complete-feature", help="Mark feature as completed")
+app.add_typer(archive_feature.app, name="archive-feature", help="Archive completed feature")
 
 
 @app.command()

@@ -43,6 +43,7 @@ fields:
       - reviewing
       - blocked
       - completed
+      - archived
     example: "executing"
     required: true
 
@@ -212,6 +213,7 @@ json_schema:
         - reviewing
         - blocked
         - completed
+        - archived
     active_task:
       type: string
     task_queue:
