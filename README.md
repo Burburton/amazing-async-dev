@@ -182,7 +182,8 @@ python -m pytest tests/ -v
 | `test_live_api_hardening.py` | 27 | Live API error handling & retry |
 | `test_ux_improvements.py` | 13 | UX improvements (status, paths, next-step) |
 | `test_backfill.py` | 17 | Historical archive backfill |
-| **Total** | **240** | |
+| `test_workflow_feedback.py` | 29 | Workflow feedback capture |
+| **Total** | **394** | |
 
 ### Test categories
 
@@ -217,6 +218,7 @@ python -m pytest tests/ -v
 | 016 | ✅ Complete | Decision Template System - structured decision templates |
 | 017 | ✅ Complete | Archive-aware Plan Agent - history-aware planning |
 | 018 | ✅ Complete | Limited Batch Operations - batch status, archive, backfill, summary |
+| 019a | ✅ Complete | Workflow Feedback Capture - lightweight issue capture for system hardening |
 
 ---
 
@@ -295,6 +297,15 @@ asyncdev archive list --product {id} --has-lessons
 asyncdev backfill batch --project {id} --dry-run
 asyncdev backfill batch --project {id} --all --limit 5
 asyncdev summary all-projects
+
+# Feature 019a: Workflow Feedback
+asyncdev feedback record --scope system --type cli_behavior --description "..."
+asyncdev feedback record --scope product --product {id} --type execution_pack --description "..."
+asyncdev feedback list
+asyncdev feedback list --followup-needed
+asyncdev feedback show --feedback-id {id}
+asyncdev feedback update --feedback-id {id} --resolution fixed
+asyncdev feedback summary
 ```
 
 ---
