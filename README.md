@@ -212,6 +212,11 @@ python -m pytest tests/ -v
 | 011 | ✅ Complete | Live API Mode Hardening - API failure classification, retry logic, error handling |
 | 012 | ✅ Complete | UX/Ergonomics Improvements - enhanced status, path display, next-step guidance |
 | 013 | ✅ Complete | Historical Archive Backfill - backfill historical features into archive system |
+| 014 | ✅ Complete | Archive Query / History Inspection - archive list/show with filters |
+| 015 | ✅ Complete | Daily Management Summary / Decision Inbox - nightly review layer |
+| 016 | ✅ Complete | Decision Template System - structured decision templates |
+| 017 | ✅ Complete | Archive-aware Plan Agent - history-aware planning |
+| 018 | ✅ Complete | Limited Batch Operations - batch status, archive, backfill, summary |
 
 ---
 
@@ -271,6 +276,25 @@ asyncdev sqlite snapshot --project {id}
 asyncdev inspect-stop show --project {id}
 asyncdev inspect-stop history --project {id}
 asyncdev inspect-stop guidance --project {id}
+
+# Feature 014: Archive Query
+asyncdev archive list
+asyncdev archive list --recent --limit 10
+asyncdev archive list --product {id} --has-patterns
+asyncdev archive show --feature {id}
+
+# Feature 015: Daily Management Summary
+asyncdev summary today
+asyncdev summary decisions
+asyncdev summary issues
+asyncdev summary next-day
+
+# Feature 018: Batch Operations
+asyncdev status --all-features --project {id}
+asyncdev archive list --product {id} --has-lessons
+asyncdev backfill batch --project {id} --dry-run
+asyncdev backfill batch --project {id} --all --limit 5
+asyncdev summary all-projects
 ```
 
 ---

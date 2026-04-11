@@ -1,4 +1,14 @@
-"""backfill command - Archive historical features retroactively."""
+"""backfill command - Archive historical features retroactively.
+
+Feature 013: Historical Archive Backfill
+Feature 018: Limited Batch Operations (batch backfill)
+
+Commands:
+    asyncdev backfill create --project <id> --feature <id> - Single backfill
+    asyncdev backfill batch --project <id> --all           - Batch backfill all eligible
+    asyncdev backfill check --project <id> --feature <id>  - Check eligibility
+    asyncdev backfill list --project <id>                  - List candidates
+"""
 
 from __future__ import annotations
 
@@ -220,6 +230,158 @@ def list(
         console.print("[cyan]Run 'asyncdev backfill create --feature <id>' to archive[/cyan]")
     else:
         console.print("\n[green]All features archived[/green]")
+
+
+@app.command()
+def batch(
+    project: str = typer.Option(..., "--project", "-p", help="Project ID"),
+    all: bool = typer.Option(False, "--all", "-a", help="Backfill all eligible features"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview without saving"),
+    limit: int = typer.Option(10, "--limit", "-l", help="Maximum features to backfill"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Batch backfill multiple eligible historical features.
+
+    Feature 018: Limited Batch Operations
+
+    Scans project for features needing backfill and processes them
+    in one controlled batch operation. Requires --all flag for safety.
+
+    Safety features:
+    - Dry run mode shows what would be backfilled
+    - Requires explicit --all flag
+    - Shows summary before processing
+    - Reports each backfill result
+
+    Examples:
+        asyncdev backfill batch --project demo --dry-run
+        asyncdev backfill batch --project demo --all
+        asyncdev backfill batch --project demo --all --limit 5
+    """
+    root = Path.cwd() if path == Path("projects") else path
+    project_path = path / project
+
+    if not all and not dry_run:
+        console.print("[red]--all flag required for batch backfill[/red]")
+        console.print("[yellow]Use --dry-run to preview first, or --all to proceed[/yellow]")
+        raise typer.Exit(1)
+
+    console.print(Panel(f"Batch Backfill: {project}", title="Feature 018", border_style="yellow"))
+
+    features_path = project_path / "features"
+    archive_path = project_path / "archive"
+
+    if not features_path.exists():
+        console.print("[yellow]No features directory[/yellow]")
+        return
+
+    feature_dirs = [f for f in features_path.iterdir() if f.is_dir()]
+    eligible_features = []
+
+    for feature_dir in feature_dirs:
+        feature_id = feature_dir.name
+        eligibility = check_backfill_eligibility(feature_id, project, path)
+
+        if eligibility.get("eligible"):
+            eligible_features.append({
+                "feature_id": feature_id,
+                "spec_path": eligibility.get("spec_path"),
+                "has_spec": eligibility.get("has_spec", False),
+            })
+
+    if not eligible_features:
+        console.print("[green]No features need backfill[/green]")
+        console.print("[dim]All features already archived[/dim]")
+        return
+
+    if limit > 0:
+        eligible_features = eligible_features[:limit]
+
+    console.print(f"[bold]Found {len(eligible_features)} eligible features[/bold]\n")
+
+    preview_table = Table(title="Batch Preview")
+    preview_table.add_column("Feature ID", style="cyan")
+    preview_table.add_column("Has Spec", style="green")
+    preview_table.add_column("Spec Path", style="dim")
+
+    for ef in eligible_features:
+        spec_path_short = ""
+        if ef.get("spec_path"):
+            spec_path_short = get_relative_path(Path(ef["spec_path"]), root)[:40]
+        preview_table.add_row(
+            ef["feature_id"],
+            "✅" if ef.get("has_spec") else "❌",
+            spec_path_short,
+        )
+
+    console.print(preview_table)
+
+    if dry_run:
+        console.print("\n[yellow]Dry run - no changes made[/yellow]")
+        console.print("[cyan]Run with --all to proceed[/cyan]")
+        return
+
+    console.print(f"\n[bold yellow]Processing {len(eligible_features)} features...[/bold yellow]")
+
+    results_table = Table(title="Batch Results")
+    results_table.add_column("Feature ID", style="cyan")
+    results_table.add_column("Status", style="green")
+    results_table.add_column("Archive Path", style="dim")
+
+    success_count = 0
+    failed_count = 0
+
+    for ef in eligible_features:
+        feature_id = ef["feature_id"]
+        spec_path = Path(ef["spec_path"]) if ef.get("spec_path") else None
+
+        try:
+            archive_pack = build_backfill_archive_pack(
+                feature_id=feature_id,
+                product_id=project,
+                title=None,
+                final_status="completed",
+                delivered_outputs=None,
+                decisions_made=None,
+                lessons_input=None,
+                patterns_input=None,
+                artifact_links=None,
+                historical_notes=None,
+                feature_spec_path=spec_path,
+            )
+
+            archive_dir = project_path / "archive" / feature_id
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            archive_file_path = archive_dir / "archive-pack.yaml"
+            save_archive_pack(archive_pack, archive_file_path)
+
+            relative_archive = get_relative_path(archive_file_path, root)
+            results_table.add_row(feature_id, "✅ Success", relative_archive[:40])
+            success_count += 1
+
+        except Exception as e:
+            results_table.add_row(feature_id, f"❌ Failed: {str(e)[:30]}", "")
+            failed_count += 1
+
+    console.print(results_table)
+
+    console.print(f"\n[bold]Summary:[/bold]")
+    console.print(f"  [green]Success: {success_count}[/green]")
+    console.print(f"  [red]Failed: {failed_count}[/red]")
+
+    if success_count > 0:
+        print_success_panel(
+            message=f"Backfilled {success_count} features",
+            title="Batch Backfill Complete",
+            paths=[{"label": "Archive Directory", "path": str(project_path / "archive")}],
+            root=root,
+        )
+
+    print_next_step(
+        action="Review archived features",
+        command="asyncdev archive list --product " + project,
+    )
 
 
 def _parse_list(input_str: str | None) -> list[str]:

@@ -409,3 +409,121 @@ def _display_next_day_recommendation(review_pack: dict, root: Path) -> None:
 
 if __name__ == "__main__":
     app()
+
+
+@app.command("all-projects")
+def all_projects(
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Show summary across all projects.
+
+    Feature 018: Limited Batch Operations
+
+    Aggregates status across all projects for a portfolio view:
+    - Project count and active features
+    - Phase distribution across all projects
+    - Blocked items count
+    - Pending decisions count
+    - Archive summary
+
+    Examples:
+        asyncdev summary all-projects
+    """
+    root = Path.cwd() if path == Path("projects") else path
+
+    console.print(Panel("All Projects Summary", title="Feature 018", border_style="blue"))
+
+    if not path.exists():
+        console.print("[yellow]No projects directory[/yellow]")
+        console.print(f"[dim]path: {get_relative_path(path, root)}[/dim]")
+        return
+
+    projects = [p for p in path.iterdir() if p.is_dir() and not p.name.startswith(".")]
+
+    if not projects:
+        console.print("[dim]No projects found[/dim]")
+        console.print(f"[dim]root: {root}[/dim]")
+        return
+
+    table = Table(title="Projects Overview")
+    table.add_column("Project", style="cyan")
+    table.add_column("Phase", style="yellow")
+    table.add_column("Features", style="green")
+    table.add_column("Blocked", style="red")
+    table.add_column("Decisions", style="magenta")
+    table.add_column("Archived", style="dim")
+
+    total_projects = 0
+    total_blocked = 0
+    total_decisions = 0
+    total_archived = 0
+    phase_counts = {}
+
+    for project_dir in sorted(projects):
+        runstate_path = project_dir / "runstate.md"
+
+        if runstate_path.exists():
+            store = StateStore(project_dir)
+            runstate = store.load_runstate()
+
+            if runstate:
+                total_projects += 1
+                phase = runstate.get("current_phase", "planning")
+                blocked = len(runstate.get("blocked_items", []))
+                decisions = len(runstate.get("decisions_needed", []))
+
+                phase_counts[phase] = phase_counts.get(phase, 0) + 1
+                total_blocked += blocked
+                total_decisions += decisions
+
+                phase_style = {
+                    "planning": "blue",
+                    "executing": "yellow",
+                    "reviewing": "cyan",
+                    "blocked": "red",
+                    "completed": "green",
+                    "archived": "dim",
+                }
+                style = phase_style.get(phase, "white")
+
+                features_dir = project_dir / "features"
+                features_count = len([f for f in features_dir.iterdir() if f.is_dir()]) if features_dir.exists() else 0
+
+                archive_dir = project_dir / "archive"
+                archived_count = len([f for f in archive_dir.iterdir() if f.is_dir()]) if archive_dir.exists() else 0
+                total_archived += archived_count
+
+                table.add_row(
+                    project_dir.name,
+                    f"[{style}]{phase}[/{style}]",
+                    str(features_count),
+                    str(blocked) if blocked > 0 else "0",
+                    str(decisions) if decisions > 0 else "0",
+                    str(archived_count),
+                )
+
+    console.print(table)
+
+    console.print(f"\n[bold]Aggregated Metrics:[/bold]")
+    console.print(f"  Projects tracked: {total_projects}")
+    console.print(f"  Total blocked items: {total_blocked}")
+    console.print(f"  Total pending decisions: {total_decisions}")
+    console.print(f"  Total archived features: {total_archived}")
+
+    if phase_counts:
+        console.print(f"\n[bold]Phase Distribution:[/bold]")
+        for phase, count in sorted(phase_counts.items()):
+            console.print(f"  {phase}: {count}")
+
+    if total_blocked > 0:
+        console.print(f"\n[yellow]⚠️ {total_blocked} blocked items across projects[/yellow]")
+
+    if total_decisions > 0:
+        console.print(f"\n[magenta]📋 {total_decisions} decisions pending[/magenta]")
+
+    console.print(f"\n[dim]root: {root}[/dim]")
+
+    print_next_step(
+        action="Inspect specific project",
+        command="asyncdev status --project <id> --all-features",
+    )

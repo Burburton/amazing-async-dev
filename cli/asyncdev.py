@@ -54,8 +54,9 @@ app.add_typer(inspect_stop.app, name="inspect-stop", help="Inspect stop point an
 @app.command()
 def status(
     all: bool = typer.Option(False, "--all", help="Show all products and features"),
+    all_features: bool = typer.Option(False, "--all-features", help="Show all features in a project"),
     feature: str = typer.Option(None, "--feature", help="Show specific feature details"),
-    project: str = typer.Option(None, "--project", help="Project ID (required for --feature)"),
+    project: str = typer.Option(None, "--project", help="Project ID (required for --feature or --all-features)"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Show current RunState status.
@@ -63,16 +64,132 @@ def status(
     Levels:
     - Default: Current RunState
     - --all: All products and features summary
+    - --project <id> --all-features: All features in a specific project
     - --feature <id>: Specific feature details
     """
     root = Path.cwd() if path == Path("projects") else path
     
     if all:
         _show_all_status(path, root)
+    elif all_features:
+        _show_all_features_status(project, path, root)
     elif feature:
         _show_feature_status(feature, project, path, root)
     else:
         _show_current_status(path, root)
+
+
+def _show_all_features_status(project: str | None, path: Path, root: Path) -> None:
+    """Show all features in a specific project."""
+    if not project:
+        console.print("[red]--project required when using --all-features[/red]")
+        console.print("[yellow]Example: asyncdev status --all-features --project my-app[/yellow]")
+        raise typer.Exit(1)
+    
+    project_path = path / project
+    
+    if not project_path.exists():
+        console.print(f"[red]Project not found: {project}[/red]")
+        raise typer.Exit(1)
+    
+    console.print(f"[bold cyan]All Features in: {project}[/bold cyan]\n")
+    
+    from runtime.state_store import StateStore
+    from runtime.sqlite_state_store import SQLiteStateStore
+    
+    store = StateStore(project_path)
+    runstate = store.load_runstate()
+    
+    sqlite_store = SQLiteStateStore(project_path)
+    features = sqlite_store.list_features(project)
+    
+    features_dir = project_path / "features"
+    archive_dir = project_path / "archive"
+    
+    phase_style = {
+        "planning": "blue",
+        "executing": "yellow",
+        "reviewing": "cyan",
+        "blocked": "red",
+        "completed": "green",
+        "archived": "dim",
+    }
+    
+    if features:
+        table = Table(title="Features (SQLite)")
+        table.add_column("Feature ID", style="cyan")
+        table.add_column("Name", style="green")
+        table.add_column("Phase", style="yellow")
+        table.add_column("Active Task", style="dim")
+    else:
+        table = Table(title="Features (File-based)")
+        table.add_column("Feature ID", style="cyan")
+        table.add_column("Status", style="yellow")
+        table.add_column("In RunState", style="green")
+        table.add_column("Archived", style="dim")
+    
+    if features:
+        for f in features:
+            feature_id = f.get("feature_id", "")
+            name = f.get("name", feature_id)
+            phase = f.get("phase", "unknown")
+            active_task = f.get("active_task", "")[:30] if f.get("active_task") else ""
+            
+            style = phase_style.get(phase, "white")
+            
+            table.add_row(
+                feature_id,
+                name[:30],
+                f"[{style}]{phase}[/{style}]",
+                active_task,
+            )
+    elif features_dir.exists():
+        feature_dirs = [f for f in features_dir.iterdir() if f.is_dir()]
+        
+        for feature_dir in sorted(feature_dirs):
+            feature_id = feature_dir.name
+            
+            in_runstate = "Y" if runstate and runstate.get("feature_id") == feature_id else "N"
+            archived = "Y" if archive_dir.exists() and (archive_dir / feature_id).exists() else "N"
+            
+            status_text = "archived" if archived == "Y" else ("active" if in_runstate == "Y" else "defined")
+            style = phase_style.get(status_text, "white")
+            
+            table.add_row(feature_id, f"[{style}]{status_text}[/{style}]", in_runstate, archived)
+    
+    console.print(table)
+    
+    phase_summary = {"planning": 0, "executing": 0, "reviewing": 0, "blocked": 0, "completed": 0, "archived": 0}
+    if features:
+        for f in features:
+            phase = f.get("phase", "unknown")
+            if phase in phase_summary:
+                phase_summary[phase] += 1
+    elif features_dir.exists():
+        for feature_dir in features_dir.iterdir():
+            if archive_dir.exists() and (archive_dir / feature_dir.name).exists():
+                phase_summary["archived"] += 1
+            elif runstate and runstate.get("feature_id") == feature_dir.name:
+                phase = runstate.get("current_phase", "planning")
+                if phase in phase_summary:
+                    phase_summary[phase] += 1
+            else:
+                phase_summary["defined"] = phase_summary.get("defined", 0) + 1
+    
+    console.print(f"\n[bold]Phase Distribution:[/bold]")
+    for phase, count in phase_summary.items():
+        if count > 0:
+            console.print(f"  {phase}: {count}")
+    
+    sqlite_store.close()
+    
+    console.print(f"\n[dim]Project: {project}[/dim]")
+    console.print(f"[dim]root: {root}[/dim]")
+    
+    print_next_step(
+        action="Inspect specific feature",
+        command="asyncdev status --feature <id> --project " + project,
+    )
 
 
 def _show_current_status(path: Path, root: Path) -> None:
