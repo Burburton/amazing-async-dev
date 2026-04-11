@@ -153,16 +153,51 @@ The first goal: prove AI can independently make useful progress on a small featu
 
 ---
 
-## Initial milestones
+## Testing
 
-### Feature 001 — Core Object System
-Define six core objects with schemas, templates, and examples.
+The project has comprehensive test coverage using pytest.
 
-### Feature 002 — Day Loop CLI
-Implement `plan-day`, `run-day`, `review-night`, `resume-next-day` commands.
+### Run tests
 
-### Feature 003 — Single Feature Demo
-Run one real feature through the full async day loop.
+```bash
+python -m pytest tests/ -v
+```
+
+### Test coverage
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `test_cli_init.py` | 6 | init create/status commands |
+| `test_cli_new_product.py` | 8 | new-product create/list |
+| `test_cli_new_feature.py` | 7 | new-feature create/list |
+| `test_plan_day.py` | 11 | plan-day create/show |
+| `test_review_night.py` | 11 | review-night generate/show |
+| `test_resume_next_day.py` | 20 | continue-loop/status/unblock/handle-failed |
+| `test_runstate_transitions.py` | 18 | Phase transitions |
+| `test_artifact_generation.py` | 23 | YAML/Markdown format |
+| `test_error_handling.py` | 21 | Error handling |
+| **Total** | **124** | |
+
+### Test categories
+
+- **CLI commands**: All asyncdev commands have test coverage
+- **Phase transitions**: RunState transitions between planning/executing/reviewing/blocked
+- **Artifact format**: YAML block extraction and markdown generation
+- **Error handling**: Missing state, invalid inputs, corrupted files
+
+---
+
+## Implementation status
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| 001 | ✅ Complete | Core Object System - schemas, templates, examples |
+| 002 | ✅ Complete | Day Loop CLI - plan-day, run-day, review-night, resume-next-day |
+| 003 | ✅ Complete | Single Feature Demo - full async day loop |
+| 004 | ✅ Complete | Dual Execution Mode - external tool + live API |
+| 005 | ✅ Complete | Failure/Blocker/Decision Flow |
+| 006 | ✅ Complete | Initialization Commands - init, new-product, new-feature |
+| 007 | ✅ Complete | Tests & Stability - 124 tests passing |
 
 ---
 
