@@ -8,6 +8,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from runtime.state_store import StateStore
+from cli.utils.output_formatter import print_next_step, print_success_panel
+from cli.utils.path_formatter import get_relative_path
 
 app = typer.Typer(help="Mark feature as completed and prepare for archiving")
 console = Console()
@@ -35,6 +37,7 @@ def mark(
     project_path = path / project
     store = StateStore(project_path)
     runstate = store.load_runstate()
+    root = Path.cwd() if path == Path("projects") else path
 
     if runstate is None:
         console.print("[red]No RunState found[/red]")
@@ -90,8 +93,23 @@ def mark(
 
     store.save_runstate(runstate)
 
-    console.print(f"\n[green]Feature {feature_id} marked as {status}[/green]")
-    console.print("Next: Run 'asyncdev archive-feature' to create ArchivePack")
+    runstate_path = store.project_path / "runstate.md"
+
+    print_success_panel(
+        message=f"Feature {feature_id} marked as {status}",
+        title="Complete-Feature Done",
+        paths=[
+            {"label": "RunState", "path": str(runstate_path)},
+        ],
+        root=root,
+    )
+
+    print_next_step(
+        action="Archive the completed feature",
+        command="asyncdev archive-feature create",
+        artifact_path=runstate_path,
+        root=root,
+    )
 
 
 @app.command()

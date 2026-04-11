@@ -11,6 +11,8 @@ from rich.table import Table
 
 from runtime.state_store import StateStore
 from runtime.archive_pack_builder import build_archive_pack
+from cli.utils.output_formatter import print_next_step, print_success_panel
+from cli.utils.path_formatter import get_relative_path
 
 app = typer.Typer(help="Archive a completed feature with lessons and patterns")
 console = Console()
@@ -38,6 +40,7 @@ def create(
     project_path = path / project
     store = StateStore(project_path)
     runstate = store.load_runstate()
+    root = Path.cwd() if path == Path("projects") else path
 
     if runstate is None:
         console.print("[red]No RunState found[/red]")
@@ -91,15 +94,29 @@ def create(
     with open(archive_path, "w", encoding="utf-8") as f:
         yaml.dump(archive_pack, f, default_flow_style=False, sort_keys=False)
 
-    console.print(f"[green]ArchivePack saved: {archive_path}[/green]")
-
     runstate["current_phase"] = "archived"
     runstate["last_action"] = f"Feature archived: {feature_id}"
     runstate["next_recommended_action"] = "Feature archived. Start new feature or product."
     store.save_runstate(runstate)
 
-    console.print(f"\n[green]Feature {feature_id} archived successfully[/green]")
-    console.print("Archived features are excluded from active execution selection.")
+    print_success_panel(
+        message=f"Feature {feature_id} archived successfully",
+        title="Archive Complete",
+        paths=[
+            {"label": "ArchivePack", "path": str(archive_path)},
+        ],
+        root=root,
+    )
+
+    console.print("[dim]Archived features are excluded from active execution selection.[/dim]")
+
+    print_next_step(
+        action="Start a new feature or product",
+        command="asyncdev new-feature create",
+        artifact_path=archive_path,
+        root=root,
+        hints=["Create a new feature for continued development"],
+    )
 
 
 @app.command()
