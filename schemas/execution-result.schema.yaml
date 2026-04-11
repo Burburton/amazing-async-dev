@@ -14,6 +14,7 @@ required:
   - recommended_next_step
 
 optional:
+  - issues_resolved
   - metrics
   - notes
   - warnings
@@ -72,7 +73,7 @@ fields:
 
   issues_found:
     type: array
-    description: Issues discovered
+    description: Issues discovered during execution
     items_type: object
     example:
       - type: warning
@@ -80,6 +81,16 @@ fields:
         severity: low
         resolution: fixed
     required: true
+
+  issues_resolved:
+    type: array
+    description: Issues resolved during this execution
+    items_type: object
+    example:
+      - description: "Test fixture path issue"
+        resolution: "Adjusted fixture setup"
+        resolved_at: "2026-04-11T11:00"
+    required: false
 
   blocked_reasons:
     type: array
@@ -247,6 +258,17 @@ json_schema:
               - fixed
               - pending
               - deferred
+    issues_resolved:
+      type: array
+      items:
+        type: object
+        properties:
+          description:
+            type: string
+          resolution:
+            type: string
+          resolved_at:
+            type: string
     blocked_reasons:
       type: array
       items:

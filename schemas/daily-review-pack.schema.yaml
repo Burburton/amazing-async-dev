@@ -1,6 +1,6 @@
 schema_type: daily-review-pack
-version: "1.0"
-description: Nightly summary for fast human review
+version: "2.0"
+description: Nightly management summary for fast human review (Feature 015)
 
 required:
   - date
@@ -9,29 +9,30 @@ required:
   - today_goal
   - what_was_completed
   - evidence
-  - problems_found
+  - issues_summary
   - blocked_items
   - decisions_needed
   - recommended_options
-  - tomorrow_plan
+  - next_day_recommendation
 
 optional:
-  - risk_summary
+  - risk_watch_items
   - confidence_notes
   - open_followups
   - metrics_summary
+  - historical_context
 
 fields:
   date:
     type: date
     description: Date of this review
-    example: "2024-01-15"
+    example: "2026-04-11"
     required: true
 
   project_id:
     type: string
     description: Project being reviewed
-    example: "demo-product-001"
+    example: "demo-product"
     required: true
 
   feature_id:
@@ -42,17 +43,19 @@ fields:
 
   today_goal:
     type: string
-    description: What was planned today
-    example: "Create schema files for ProductBrief and FeatureSpec"
+    description: Original goal from morning ExecutionPack
+    example: "Implement archive query commands with list/show subcommands"
     required: true
 
   what_was_completed:
     type: array
-    description: Items completed today
-    items_type: string
+    description: Items completed today with brief context
+    items_type: object
     example:
-      - "Created product-brief.schema.yaml"
-      - "Created feature-spec.schema.yaml"
+      - item: "runtime/archive_query.py"
+        description: "Query/filter logic for archives"
+      - item: "cli/commands/archive.py"
+        description: "CLI commands for archive inspection"
     required: true
 
   evidence:
@@ -60,38 +63,68 @@ fields:
     description: Evidence linking to artifacts
     items_type: object
     example:
-      - item: "product-brief.schema.yaml"
-        path: "schemas/product-brief.schema.yaml"
+      - item: "archive_query.py"
+        path: "runtime/archive_query.py"
         verified: true
+        verification_note: "31 tests pass"
     required: true
 
-  problems_found:
-    type: array
-    description: Issues encountered
-    items_type: string
-    example: []
+  issues_summary:
+    type: object
+    description: Structured issue summary with resolved/unresolved distinction
     required: true
+    properties:
+      encountered:
+        type: array
+        description: All issues encountered today
+        items_type: object
+        example:
+          - description: "Test fixture path issue"
+            severity: medium
+            timestamp: "2026-04-11T10:30"
+      resolved:
+        type: array
+        description: Issues resolved during execution
+        items_type: object
+        example:
+          - description: "Test fixture path issue"
+            resolution: "Adjusted fixture setup"
+            resolved_at: "2026-04-11T11:00"
+      unresolved:
+        type: array
+        description: Issues still pending resolution
+        items_type: object
+        example:
+          - description: "LSP type errors in llm_adapter"
+            severity: low
+            blocking: false
+            estimated_impact: "Pre-existing, not blocking"
 
   blocked_items:
     type: array
-    description: Items still blocked
+    description: Items still blocked, awaiting resolution
     items_type: object
     example: []
     required: true
 
   decisions_needed:
     type: array
-    description: Decisions requiring human judgment
+    description: Decision inbox - decisions requiring human judgment
     max_items: 3
     items_type: object
     example:
-      - decision: "schema-format"
+      - decision_id: "dec-001"
+        decision: "SQLite index vs file-based query"
+        decision_type: technical
         options:
-          - "YAML"
-          - "JSON"
-        recommendation: "YAML"
-        impact: "all schema files"
-        urgency: high
+          - "SQLite primary"
+          - "Files primary"
+        recommendation: "Files primary"
+        recommendation_reason: "Human-readable, artifact-first philosophy"
+        impact: "Archive query performance and usability"
+        blocking_tomorrow: false
+        defer_impact: "Minor - current file-based approach works"
+        urgency: medium
     required: true
 
   recommended_options:
@@ -99,62 +132,115 @@ fields:
     description: AI recommendations with reasoning
     items_type: object
     example:
-      - decision: "schema-format"
-        recommended: "YAML"
-        reason: "human-readable, easier editing"
+      - decision_id: "dec-001"
+        decision: "SQLite index vs file-based query"
+        recommended: "Files primary"
+        reason: "Matches artifact-first philosophy, human-readable"
     required: true
 
-  tomorrow_plan:
-    type: string
-    description: Proposed plan for next day
-    example: "Continue with RunState and ExecutionPack schemas"
+  next_day_recommendation:
+    type: object
+    description: Structured recommendation for tomorrow's day-run
     required: true
+    properties:
+      action:
+        type: string
+        description: Recommended next action
+        example: "Continue with Feature 016 - batch operations"
+      preconditions:
+        type: array
+        description: Required conditions before proceeding
+        items_type: string
+        example:
+          - "Feature 015 tests passing"
+          - "Documentation reviewed"
+      safe_to_execute:
+        type: boolean
+        description: Whether next step is safe to execute without human intervention
+        example: true
+      blocking_decisions:
+        type: array
+        description: Decision IDs that block this action
+        items_type: string
+        example: []
+      estimated_scope:
+        type: enum
+        description: Estimated effort for next action
+        values:
+          - quick
+          - half-day
+          - full-day
+          - multi-day
+        example: "half-day"
 
-  risk_summary:
-    type: string
-    description: Summary of risks
-    example: "No significant risks"
+  risk_watch_items:
+    type: array
+    description: Items that may become risky soon (not blocking yet)
+    items_type: object
+    example:
+      - item: "Pre-existing LSP errors"
+        risk_type: quality
+        current_status: "5 errors in unrelated files"
+        escalation_trigger: "Errors increase or spread to new files"
     required: false
 
   confidence_notes:
     type: string
-    description: AI confidence in quality
-    example: "High confidence. All schemas match spec."
+    description: AI confidence in quality of work
+    example: "High confidence. 31 tests pass, diagnostics clean on Feature 014 files."
     required: false
 
   open_followups:
     type: array
-    description: Items to follow up later
+    description: Items to follow up later (not blocking)
     items_type: string
     example:
-      - "Consider validation tests"
-      - "Add update documentation"
+      - "Consider SQLite optimization for large archives"
     required: false
 
   metrics_summary:
     type: object
     description: Summary metrics
     example:
-      execution_time: "2h"
-      files_created: 2
+      execution_time: "1h"
+      files_created: 4
+      tests_added: 31
       decisions_made: 0
     required: false
+
+  historical_context:
+    type: object
+    description: Context from archive history relevant to today's work
+    required: false
+    properties:
+      related_archives:
+        type: array
+        description: Archive IDs with similar patterns
+        items_type: string
+        example: ["001-test-feature"]
+      lessons_applied:
+        type: array
+        description: Lessons from archives that influenced today's work
+        items_type: string
+        example: ["Keep CLI commands simple from Feature 012"]
 
 lifecycle:
   created_by: review-night workflow
   update_frequency: never
-  consumed_by: human reviewer
+  consumed_by: human reviewer, summary command
 
 compression_rules:
   - "Limit decisions_needed to 3 items"
   - "Aggregate minor items"
   - "Focus on impact not details"
   - "Link to evidence not repeat"
+  - "Distinguish resolved from unresolved clearly"
+  - "Highlight blocking vs non-blocking issues"
   - "Target 20-30 min review time"
 
 review_time_targets:
-  completion_scan: "5 min"
-  problems_review: "5 min"
+  completion_scan: "3 min"
+  issues_review: "5 min"
   decisions: "10-15 min"
   tomorrow_confirm: "2-3 min"
   total: "20-30 min"
@@ -170,8 +256,10 @@ validation:
   - today_goal must match morning ExecutionPack
   - decisions_needed must have 3 or fewer
   - each decision must have options and recommendation
+  - each decision must have blocking_tomorrow field
   - evidence paths should exist
-  - tomorrow_plan must be specific
+  - next_day_recommendation.action must be specific
+  - issues_summary must have encountered array
 
 json_schema:
   "$schema": "http://json-schema.org/draft-07/schema#"
@@ -183,11 +271,11 @@ json_schema:
     - today_goal
     - what_was_completed
     - evidence
-    - problems_found
+    - issues_summary
     - blocked_items
     - decisions_needed
     - recommended_options
-    - tomorrow_plan
+    - next_day_recommendation
   properties:
     date:
       type: string
@@ -201,7 +289,12 @@ json_schema:
     what_was_completed:
       type: array
       items:
-        type: string
+        type: object
+        properties:
+          item:
+            type: string
+          description:
+            type: string
     evidence:
       type: array
       items:
@@ -219,10 +312,52 @@ json_schema:
             type: boolean
           verification_note:
             type: string
-    problems_found:
-      type: array
-      items:
-        type: string
+    issues_summary:
+      type: object
+      required:
+        - encountered
+      properties:
+        encountered:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              severity:
+                enum:
+                  - high
+                  - medium
+                  - low
+              timestamp:
+                type: string
+        resolved:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              resolution:
+                type: string
+              resolved_at:
+                type: string
+        unresolved:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              severity:
+                enum:
+                  - high
+                  - medium
+                  - low
+              blocking:
+                type: boolean
+              estimated_impact:
+                type: string
     blocked_items:
       type: array
       items:
@@ -248,19 +383,35 @@ json_schema:
         type: object
         required:
           - decision
+          - decision_type
           - options
           - recommendation
           - impact
+          - blocking_tomorrow
         properties:
+          decision_id:
+            type: string
           decision:
             type: string
+          decision_type:
+            enum:
+              - technical
+              - scope
+              - priority
+              - design
           options:
             type: array
             items:
               type: string
           recommendation:
             type: string
+          recommendation_reason:
+            type: string
           impact:
+            type: string
+          blocking_tomorrow:
+            type: boolean
+          defer_impact:
             type: string
           urgency:
             enum:
@@ -276,16 +427,55 @@ json_schema:
           - recommended
           - reason
         properties:
+          decision_id:
+            type: string
           decision:
             type: string
           recommended:
             type: string
           reason:
             type: string
-    tomorrow_plan:
-      type: string
-    risk_summary:
-      type: string
+    next_day_recommendation:
+      type: object
+      required:
+        - action
+        - safe_to_execute
+      properties:
+        action:
+          type: string
+        preconditions:
+          type: array
+          items:
+            type: string
+        safe_to_execute:
+          type: boolean
+        blocking_decisions:
+          type: array
+          items:
+            type: string
+        estimated_scope:
+          enum:
+            - quick
+            - half-day
+            - full-day
+            - multi-day
+    risk_watch_items:
+      type: array
+      items:
+        type: object
+        properties:
+          item:
+            type: string
+          risk_type:
+            enum:
+              - quality
+              - timeline
+              - scope
+              - dependency
+          current_status:
+            type: string
+          escalation_trigger:
+            type: string
     confidence_notes:
       type: string
     open_followups:
@@ -299,5 +489,18 @@ json_schema:
           type: string
         files_created:
           type: integer
+        tests_added:
+          type: integer
         decisions_made:
           type: integer
+    historical_context:
+      type: object
+      properties:
+        related_archives:
+          type: array
+          items:
+            type: string
+        lessons_applied:
+          type: array
+          items:
+            type: string
