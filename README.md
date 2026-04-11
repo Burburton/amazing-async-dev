@@ -176,7 +176,9 @@ python -m pytest tests/ -v
 | `test_runstate_transitions.py` | 18 | Phase transitions |
 | `test_artifact_generation.py` | 23 | YAML/Markdown format |
 | `test_error_handling.py` | 21 | Error handling |
-| **Total** | **124** | |
+| `test_complete_archive.py` | 16 | Completion & archive flow |
+| `test_sqlite_state_store.py` | 20 | SQLite persistence layer |
+| **Total** | **160** | |
 
 ### Test categories
 
@@ -184,6 +186,7 @@ python -m pytest tests/ -v
 - **Phase transitions**: RunState transitions between planning/executing/reviewing/blocked
 - **Artifact format**: YAML block extraction and markdown generation
 - **Error handling**: Missing state, invalid inputs, corrupted files
+- **SQLite persistence**: Structured state store with recovery queries
 
 ---
 
@@ -197,8 +200,9 @@ python -m pytest tests/ -v
 | 004 | ✅ Complete | Dual Execution Mode - external tool + live API |
 | 005 | ✅ Complete | Failure/Blocker/Decision Flow |
 | 006 | ✅ Complete | Initialization Commands - init, new-product, new-feature |
-| 007 | ✅ Complete | Tests & Stability - 140 tests passing |
+| 007 | ✅ Complete | Tests & Stability - 160 tests passing |
 | 008 | ✅ Complete | Completion & Archive Flow - complete-feature, archive-feature |
+| 009 | ✅ Complete | SQLite State Store - structured persistence layer |
 
 ---
 
@@ -250,6 +254,11 @@ asyncdev review-night
 asyncdev resume-next-day
 asyncdev complete-feature mark
 asyncdev archive-feature create
+asyncdev sqlite history --project {id} --feature {id}
+asyncdev sqlite transitions --project {id}
+asyncdev sqlite recovery --project {id} --feature {id}
+asyncdev sqlite features --project {id}
+asyncdev sqlite snapshot --project {id}
 ```
 
 ---

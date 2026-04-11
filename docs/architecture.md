@@ -315,6 +315,141 @@ RunState: {
 
 ---
 
+## Persistence Layer: Files vs SQLite
+
+Feature 009 introduced SQLite as a structured persistence backbone while keeping file artifacts as human-readable first-class objects.
+
+### Design Philosophy
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     DUAL PERSISTENCE MODEL                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   FILES (Human-readable)          SQLITE (Structured)               │
+│   ─────────────────────          ──────────────────                │
+│   • feature-spec.yaml            • current feature status           │
+│   • execution-pack.yaml/.md      • latest runstate metadata         │
+│   • execution-result.md          • event history                    │
+│   • daily-review-pack.md         • transition history               │
+│   • archive-pack.yaml            • archive metadata/index           │
+│                                                                      │
+│   Purpose: Human review           Purpose: Query & recovery         │
+│   Format: Markdown/YAML          Format: Relational tables          │
+│   Access: File read/write        Access: SQL queries                │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Files: Human-Readable Artifacts
+
+**Purpose**: Enable human review, inspection, and manual editing.
+
+| Artifact | Why File? |
+|----------|-----------|
+| feature-spec.yaml | Human defines scope, reads during review |
+| execution-pack.yaml | Human approves bounded task |
+| execution-result.md | Human reviews outcome |
+| daily-review-pack.md | Human reads nightly summary |
+| archive-pack.yaml | Human accesses lessons for future features |
+
+**Characteristics**:
+- Immutable after creation (except RunState)
+- Markdown/YAML format for readability
+- Stored in project directories for visibility
+- Can be edited manually if needed
+
+### SQLite: Structured Persistence
+
+**Purpose**: Enable queries, recovery, and history tracking.
+
+| Table | Purpose |
+|-------|---------|
+| products | Product registry |
+| features | Feature status tracking |
+| runstate_snapshots | Point-in-time state recovery |
+| execution_events | Event history for debugging |
+| lifecycle_transitions | Phase transition audit trail |
+| archive_records | Archive metadata index |
+
+**Characteristics**:
+- Updated on every state change
+- JSON fields for complex data (task_queue, blocked_items)
+- Timestamps for temporal queries
+- Foreign key relationships for integrity
+
+### SQLiteStateStore: Dual Writer
+
+```python
+# SQLiteStateStore mirrors StateStore interface
+store = SQLiteStateStore(project_path)
+
+# Writes to BOTH file AND SQLite
+store.save_runstate(runstate)
+# → writes runstate.md (file)
+# → writes runstate_snapshots table (SQLite)
+# → writes execution_events table (SQLite)
+# → updates features table phase
+
+# Reads from file (human-readable)
+runstate = store.load_runstate()
+# → reads runstate.md
+
+# Queries from SQLite (structured)
+info = store.get_recovery_info(feature_id)
+# → queries runstate_snapshots, execution_events, lifecycle_transitions
+```
+
+### When to Use Each
+
+| Scenario | Use | Why |
+|----------|-----|-----|
+| Human reads feature spec | File | Markdown readable |
+| Human edits execution pack | File | YAML editable |
+| AI queries recovery info | SQLite | Structured query |
+| AI checks phase transitions | SQLite | History table |
+| AI finds archived features | SQLite | Archive index |
+| System logs execution event | SQLite | Event table |
+
+### Database Location
+
+```
+projects/{product_id}/.runtime/amazing_async_dev.db
+```
+
+Or globally:
+```
+.runtime/amazing_async_dev.db
+```
+
+### CLI Access
+
+```bash
+# SQLite queries (structured)
+asyncdev sqlite history --project {id} --feature {id}
+asyncdev sqlite transitions --project {id}
+asyncdev sqlite recovery --project {id} --feature {id}
+asyncdev sqlite features --project {id}
+asyncdev sqlite snapshot --project {id}
+```
+
+### Recovery Example
+
+```python
+# AI needs to resume after interruption
+info = store.get_recovery_info("001-auth")
+
+# Returns structured recovery data:
+{
+    "latest_snapshot": {...},      # Last known state
+    "recent_events": [...],        # Recent actions
+    "transitions": [...],          # Phase changes
+    "can_resume": True             # Recovery possible?
+}
+```
+
+---
+
 ## Key Design Decisions
 
 ### Why RunState is Central
