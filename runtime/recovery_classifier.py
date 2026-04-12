@@ -3,6 +3,12 @@
 from enum import Enum
 from typing import Any
 
+from runtime.execution_policy import (
+    check_must_pause_conditions,
+    get_policy_mode,
+    PolicyMode,
+)
+
 
 class RecoveryClassification(str, Enum):
     """Classification of workflow stop states for recovery decisions.
@@ -233,7 +239,50 @@ def get_recovery_guidance(runstate: dict[str, Any]) -> dict[str, Any]:
         "phase": runstate.get("current_phase"),
         "blocked_count": len(runstate.get("blocked_items", [])),
         "decisions_count": len(runstate.get("decisions_needed", [])),
+        "policy_mode": get_policy_mode(runstate).value,
         "recommended_action": guidance["recommended_action"],
         "explanation": guidance["explanation"],
         "warnings": guidance["warnings"],
     }
+
+
+def get_policy_pause_reason(runstate: dict[str, Any]) -> dict[str, Any] | None:
+    """Get structured pause reason from policy checks.
+    
+    Args:
+        runstate: Current RunState dictionary
+        
+    Returns:
+        PauseReason dict if must pause, None if can proceed
+    """
+    pause_reason = check_must_pause_conditions(runstate)
+    if pause_reason:
+        return pause_reason.to_dict()
+    return None
+
+
+def can_auto_proceed(runstate: dict[str, Any]) -> tuple[bool, dict[str, Any] | None]:
+    """Check if workflow can auto-proceed based on policy.
+    
+    Args:
+        runstate: Current RunState dictionary
+        
+    Returns:
+        (can_proceed, pause_reason_dict_if_blocked)
+    """
+    pause_reason = check_must_pause_conditions(runstate)
+    if pause_reason:
+        return False, pause_reason.to_dict()
+    
+    policy_mode = get_policy_mode(runstate)
+    
+    if policy_mode == PolicyMode.CONSERVATIVE:
+        return False, {
+            "category": "policy_boundary",
+            "summary": "Conservative policy requires manual confirmation",
+            "why": f"Policy mode: {policy_mode.value}",
+            "required_to_continue": "Proceed manually or change policy mode",
+            "suggested_next_action": "asyncdev policy set --mode balanced",
+        }
+    
+    return True, None

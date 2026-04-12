@@ -1,0 +1,245 @@
+schema_type: execution-policy
+version: "1.0"
+description: Low-interruption execution policy for workflow automation (Feature 020)
+
+# Policy modes determine how conservative the system should be
+policy_modes:
+  conservative:
+    description: "Ask for confirmation on most transitions"
+    auto_continue:
+      - execution_success_to_review  # Only this auto-continues in conservative
+    must_pause:
+      - decisions_needed_not_empty
+      - blocked_items_not_empty
+      - scope_change_detected
+      - git_push_requested
+      - remote_mutation
+      - irreversible_archive
+      - batch_multi_feature
+      - external_api_side_effect
+      - promotion_externalization
+    conditional_pause: []  # Everything else pauses in conservative
+
+  balanced:
+    description: "Auto-continue safe transitions, pause for decisions/risky"
+    auto_continue:
+      - execution_success_to_review
+      - review_pack_generated
+      - safe_state_advance
+      - non_destructive_artifact_creation
+    must_pause:
+      - decisions_needed_not_empty
+      - blocked_items_not_empty
+      - scope_change_detected
+      - git_push_requested
+      - remote_mutation
+      - irreversible_archive
+      - batch_multi_feature
+      - external_api_side_effect
+      - promotion_externalization
+    conditional_pause:
+      - first_feature_in_product  # Pause to confirm initial feature
+      - unfamiliar_pattern_detected  # May need human guidance
+
+  low_interruption:
+    description: "Minimize interruptions, only pause for blockers/risky"
+    auto_continue:
+      - execution_success_to_review
+      - review_pack_generated
+      - safe_state_advance
+      - non_destructive_artifact_creation
+      - next_safe_task_in_queue
+      - routine_cli_commands
+    must_pause:
+      - blocked_items_not_empty  # Still must pause for blockers
+      - git_push_requested
+      - remote_mutation
+      - irreversible_archive
+      - batch_multi_feature
+      - external_api_side_effect
+      - promotion_externalization
+    conditional_pause:
+      - decisions_needed_not_empty  # In low-interruption, decisions may auto-resolve
+      - scope_change_detected  # Major scope changes still need review
+
+# Default mode
+default_mode: "conservative"
+
+# Pause categories for structured display
+pause_categories:
+  decision_required:
+    description: "Human decision needed before proceeding"
+    color: "yellow"
+    urgency: "high"
+  
+  blocker:
+    description: "External dependency or issue blocking progress"
+    color: "red"
+    urgency: "critical"
+  
+  risky_action:
+    description: "Action with external side effects or irreversible consequences"
+    color: "magenta"
+    urgency: "high"
+  
+  scope_change:
+    description: "Task scope has changed from original plan"
+    color: "orange"
+    urgency: "medium"
+  
+  policy_boundary:
+    description: "Current policy mode requires pause for this transition"
+    color: "blue"
+    urgency: "low"
+
+# Auto-continue conditions
+auto_continue_rules:
+  execution_success_to_review:
+    trigger: "execution_result.status == success"
+    action: "generate_review_pack"
+    conditions:
+      - "no decisions_needed"
+      - "no blocked_items"
+      - "no scope_change_detected"
+      - "no pending risky actions"
+    notes: "Safe to proceed after successful execution"
+
+  review_pack_generated:
+    trigger: "review_pack.created == true"
+    action: "advance_to_safe_state"
+    conditions:
+      - "review_pack.validated == true"
+    notes: "Review artifact ready, system in safe state"
+
+  safe_state_advance:
+    trigger: "runstate.current_phase in [planning, reviewing]"
+    action: "proceed_to_next_safe_step"
+    conditions:
+      - "no blockers"
+      - "no decisions"
+      - "next step is bounded and safe"
+    notes: "Normal workflow progression"
+
+  non_destructive_artifact_creation:
+    trigger: "artifact.type in [schema, template, doc, test]"
+    action: "create_artifact"
+    conditions:
+      - "artifact does not overwrite existing"
+      - "no external side effects"
+    notes: "Safe internal artifact creation"
+
+# Must-pause conditions (always pause regardless of mode)
+must_pause_rules:
+  decisions_needed_not_empty:
+    trigger: "len(runstate.decisions_needed) > 0"
+    category: "decision_required"
+    required_to_continue: "Make decision or use --force"
+    suggested_action: "asyncdev resume-next-day continue-loop --decision <choice>"
+
+  blocked_items_not_empty:
+    trigger: "len(runstate.blocked_items) > 0"
+    category: "blocker"
+    required_to_continue: "Resolve blocker or use alternative task"
+    suggested_action: "asyncdev resume-next-day unblock --retry or --alternative <task>"
+
+  scope_change_detected:
+    trigger: "runstate.scope_change_flag == true"
+    category: "scope_change"
+    required_to_continue: "Acknowledge scope change or revert"
+    suggested_action: "Review scope change, use --acknowledge-scope or --revert"
+
+  git_push_requested:
+    trigger: "action.type == git_push"
+    category: "risky_action"
+    required_to_continue: "Confirm push to remote"
+    suggested_action: "Use --confirm-push to proceed"
+
+  remote_mutation:
+    trigger: "action.target in [github, external_api, remote_service]"
+    category: "risky_action"
+    required_to_continue: "Confirm external mutation"
+    suggested_action: "Use --confirm-external to proceed"
+
+  irreversible_archive:
+    trigger: "action.type == archive and action.irreversible == true"
+    category: "risky_action"
+    required_to_continue: "Confirm irreversible archive operation"
+    suggested_action: "Use --confirm-archive to proceed"
+
+  batch_multi_feature:
+    trigger: "action.scope == multi_feature"
+    category: "risky_action"
+    required_to_continue: "Confirm batch operation affecting multiple features"
+    suggested_action: "Use --confirm-batch to proceed"
+
+  external_api_side_effect:
+    trigger: "action.has_side_effects == true and action.external == true"
+    category: "risky_action"
+    required_to_continue: "Confirm external API action with side effects"
+    suggested_action: "Use --confirm-external to proceed"
+
+  promotion_externalization:
+    trigger: "action.type == promotion_externalization"
+    category: "risky_action"
+    required_to_continue: "Confirm promotion to external issue tracker"
+    suggested_action: "Use --confirm-promotion to proceed"
+
+# Risky action types for detection
+risky_action_types:
+  - git_push
+  - git_commit_to_remote
+  - archive_irreversible
+  - batch_multi_feature
+  - external_api_mutation
+  - promotion_externalization
+  - github_issue_create
+  - remote_state_change
+
+# Pause reason model
+pause_reason_structure:
+  required_fields:
+    - category
+    - summary
+    - why
+    - required_to_continue
+    - suggested_next_action
+  
+  example:
+    category: "decision_required"
+    summary: "Pending decision on schema format"
+    why: "RunState contains 1 unresolved decision: 'schema-format'"
+    required_to_continue: "Make decision (approve/revise/defer) or use --force"
+    suggested_next_action: "asyncdev resume-next-day continue-loop --decision approve"
+
+# Integration points
+integrates_with:
+  - RunState.current_phase
+  - RunState.decisions_needed
+  - RunState.blocked_items
+  - RunState.scope_change_flag
+  - recovery_classifier.ResumeEligibility
+  - execution_pack.validation
+  - review_pack_builder
+  - workflow_feedback.promotion
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  properties:
+    policy_mode:
+      enum: ["conservative", "balanced", "low_interruption"]
+      default: "conservative"
+    scope_change_flag:
+      type: boolean
+      default: false
+    pending_risky_actions:
+      type: array
+      items:
+        type: object
+        properties:
+          action_type:
+            type: string
+          target:
+            type: string
+          requires_confirmation:
+            type: boolean

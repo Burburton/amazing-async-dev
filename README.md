@@ -184,7 +184,8 @@ python -m pytest tests/ -v
 | `test_backfill.py` | 17 | Historical archive backfill |
 | `test_workflow_feedback.py` | 29 | Workflow feedback capture |
 | `test_feedback_promotion.py` | 22 | Feedback promotion / issue escalation |
-| **Total** | **444** | |
+| `test_execution_policy.py` | 38 | Execution policy / auto-continue rules |
+| **Total** | **482** | |
 
 ### Test categories
 
@@ -222,6 +223,7 @@ python -m pytest tests/ -v
 | 019a | ✅ Complete | Workflow Feedback Capture - lightweight issue capture for system hardening |
 | 019b | ✅ Complete | Workflow Feedback Triage - confidence levels, problem domain classification |
 | 019c | ✅ Complete | Feedback Promotion / Issue Escalation - controlled promotion to formal follow-up |
+| 020 | ✅ Complete | Low-Interruption Execution Policy - auto-continue safe transitions, pause for risky |
 
 ---
 
@@ -320,6 +322,15 @@ asyncdev feedback promotions list
 asyncdev feedback promotions list --status open --reason system_bug
 asyncdev feedback promotions show --promotion-id {id}
 asyncdev feedback promotions update --promotion-id {id} --status addressed --note "Fixed"
+
+# Feature 020: Execution Policy
+asyncdev policy show
+asyncdev policy set --mode balanced
+asyncdev policy modes
+asyncdev policy scope-flag --set-flag true
+asyncdev policy scope-flag --clear
+asyncdev policy risky-actions --list
+asyncdev policy risky-actions --clear-all
 ```
 
 ---

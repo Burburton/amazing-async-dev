@@ -1,6 +1,6 @@
 schema_type: runstate
-version: "1.0"
-description: Current execution state of a project or feature for pause/resume
+version: "1.1"
+description: Current execution state of a project or feature for pause/resume with policy integration (Feature 020)
 
 required:
   - project_id
@@ -20,6 +20,9 @@ optional:
   - artifacts
   - notes
   - health_status
+  - policy_mode
+  - scope_change_flag
+  - pending_risky_actions
 
 fields:
   project_id:
@@ -143,6 +146,34 @@ fields:
       - blocked
       - failed
     example: "healthy"
+    required: false
+
+  policy_mode:
+    type: enum
+    description: Execution policy mode for auto-continue/pause behavior (Feature 020)
+    values:
+      - conservative
+      - balanced
+      - low_interruption
+    example: "conservative"
+    required: false
+    default: "conservative"
+
+  scope_change_flag:
+    type: boolean
+    description: Flag indicating task scope has changed from original plan (Feature 020)
+    example: false
+    required: false
+    default: false
+
+  pending_risky_actions:
+    type: array
+    description: List of pending risky actions requiring confirmation (Feature 020)
+    items_type: object
+    example:
+      - action_type: "git_push"
+        target: "origin/main"
+        requires_confirmation: true
     required: false
 
 lifecycle:
@@ -278,3 +309,23 @@ json_schema:
         - warning
         - blocked
         - failed
+    policy_mode:
+      enum:
+        - conservative
+        - balanced
+        - low_interruption
+      default: conservative
+    scope_change_flag:
+      type: boolean
+      default: false
+    pending_risky_actions:
+      type: array
+      items:
+        type: object
+        properties:
+          action_type:
+            type: string
+          target:
+            type: string
+          requires_confirmation:
+            type: boolean
