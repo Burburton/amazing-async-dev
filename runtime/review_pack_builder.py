@@ -4,9 +4,11 @@ Feature 015: Enhanced with structured issues_summary, decision inbox, and next_d
 Feature 016: Integrated decision template matching for consistent decision structure.
 Feature 019a: Integrated workflow_feedback section for workflow/system issues.
 Feature 019c: Integrated promotions section for promoted feedback.
+Feature 033: Enriched with doctor assessment, recovery guidance, and feedback handoff signals.
 """
 
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from runtime.decision_templates import enhance_decision_with_template
@@ -17,6 +19,7 @@ from runtime.feedback_promotion_store import create_promotions_for_review
 def build_daily_review_pack(
     execution_result: dict[str, Any],
     runstate: dict[str, Any],
+    project_path: Path | None = None,
     workflow_feedbacks: list[dict[str, Any]] | None = None,
     promotions: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -38,6 +41,11 @@ def build_daily_review_pack(
         "next_day_recommendation": _build_next_day_recommendation(execution_result, runstate),
         "tomorrow_plan": _build_tomorrow_plan(execution_result),
     }
+    
+    if project_path:
+        doctor_assessment = _build_doctor_assessment(project_path)
+        if doctor_assessment:
+            review_pack["doctor_assessment"] = doctor_assessment
 
     if workflow_feedbacks:
         review_pack["workflow_feedback"] = create_workflow_feedback_for_review(workflow_feedbacks)
@@ -148,31 +156,48 @@ def _build_issues_summary(execution_result: dict[str, Any]) -> dict[str, Any]:
     
     encountered = []
     for issue in issues_found:
-        encountered.append({
-            "description": issue.get("description", str(issue)),
-            "severity": issue.get("severity", "medium"),
-            "timestamp": issue.get("timestamp", ""),
-        })
+        if isinstance(issue, dict):
+            encountered.append({
+                "description": issue.get("description", ""),
+                "severity": issue.get("severity", "medium"),
+                "timestamp": issue.get("timestamp", ""),
+            })
+        else:
+            encountered.append({
+                "description": str(issue),
+                "severity": "medium",
+                "timestamp": "",
+            })
     
     resolved = []
     for issue in issues_resolved:
-        resolved.append({
-            "description": issue.get("description", ""),
-            "resolution": issue.get("resolution", ""),
-            "resolved_at": issue.get("resolved_at", ""),
-        })
+        if isinstance(issue, dict):
+            resolved.append({
+                "description": issue.get("description", ""),
+                "resolution": issue.get("resolution", ""),
+                "resolved_at": issue.get("resolved_at", ""),
+            })
     
     unresolved = []
     for issue in issues_found:
-        resolution = issue.get("resolution", "pending")
-        if resolution == "pending" or resolution == "deferred":
-            severity = issue.get("severity", "medium")
-            blocking = resolution == "pending" and severity != "low"
+        if isinstance(issue, dict):
+            resolution = issue.get("resolution", "pending")
+            if resolution == "pending" or resolution == "deferred":
+                severity = issue.get("severity", "medium")
+                blocking = resolution == "pending" and severity != "low"
+                unresolved.append({
+                    "description": issue.get("description", ""),
+                    "severity": severity,
+                    "blocking": blocking,
+                    "estimated_impact": _estimate_impact(issue),
+                })
+        else:
+            # String issues are always pending and blocking
             unresolved.append({
-                "description": issue.get("description", str(issue)),
-                "severity": severity,
-                "blocking": blocking,
-                "estimated_impact": _estimate_impact(issue),
+                "description": str(issue),
+                "severity": "medium",
+                "blocking": True,
+                "estimated_impact": "May slow down execution",
             })
     
     return {
@@ -391,13 +416,14 @@ def _build_risk_watch_items(execution_result: dict[str, Any], runstate: dict[str
     
     issues = execution_result.get("issues_found", [])
     for issue in issues:
-        if issue.get("resolution") == "deferred":
-            risks.append({
-                "item": issue.get("description", ""),
-                "risk_type": "quality",
-                "current_status": "Deferred",
-                "escalation_trigger": "Issue persists or severity increases",
-            })
+        if isinstance(issue, dict):
+            if issue.get("resolution") == "deferred":
+                risks.append({
+                    "item": issue.get("description", ""),
+                    "risk_type": "quality",
+                    "current_status": "Deferred",
+                    "escalation_trigger": "Issue persists or severity increases",
+                })
     
     if runstate.get("decisions_needed") and len(runstate.get("decisions_needed", [])) > 1:
         risks.append({
@@ -462,3 +488,54 @@ def _build_historical_context(runstate: dict[str, Any]) -> dict[str, Any] | None
         "related_archives": related_archives,
         "lessons_applied": lessons_applied,
     }
+
+
+def _build_doctor_assessment(project_path: Path) -> dict[str, Any] | None:
+    """Build doctor assessment section from diagnose_workspace."""
+    from runtime.workspace_doctor import diagnose_workspace
+    
+    diagnosis = diagnose_workspace(project_path)
+    
+    assessment: dict[str, Any] = {
+        "doctor_status": diagnosis.doctor_status,
+        "health_status": diagnosis.health_status,
+        "initialization_mode": diagnosis.initialization_mode,
+        "current_phase": diagnosis.current_phase,
+        "verification_status": diagnosis.verification_status,
+        "pending_decisions": diagnosis.pending_decisions,
+        "blocked_items_count": diagnosis.blocked_items_count,
+        "recommended_action": diagnosis.recommended_action,
+        "suggested_command": diagnosis.suggested_command,
+    }
+    
+    if diagnosis.likely_cause:
+        assessment["recovery_summary"] = {
+            "likely_cause": diagnosis.likely_cause,
+            "what_to_check": diagnosis.what_to_check,
+            "recovery_steps": diagnosis.recovery_steps,
+            "fallback_next_step": diagnosis.fallback_next_step,
+        }
+    
+    if diagnosis.feedback_suggestion:
+        feedback_handoff: dict[str, Any] = {
+            "suggestion": diagnosis.feedback_suggestion,
+            "reason": diagnosis.feedback_reason,
+            "suggested_command": diagnosis.suggested_feedback_command,
+        }
+        
+        if diagnosis.feedback_draft_summary:
+            feedback_handoff["draft_summary"] = diagnosis.feedback_draft_summary
+            feedback_handoff["draft_fields"] = diagnosis.feedback_draft_fields
+        
+        assessment["feedback_handoff"] = feedback_handoff
+    
+    if diagnosis.warnings:
+        assessment["warnings"] = diagnosis.warnings
+    
+    if diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT":
+        assessment["closeout_reminder"] = {
+            "status": "Feature complete, pending archive/closeout",
+            "action": "Archive or start new feature",
+        }
+    
+    return assessment

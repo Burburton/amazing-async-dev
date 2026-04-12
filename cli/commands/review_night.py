@@ -46,7 +46,7 @@ def generate(
         console.print(f"[red]ExecutionResult not found: {execution_id}[/red]")
         raise typer.Exit(1)
 
-    review_pack = build_daily_review_pack(execution_result, runstate)
+    review_pack = build_daily_review_pack(execution_result, runstate, project_path)
 
     console.print(Panel(f"DailyReviewPack Preview", title="review-night", border_style="green"))
 
@@ -64,6 +64,10 @@ def generate(
     table.add_row("decisions", str(len(review_pack["decisions_needed"])))
 
     console.print(table)
+    
+    doctor_assessment = review_pack.get("doctor_assessment")
+    if doctor_assessment:
+        _display_doctor_assessment(doctor_assessment)
 
     if review_pack["decisions_needed"]:
         console.print("\n[bold yellow]Decisions Needed:[/bold yellow]")
@@ -141,6 +145,74 @@ def show(
             console.print(f"    Recommended: {d['recommendation']}")
 
     console.print(f"\n[bold]Tomorrow's Plan:[/bold] {review_pack['tomorrow_plan']}")
+    
+    doctor_assessment = review_pack.get("doctor_assessment")
+    if doctor_assessment:
+        _display_doctor_assessment(doctor_assessment)
+
+
+def _display_doctor_assessment(assessment: dict) -> None:
+    """Display doctor assessment section."""
+    console.print(f"\n[bold cyan]Doctor Assessment[/bold cyan]")
+    
+    status = assessment.get("doctor_status", "UNKNOWN")
+    status_color = _get_status_color(status)
+    console.print(f"  Status: [{status_color}]{status}[/{status_color}]")
+    
+    console.print(f"  Initialization: {assessment.get('initialization_mode', 'unknown')}")
+    console.print(f"  Phase: {assessment.get('current_phase', 'unknown')}")
+    console.print(f"  Verification: {assessment.get('verification_status', 'not_run')}")
+    
+    if assessment.get("pending_decisions", 0) > 0:
+        console.print(f"  [yellow]Pending Decisions: {assessment['pending_decisions']}[/yellow]")
+    
+    if assessment.get("blocked_items_count", 0) > 0:
+        console.print(f"  [red]Blocked Items: {assessment['blocked_items_count']}[/red]")
+    
+    if assessment.get("recommended_action"):
+        console.print(f"\n  [bold]Recommended Action:[/bold] {assessment['recommended_action']}")
+        if assessment.get("suggested_command"):
+            console.print(f"  [green]Suggested Command: {assessment['suggested_command']}[/green]")
+    
+    recovery = assessment.get("recovery_summary")
+    if recovery:
+        console.print(f"\n  [bold yellow]Recovery Guidance[/bold yellow]")
+        console.print(f"  Likely Cause: {recovery.get('likely_cause', '')}")
+        console.print(f"  What to Check:")
+        for item in recovery.get("what_to_check", []):
+            console.print(f"    - {item}")
+        console.print(f"  Recovery Steps:")
+        for i, step in enumerate(recovery.get("recovery_steps", []), 1):
+            console.print(f"    {i}. {step}")
+    
+    feedback = assessment.get("feedback_handoff")
+    if feedback:
+        console.print(f"\n  [bold magenta]Feedback Handoff[/bold magenta]")
+        console.print(f"  {feedback.get('suggestion', '')}")
+        console.print(f"  Reason: {feedback.get('reason', '')}")
+        if feedback.get("draft_summary"):
+            console.print(f"  Draft: {feedback['draft_summary']}")
+        if feedback.get("suggested_command"):
+            console.print(f"  [green]Command: {feedback['suggested_command']}[/green]")
+    
+    closeout = assessment.get("closeout_reminder")
+    if closeout:
+        console.print(f"\n  [bold]Closeout Reminder[/bold]")
+        console.print(f"  {closeout.get('status', '')}")
+        console.print(f"  Action: {closeout.get('action', '')}")
+
+
+def _get_status_color(status: str) -> str:
+    """Get color for doctor status."""
+    if status == "HEALTHY":
+        return "green"
+    elif status == "ATTENTION_NEEDED":
+        return "yellow"
+    elif status == "BLOCKED":
+        return "red"
+    elif status == "COMPLETED_PENDING_CLOSEOUT":
+        return "blue"
+    return "white"
 
 
 if __name__ == "__main__":
