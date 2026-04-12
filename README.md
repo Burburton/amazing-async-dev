@@ -2,377 +2,307 @@
 
 **Personal Async AI Development OS**
 
-A lightweight development operating system for solo builders who want AI to make steady progress during the day and only need human review and direction at night.
+A lightweight system for solo builders: AI works during the day, you review at night.
 
 ---
 
-## Why this exists
+## Quick Start (3-Minute First Run)
 
-Most solo builders do not lack ideas.  
-They lack uninterrupted build time.
+Get started with the full day loop in 3 minutes:
 
-`amazing-async-dev` is designed for a very specific working style:
+```bash
+# 1. Install
+git clone https://github.com/Burburton/amazing-async-dev.git
+cd amazing-async-dev
+pip install -e .
 
-- AI should be able to make stable progress during the day
-- the human should only spend 1–2 hours at night reviewing, correcting, and deciding direction
-- work should resume the next day without re-explaining everything
+# 2. Initialize
+python cli/asyncdev.py init create
 
-This repository is not trying to be a giant autonomous engineering platform.  
-It is trying to be a practical async development operating system for a single builder.
+# 3. Create your first product
+python cli/asyncdev.py new-product create --product-id my-first-app --name "My First App"
 
----
+# 4. Add a feature
+python cli/asyncdev.py new-feature create --product-id my-first-app --feature-id feature-001 --name "Hello World"
 
-## Core problem
+# 5. Plan today's task
+python cli/asyncdev.py plan-day create --product-id my-first-app --feature-id feature-001 --task "Create hello-world.txt"
 
-If AI is left alone without structure, it tends to:
+# 6. Run (external tool mode - safest for first run)
+python cli/asyncdev.py run-day --product-id my-first-app --mode external
 
-- drift outside the intended scope
-- expand tasks beyond useful boundaries
-- lose continuity across days
-- produce work that is hard to review quickly
-- require too much human re-contextualization
+# 7. Review tonight
+python cli/asyncdev.py review-night generate --product-id my-first-app
 
-This project solves that by enforcing:
-
-- **artifact-first workflow**
-- **day-sized execution**
-- **state-based resume**
-- **nightly human decision packs**
-- **small, closed development loops**
+# 8. Resume tomorrow
+python cli/asyncdev.py resume-next-day continue-loop --product-id my-first-app --decision approve
+```
 
 ---
 
-## What this repository is
+## What Success Looks Like
 
-`amazing-async-dev` is an async development core that defines:
+After your first successful run, you'll see these artifacts:
 
-- product and feature artifacts
-- run state management
-- execution packs for daytime AI work
-- nightly review packs for fast human review
-- a simple day loop:
-  - plan the day
-  - run the day
-  - review at night
-  - resume the next day
+```
+projects/my-first-app/
+├── product-brief.yaml          # Your product definition
+├── runstate.md                 # Current phase (planning → executing → reviewing)
+├── features/feature-001/
+│   └── feature-spec.yaml       # Feature scope and acceptance criteria
+├── execution-packs/
+│   └── exec-*.md               # Today's bounded task
+├── execution-results/
+│   └── exec-*.md               # AI's structured output
+└── reviews/
+    └── YYYY-MM-DD-review.md    # DailyReviewPack for your review
+```
 
----
-
-## What this repository is not
-
-This repository is **not**:
-
-- a generic multi-team platform
-- a large agent society
-- a complex orchestration framework
-- a UI-first product
-- a plugin marketplace
-- a huge spec framework clone
-
-It is intentionally narrow.
+A successful first run produces:
+- `execution-results/*.md` with `status: success`
+- `reviews/*.md` with completed items and evidence
+- `runstate.md` showing `current_phase: reviewing`
 
 ---
 
-## Design principles
+## Recommended First Mode
 
-### 1. Artifact-first
-The system moves forward through explicit artifacts, not vague conversation history.
+**Use External Tool Mode for your first run.**
 
-### 2. Day-sized execution
-A task should fit into half a day to one day of AI work.
+This mode generates an `ExecutionPack.md` file that you can hand to any AI tool (Claude Code, OpenCode, Cursor, etc.). It's the safest path because:
+- You control which AI tool executes
+- You can review the ExecutionPack before execution
+- No API keys required
 
-### 3. Human decisions at night
-The human should only review what truly requires judgment.
+```bash
+python cli/asyncdev.py run-day --product-id my-first-app --mode external
+```
 
-### 4. Resume by state
-The next day should start from `RunState`, not from memory reconstruction.
-
-### 5. Stable boundaries
-Each execution unit should have a clear scope, stop condition, and expected outputs.
+Then open the generated `ExecutionPack.md` and hand it to your preferred AI tool.
 
 ---
 
-## Core objects
+## Learn More
 
-| Object | Purpose |
-|--------|---------|
-| `ProductBrief` | Minimum structured representation of a product idea |
-| `FeatureSpec` | Bounded feature with goals, scope, acceptance criteria |
-| `RunState` | Current working state (pause/resume/continuity) |
-| `ExecutionPack` | Package for daytime AI execution |
-| `ExecutionResult` | Structured outcome of daytime execution |
-| `DailyReviewPack` | Nightly summary for fast human review |
+| Resource | What you'll find |
+|----------|------------------|
+| [docs/quick-start.md](docs/quick-start.md) | 5-minute guide with execution modes explained |
+| [examples/single-feature-day-loop/](examples/single-feature-day-loop/) | Full demo with all artifacts |
+| [docs/operating-model.md](docs/operating-model.md) | Day loop phases and responsibilities |
+| [AGENTS.md](AGENTS.md) | Rules for AI execution |
 
 ---
 
-## Core workflow
+## Day Loop Overview
 
 ```
 plan-day → run-day → review-night → resume-next-day
 ```
 
-| Phase | Description |
-|-------|-------------|
-| `plan-day` | Choose bounded task for the day |
-| `run-day` | AI executes within constrained scope |
-| `review-night` | Generate compact review pack for human |
-| `resume-next-day` | Continue from decisions and state |
+| Phase | When | What you do |
+|-------|------|-------------|
+| Morning | 5 min | Define today's bounded task |
+| Daytime | 0 min | AI executes autonomously |
+| Evening | 20-30 min | Review DailyReviewPack, decide next steps |
+| Next day | 2 min | Resume from state, no re-explanation |
+
+**Time investment**: ~30 minutes per day. AI handles the rest.
 
 ---
 
-## Repository structure
+## Why This Exists
+
+Most solo builders don't lack ideas. They lack uninterrupted build time.
+
+`amazing-async-dev` is designed for:
+- AI making stable progress during the day
+- Human spending only 1-2 hours at night reviewing
+- Work resuming the next day without re-explanation
+
+---
+
+## Core Problem
+
+Without structure, AI tends to:
+- drift outside intended scope
+- expand tasks beyond useful boundaries
+- lose continuity across days
+- require too much human re-contextualization
+
+This system enforces:
+- **artifact-first workflow** (explicit artifacts, not conversation history)
+- **day-sized execution** (bounded tasks fitting half-day to one day)
+- **state-based resume** (next day starts from RunState)
+- **small, closed loops** (clear scope, stop conditions, expected outputs)
+
+---
+
+## Design Principles
+
+1. **Artifact-first** — System moves through explicit artifacts
+2. **Day-sized** — Tasks fit half-day to one day of AI work
+3. **Nightly decisions** — Human reviews only what requires judgment
+4. **Resume by state** — Next day starts from RunState, not memory
+5. **Stable boundaries** — Each execution has clear scope and outputs
+
+---
+
+## Core Objects
+
+| Object | Purpose |
+|--------|---------|
+| `ProductBrief` | Minimum structured product idea |
+| `FeatureSpec` | Bounded feature with goals, scope, criteria |
+| `RunState` | Current state (pause/resume/continuity) |
+| `ExecutionPack` | Package for daytime AI execution |
+| `ExecutionResult` | Structured outcome of execution |
+| `DailyReviewPack` | Nightly summary for human review |
+
+---
+
+## Repository Structure
 
 ```text
 amazing-async-dev/
-├─ README.md
-├─ AGENTS.md
+├─ README.md           # This file
+├─ AGENTS.md           # AI execution rules
 ├─ docs/
-│  ├─ vision.md
+│  ├─ quick-start.md   # 5-minute guide
 │  ├─ operating-model.md
 │  ├─ architecture.md
-│  ├─ terminology.md
-│  └─ decisions/
-├─ schemas/
-├─ templates/
-├─ skills/
-├─ workflows/
-├─ runtime/
-├─ cli/
-├─ projects/
-├─ tests/
+│  └ terminology.md
+├─ schemas/            # Artifact schemas
+├─ templates/          # Fillable templates
+├─ runtime/            # State management logic
+├─ cli/                # CLI commands
+├─ tests/              # 533 tests
 └─ examples/
+   └─ single-feature-day-loop/  # Full demo
 ```
-
----
-
-## Current phase
-
-**v0 — Single Feature Daily Loop**
-
-The first goal: prove AI can independently make useful progress on a small feature during the day, and the human can review and redirect it quickly at night.
 
 ---
 
 ## Testing
 
-The project has comprehensive test coverage using pytest.
-
-### Run tests
-
 ```bash
 python -m pytest tests/ -v
 ```
 
-### Test coverage
-
-| Test File | Tests | Coverage |
-|-----------|-------|----------|
-| `test_cli_init.py` | 6 | init create/status commands |
-| `test_cli_new_product.py` | 8 | new-product create/list |
-| `test_cli_new_feature.py` | 7 | new-feature create/list |
-| `test_plan_day.py` | 11 | plan-day create/show |
-| `test_review_night.py` | 11 | review-night generate/show |
-| `test_resume_next_day.py` | 20 | continue-loop/status/unblock/handle-failed |
-| `test_runstate_transitions.py` | 18 | Phase transitions |
-| `test_artifact_generation.py` | 23 | YAML/Markdown format |
-| `test_error_handling.py` | 21 | Error handling |
-| `test_complete_archive.py` | 16 | Completion & archive flow |
-| `test_sqlite_state_store.py` | 20 | SQLite persistence layer |
-| `test_execution_logging.py` | 23 | Execution logging & recovery |
-| `test_live_api_hardening.py` | 27 | Live API error handling & retry |
-| `test_ux_improvements.py` | 13 | UX improvements (status, paths, next-step) |
-| `test_backfill.py` | 17 | Historical archive backfill |
-| `test_workflow_feedback.py` | 29 | Workflow feedback capture |
-| `test_feedback_promotion.py` | 22 | Feedback promotion / issue escalation |
-| `test_execution_policy.py` | 38 | Execution policy / auto-continue rules |
-| `test_email_decision.py` | 33 | Async decision channel / email mock |
-| `test_starter_pack_integration.py` | 18 | Advisor starter pack consumption / field mapping |
+| Category | Tests | Coverage |
+|----------|-------|----------|
+| CLI commands | 50+ | All asyncdev commands |
+| Phase transitions | 18 | RunState transitions |
+| Artifact format | 23 | YAML/Markdown generation |
+| Error handling | 21 | Missing state, invalid inputs |
+| SQLite persistence | 20 | State store, recovery |
+| Policy & decisions | 71 | Auto-continue, email channel |
+| Integration | 18 | Advisor starter pack consumption |
 | **Total** | **533** | |
-
-### Test categories
-
-- **CLI commands**: All asyncdev commands have test coverage
-- **Phase transitions**: RunState transitions between planning/executing/reviewing/blocked
-- **Artifact format**: YAML block extraction and markdown generation
-- **Error handling**: Missing state, invalid inputs, corrupted files
-- **SQLite persistence**: Structured state store with recovery queries
-- **Recovery classification**: Stop-point classification and resume eligibility
 
 ---
 
-## Implementation status
+## Implementation Status
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| 001 | ✅ Complete | Core Object System - schemas, templates, examples |
-| 002 | ✅ Complete | Day Loop CLI - plan-day, run-day, review-night, resume-next-day |
-| 003 | ✅ Complete | Single Feature Demo - full async day loop |
-| 004 | ✅ Complete | Dual Execution Mode - external tool + live API |
-| 005 | ✅ Complete | Failure/Blocker/Decision Flow |
-| 006 | ✅ Complete | Initialization Commands - init, new-product, new-feature |
-| 007 | ✅ Complete | Tests & Stability - 240 tests passing |
-| 008 | ✅ Complete | Completion & Archive Flow - complete-feature, archive-feature |
-| 009 | ✅ Complete | SQLite State Store - structured persistence layer |
-| 010 | ✅ Complete | Execution Logging & Recovery Hardening - recovery classification, inspect-stop |
-| 011 | ✅ Complete | Live API Mode Hardening - API failure classification, retry logic, error handling |
-| 012 | ✅ Complete | UX/Ergonomics Improvements - enhanced status, path display, next-step guidance |
-| 013 | ✅ Complete | Historical Archive Backfill - backfill historical features into archive system |
-| 014 | ✅ Complete | Archive Query / History Inspection - archive list/show with filters |
-| 015 | ✅ Complete | Daily Management Summary / Decision Inbox - nightly review layer |
-| 016 | ✅ Complete | Decision Template System - structured decision templates |
-| 017 | ✅ Complete | Archive-aware Plan Agent - history-aware planning |
-| 018 | ✅ Complete | Limited Batch Operations - batch status, archive, backfill, summary |
-| 019a | ✅ Complete | Workflow Feedback Capture - lightweight issue capture for system hardening |
-| 019b | ✅ Complete | Workflow Feedback Triage - confidence levels, problem domain classification |
-| 019c | ✅ Complete | Feedback Promotion / Issue Escalation - controlled promotion to formal follow-up |
-| 020 | ✅ Complete | Low-Interruption Execution Policy - auto-continue safe transitions, pause for risky |
-| 021 | ✅ Complete | Async Decision Channel - email-first decision requests with mock delivery |
-| 022 | ✅ Complete | Starter Pack Integration - consume advisor starter packs for product initialization |
+All core features complete:
+
+| Feature | Description |
+|---------|-------------|
+| Core Object System | Schemas, templates, examples |
+| Day Loop CLI | plan-day, run-day, review-night, resume-next-day |
+| Execution Modes | External tool + live API |
+| State Persistence | SQLite-based storage |
+| Archive System | Feature completion, history query |
+| Feedback Capture | Issue capture, triage, promotion |
+| Execution Policy | Auto-continue safe, pause for risky |
+| Decision Channel | Email-first async decisions |
+| Starter Pack Integration | Advisor → async-dev handoff |
 
 ---
 
 ## Feature Lifecycle
 
-### Active Phases
-- `planning` → `executing` → `reviewing` → `blocked`
-- Blocked features: use `asyncdev resume-next-day unblock`
+```
+planning → executing → reviewing → blocked → completed → archived
+```
 
-### Completion Phase
-- `completed` - Feature marked as finished
-- Use: `asyncdev complete-feature mark`
-- Validates: no blockers, no pending decisions
-
-### Archive Phase
-- `archived` - Feature preserved for future reference
-- Use: `asyncdev archive-feature create`
-- Archives stored in: `projects/{product}/archive/{feature}/archive-pack.yaml`
-
-### ArchivePack captures
-- `delivered_outputs` - What was actually delivered
-- `acceptance_result` - Were criteria satisfied?
-- `lessons_learned` - What worked / what to improve
-- `reusable_patterns` - Patterns for future features
-- `decisions_made` - Key decisions during implementation
-- `unresolved_followups` - Items still open
+| Phase | CLI |
+|-------|-----|
+| Unblock | `asyncdev resume-next-day unblock` |
+| Complete | `asyncdev complete-feature mark` |
+| Archive | `asyncdev archive-feature create` |
 
 ---
 
-## Success criteria
+## Success Criteria
 
-1. AI can work independently for several hours on a bounded feature
-2. Nightly review takes about 20–30 minutes
-3. Human handles only a small number of meaningful decisions
-4. Next day resumes from state instead of repeated explanation
-5. Completed features archived with lessons for future work
+1. AI works independently for hours on bounded tasks
+2. Nightly review takes 20-30 minutes
+3. Human handles few meaningful decisions
+4. Next day resumes from state, not explanation
+5. Completed features archived with lessons
 
 ---
 
-## Planned CLI
+## CLI Reference
 
 ```bash
-asyncdev init
-asyncdev new-product
-asyncdev new-product create --product-id my-app --name "My App"
-asyncdev new-product create --product-id my-app --name "My App" --starter-pack starter-pack.yaml
-asyncdev new-feature
-asyncdev plan-day
-asyncdev run-day
-asyncdev review-night
-asyncdev resume-next-day
-asyncdev complete-feature mark
-asyncdev archive-feature create
-asyncdev sqlite history --project {id} --feature {id}
-asyncdev sqlite transitions --project {id}
-asyncdev sqlite recovery --project {id} --feature {id}
-asyncdev sqlite features --project {id}
-asyncdev sqlite snapshot --project {id}
-asyncdev inspect-stop show --project {id}
-asyncdev inspect-stop history --project {id}
-asyncdev inspect-stop guidance --project {id}
+# Initialization
+asyncdev init create
+asyncdev new-product create --product-id {id} --name "{name}"
+asyncdev new-feature create --product-id {id} --feature-id {id} --name "{name}"
 
-# Starter Pack Integration (amazing-skill-pack-advisor v1)
-# Use advisor-generated starter pack for product initialization
-asyncdev new-product create --product-id {id} --name "{name}" --starter-pack starter-pack.yaml
+# Day Loop
+asyncdev plan-day create --product-id {id} --feature-id {id} --task "{task}"
+asyncdev run-day --product-id {id} --mode {external|live|mock}
+asyncdev review-night generate --product-id {id}
+asyncdev resume-next-day continue-loop --product-id {id} --decision {approve|revise|defer}
 
-# Feature 014: Archive Query
-asyncdev archive list
-asyncdev archive list --recent --limit 10
-asyncdev archive list --product {id} --has-patterns
+# Completion & Archive
+asyncdev complete-feature mark --product-id {id} --feature-id {id}
+asyncdev archive-feature create --product-id {id} --feature-id {id}
+asyncdev archive list --product {id}
 asyncdev archive show --feature {id}
 
-# Feature 015: Daily Management Summary
-asyncdev summary today
-asyncdev summary decisions
-asyncdev summary issues
-asyncdev summary next-day
-
-# Feature 018: Batch Operations
+# Status & Summary
+asyncdev summary today --project {id}
+asyncdev summary decisions --project {id}
 asyncdev status --all-features --project {id}
-asyncdev archive list --product {id} --has-lessons
-asyncdev backfill batch --project {id} --dry-run
-asyncdev backfill batch --project {id} --all --limit 5
-asyncdev summary all-projects
 
-# Feature 019a: Workflow Feedback
-asyncdev feedback record --scope system --type cli_behavior --description "..."
-asyncdev feedback record --scope product --product {id} --type execution_pack --description "..."
-asyncdev feedback list
+# Feedback
+asyncdev feedback record --scope {system|product} --description "..."
 asyncdev feedback list --followup-needed
-asyncdev feedback show --feedback-id {id}
-asyncdev feedback update --feedback-id {id} --resolution fixed
-asyncdev feedback summary
+asyncdev feedback promote --feedback-id {id} --reason {type}
 
-# Feature 019b: Workflow Feedback Triage
-asyncdev feedback triage --feedback-id {id} --confidence high --domain async_dev --escalation-recommendation candidate_issue
-asyncdev feedback triage --feedback-id {id} --confidence uncertain --triage-note "Needs review"
-
-# Feature 019c: Feedback Promotion
-asyncdev feedback promote --feedback-id {id} --reason system_bug --note "Priority fix"
-asyncdev feedback promotions list
-asyncdev feedback promotions list --status open --reason system_bug
-asyncdev feedback promotions show --promotion-id {id}
-asyncdev feedback promotions update --promotion-id {id} --status addressed --note "Fixed"
-
-# Feature 020: Execution Policy
+# Policy
 asyncdev policy show
-asyncdev policy set --mode balanced
-asyncdev policy modes
-asyncdev policy scope-flag --set-flag true
-asyncdev policy scope-flag --clear
-asyncdev policy risky-actions --list
-asyncdev policy risky-actions --clear-all
+asyncdev policy set --mode {conservative|balanced|low_interruption}
 
-# Feature 021: Async Decision Channel
-asyncdev email-decision create --project my-app --feature 001 --question "YAML or JSON?" --options "A:YAML,B:JSON" --recommendation "A" --send
-asyncdev email-decision list --project my-app
-asyncdev email-decision show --project my-app --id dr-001
-asyncdev email-decision reply --project my-app --id dr-001 --command "DECISION A"
-asyncdev email-decision stats --project my-app
+# Decision Channel
+asyncdev email-decision create --project {id} --question "..." --options "A:...,B:..." --send
+asyncdev email-decision reply --project {id} --id {id} --command "DECISION A"
+
+# Starter Pack (advisor integration)
+asyncdev new-product create --product-id {id} --name "{name}" --starter-pack starter-pack.yaml
 ```
 
 ---
 
-## Implementation roadmap
+## Roadmap
 
-| Version | Features |
-|---------|----------|
-| v0 | Local files, markdown/yaml artifacts, Python CLI, manual invocation |
-| v1 | SQLite-based state, better pause/resume, execution logging, failure recovery |
-| v2 | Optional durable runtime, approval entry points, lightweight dashboard |
-
----
-
-## Intended user
-
-- solo builders
-- part-time builders
-- builders with many product ideas but little uninterrupted time
-- builders who want AI to work asynchronously, not interactively all day
+| Version | Focus |
+|---------|-------|
+| v0 | Local files, YAML artifacts, Python CLI |
+| v1 | SQLite state, recovery, policy modes |
+| v2 | Durable runtime, dashboard |
 
 ---
 
-## First step
+## Intended User
 
-Start with **Feature 001: Core Object System**.
+- Solo builders with limited uninterrupted time
+- Part-time makers with many ideas
+- Developers who want async AI, not interactive all-day
 
-See `docs/infra/amazing-async-dev-feature-001-core-object-system.md` for details.
+---
+
+**Start here**: Run the [3-minute first run](#quick-start-3-minute-first-run) above.
