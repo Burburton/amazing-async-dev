@@ -102,4 +102,6 @@ projects/*/execution-packs/
 projects/*/execution-results/
 projects/*/reviews/
 projects/*/runstate.md
+projects/
+.runtime/
 runtime/state.db
