@@ -31,3 +31,49 @@ class DoctorDiagnosis:
     warnings: list[str] = field(default_factory=list)
     
     workspace_path: str = ""
+
+
+def diagnose_workspace(project_path: Path) -> DoctorDiagnosis:
+    """Generate workspace diagnosis with health classification."""
+    diagnosis = DoctorDiagnosis()
+    diagnosis.workspace_path = str(project_path)
+    
+    if not project_path.exists():
+        diagnosis.doctor_status = "UNKNOWN"
+        diagnosis.recommended_action = "Initialize workspace first."
+        diagnosis.suggested_command = "asyncdev init create"
+        diagnosis.rationale = "Project directory does not exist."
+        return diagnosis
+    
+    from runtime.workspace_snapshot import generate_workspace_snapshot
+    
+    snapshot = generate_workspace_snapshot(project_path)
+    
+    diagnosis.initialization_mode = snapshot.initialization_mode
+    diagnosis.provider_linkage = snapshot.provider_linkage
+    diagnosis.product_id = snapshot.product_id
+    diagnosis.feature_id = snapshot.feature_id
+    diagnosis.current_phase = snapshot.current_phase
+    diagnosis.verification_status = snapshot.verification_status
+    diagnosis.pending_decisions = snapshot.pending_decisions
+    
+    _apply_rules(diagnosis, snapshot)
+    
+    return diagnosis
+
+
+def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
+    """Apply recommendation rules to classify health."""
+    
+    if not snapshot.product_id or snapshot.current_phase in ["unknown", "none", ""]:
+        diagnosis.doctor_status = "UNKNOWN"
+        diagnosis.recommended_action = "Initialize workspace first."
+        diagnosis.suggested_command = "asyncdev init create"
+        diagnosis.rationale = "Insufficient workspace metadata."
+        return
+    
+    diagnosis.doctor_status = "HEALTHY"
+    diagnosis.health_status = "healthy"
+    diagnosis.recommended_action = "Check workspace state."
+    diagnosis.suggested_command = f"asyncdev status --project {snapshot.product_id}"
+    diagnosis.rationale = "Workspace has sufficient metadata."

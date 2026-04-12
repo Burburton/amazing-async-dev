@@ -2,8 +2,10 @@
 
 """Tests for workspace doctor functionality (Feature 029)."""
 
+from pathlib import Path
 import pytest
-from runtime.workspace_doctor import DoctorDiagnosis
+
+from runtime.workspace_doctor import DoctorDiagnosis, diagnose_workspace
 
 
 class TestDoctorDiagnosisDataclass:
@@ -43,3 +45,25 @@ class TestDoctorDiagnosisDataclass:
         assert diagnosis.doctor_status == "HEALTHY"
         assert diagnosis.product_id == "my-app"
         assert diagnosis.recommended_action == "Plan a task"
+
+
+class TestDiagnoseWorkspace:
+    def test_empty_project_returns_unknown(self, tmp_path):
+        """Empty project should return UNKNOWN status."""
+        empty_project = tmp_path / "empty-project"
+        empty_project.mkdir()
+        
+        diagnosis = diagnose_workspace(empty_project)
+        
+        assert diagnosis.doctor_status == "UNKNOWN"
+        assert diagnosis.recommended_action != ""
+        assert "init" in diagnosis.suggested_command.lower()
+
+    def test_missing_project_returns_unknown(self, tmp_path):
+        """Missing project path should return UNKNOWN."""
+        missing = tmp_path / "nonexistent"
+        
+        diagnosis = diagnose_workspace(missing)
+        
+        assert diagnosis.doctor_status == "UNKNOWN"
+        assert diagnosis.workspace_path == str(missing)
