@@ -1,6 +1,11 @@
-"""resume-next-day command - Continue from human decisions."""
+"""resume-next-day command - Continue from human decisions.
 
+Feature 034: Enriched with prior-night decision pack alignment.
+"""
+
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -24,6 +29,137 @@ app = typer.Typer(help="Resume from human decisions, start next day loop")
 console = Console()
 
 
+def _load_latest_review_pack(project_path: Path) -> dict[str, Any] | None:
+    """Load latest enriched review pack if available and not stale.
+    
+    Returns None if:
+    - No reviews directory
+    - No review files
+    - Review pack is stale (date != today)
+    - Review pack cannot be parsed
+    """
+    reviews_dir = project_path / "reviews"
+    if not reviews_dir.exists():
+        return None
+    
+    review_files = sorted(reviews_dir.glob("*-review.md"), reverse=True)
+    if not review_files:
+        return None
+    
+    latest_review = review_files[0]
+    
+    store = StateStore(project_path)
+    review_date = latest_review.stem.replace("-review", "")
+    review_pack = store.load_daily_review_pack(review_date)
+    
+    if review_pack is None:
+        return None
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    if review_pack.get("date") != today:
+        review_pack["is_stale"] = True
+        review_pack["stale_date"] = review_pack.get("date")
+    
+    return review_pack
+
+
+def _extract_continuation_context(review_pack: dict[str, Any]) -> dict[str, Any]:
+    """Extract continuation-relevant fields from review pack.
+    
+    Returns concise context for resume display.
+    """
+    context: dict[str, Any] = {
+        "prior_review_timestamp": review_pack.get("date", ""),
+        "prior_review_status": "found",
+        "is_stale": review_pack.get("is_stale", False),
+    }
+    
+    doctor_assessment = review_pack.get("doctor_assessment")
+    if doctor_assessment:
+        context["prior_doctor_status"] = doctor_assessment.get("doctor_status", "")
+        context["prior_health_status"] = doctor_assessment.get("health_status", "")
+        context["prior_initialization_mode"] = doctor_assessment.get("initialization_mode", "")
+        context["prior_current_phase"] = doctor_assessment.get("current_phase", "")
+        context["prior_recommended_action"] = doctor_assessment.get("recommended_action", "")
+        context["prior_suggested_command"] = doctor_assessment.get("suggested_command", "")
+        
+        if doctor_assessment.get("recovery_summary"):
+            context["prior_recovery_summary"] = doctor_assessment["recovery_summary"]
+        
+        if doctor_assessment.get("feedback_handoff"):
+            context["prior_feedback_handoff"] = doctor_assessment["feedback_handoff"]
+        
+        if doctor_assessment.get("closeout_reminder"):
+            context["prior_closeout_reminder"] = doctor_assessment["closeout_reminder"]
+    
+    if review_pack.get("tomorrow_plan"):
+        context["prior_tomorrow_plan"] = review_pack.get("tomorrow_plan")
+    
+    return context
+
+
+def _display_prior_context(context: dict[str, Any]) -> None:
+    """Display prior-night context in resume output.
+    
+    Passive display - user chooses to act on the information.
+    """
+    if context.get("is_stale"):
+        console.print(f"\n[dim yellow]Prior review from {context.get('stale_date')} may be outdated[/dim yellow]")
+        return
+    
+    console.print("\n[bold cyan]Prior Night Context[/bold cyan]")
+    
+    console.print(f"  Review Date: {context.get('prior_review_timestamp', 'N/A')}")
+    
+    doctor_status = context.get("prior_doctor_status", "")
+    if doctor_status:
+        status_color = _get_status_color(doctor_status)
+        console.print(f"  Doctor Status: [{status_color}]{doctor_status}[/{status_color}]")
+    
+    if context.get("prior_initialization_mode"):
+        console.print(f"  Initialization: {context['prior_initialization_mode']}")
+    
+    if context.get("prior_current_phase"):
+        console.print(f"  Prior Phase: {context['prior_current_phase']}")
+    
+    if context.get("prior_recommended_action"):
+        console.print(f"\n  [bold]Prior Recommended Action:[/bold] {context['prior_recommended_action']}")
+    
+    if context.get("prior_suggested_command"):
+        console.print(f"  [green]Prior Suggested: {context['prior_suggested_command']}[/green]")
+    
+    recovery = context.get("prior_recovery_summary")
+    if recovery:
+        console.print(f"\n  [bold yellow]Prior Recovery Guidance[/bold yellow]")
+        console.print(f"  Likely Cause: {recovery.get('likely_cause', '')}")
+        if recovery.get("recovery_steps"):
+            console.print(f"  Steps: {len(recovery['recovery_steps'])} actions pending")
+    
+    feedback = context.get("prior_feedback_handoff")
+    if feedback:
+        console.print(f"\n  [bold magenta]Prior Feedback Handoff[/bold magenta]")
+        console.print(f"  {feedback.get('suggestion', '')}")
+    
+    closeout = context.get("prior_closeout_reminder")
+    if closeout:
+        console.print(f"\n  [bold blue]Prior Closeout Reminder[/bold blue]")
+        console.print(f"  {closeout.get('status', '')}")
+        console.print(f"  Action: {closeout.get('action', '')}")
+
+
+def _get_status_color(status: str) -> str:
+    """Get color for doctor status."""
+    if status == "HEALTHY":
+        return "green"
+    elif status == "ATTENTION_NEEDED":
+        return "yellow"
+    elif status == "BLOCKED":
+        return "red"
+    elif status == "COMPLETED_PENDING_CLOSEOUT":
+        return "blue"
+    return "white"
+
+
 @app.command()
 def continue_loop(
     project: str = typer.Option("demo-product-001", help="Project ID"),
@@ -44,6 +180,11 @@ def continue_loop(
         console.print("[red]No RunState found[/red]")
         logger.close()
         raise typer.Exit(1)
+
+    review_pack = _load_latest_review_pack(project_path)
+    if review_pack:
+        context = _extract_continuation_context(review_pack)
+        _display_prior_context(context)
 
     feature_id = runstate.get("feature_id", "")
     product_id = runstate.get("project_id", "")
@@ -200,6 +341,27 @@ def status(
     if runstate is None:
         console.print("[yellow]No RunState found[/yellow]")
         return
+
+    review_pack = _load_latest_review_pack(project_path)
+    if review_pack:
+        context = _extract_continuation_context(review_pack)
+        console.print(Panel("Prior Review Summary", title="review-night alignment", border_style="cyan"))
+        
+        doctor_status = context.get("prior_doctor_status", "")
+        if doctor_status:
+            status_color = _get_status_color(doctor_status)
+            console.print(f"Prior Doctor Status: [{status_color}]{doctor_status}[/{status_color}]")
+        
+        console.print(f"Prior Review Date: {context.get('prior_review_timestamp', 'N/A')}")
+        
+        if context.get("prior_recommended_action"):
+            console.print(f"Prior Recommended: {context['prior_recommended_action']}")
+        
+        if context.get("prior_suggested_command"):
+            console.print(f"[green]Prior Suggested: {context['prior_suggested_command']}[/green]")
+        
+        if context.get("is_stale"):
+            console.print(f"\n[dim yellow]Note: Prior review may be outdated[/dim yellow]")
 
     console.print(Panel("Current State", title="resume-status"))
 
