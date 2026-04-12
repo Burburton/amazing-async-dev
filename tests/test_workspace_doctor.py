@@ -414,3 +414,96 @@ name: Healthy Reviewing Test
         diagnosis = diagnose_workspace(project)
         
         assert diagnosis.doctor_status == "HEALTHY"
+
+    def test_starter_pack_healthy_returns_healthy(self, tmp_path):
+        """Starter-pack mode healthy should return HEALTHY with provider linkage."""
+        project = tmp_path / "starter-pack-healthy"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: starter-healthy
+feature_id: feature-001
+current_phase: planning
+active_task: ""
+task_queue:
+  - create-schema
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Created feature
+updated_at: 2026-04-12T10:00:00Z
+workflow_hints:
+  policy_mode: balanced
+  execution: external-tool-first
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: starter-healthy
+name: Starter Pack Healthy Test
+starter_pack_context:
+  - 'Product type: ai_tooling'
+  - 'Stage: mvp'
+  - 'Team mode: solo'
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "HEALTHY"
+        assert diagnosis.initialization_mode == "starter-pack"
+        assert diagnosis.provider_linkage.get("detected") == True
+        assert diagnosis.provider_linkage.get("product_type") == "ai_tooling"
+
+    def test_starter_pack_verify_failed_mentions_provider(self, tmp_path):
+        """Starter-pack verification failed should mention provider issue."""
+        project = tmp_path / "starter-pack-verify-failed"
+        project.mkdir()
+        
+        results_dir = project / "execution-results"
+        results_dir.mkdir()
+        
+        result_content = """---
+```yaml
+execution_id: exec-failed
+status: failed
+completed_items: []
+issues_found:
+  - Contract version mismatch
+```
+---
+"""
+        (results_dir / "exec-001.md").write_text(result_content)
+        
+        runstate_content = """---
+```yaml
+project_id: starter-verify-failed
+feature_id: feature-001
+current_phase: executing
+active_task: verify
+task_queue: []
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Verification failed
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: starter-verify-failed
+name: Starter Pack Verify Failed Test
+starter_pack_context:
+  - 'Product type: web_app'
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "ATTENTION_NEEDED"
+        assert diagnosis.initialization_mode == "starter-pack"
+        assert "starter-pack" in diagnosis.suggested_command.lower() or "compatibility" in diagnosis.rationale.lower()
+        assert len(diagnosis.warnings) >= 1
