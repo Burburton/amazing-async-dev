@@ -16,6 +16,7 @@ def create(
     problem: str = typer.Option("", help="Problem statement"),
     target_user: str = typer.Option("", help="Target user description"),
     path: str = typer.Option("projects", help="Root directory for projects"),
+    starter_pack: str = typer.Option("", help="Path to starter-pack.yaml from advisor"),
 ):
     """Create new product with ProductBrief.
 
@@ -24,12 +25,14 @@ def create(
     - product-brief.yaml with provided info
     - runstate.md with initial planning phase
 
-    Example:
+    Examples:
         asyncdev new-product create --product-id my-app --name "My App"
         asyncdev new-product create --product-id demo-001 --name "Demo" --problem "Test"
+        asyncdev new-product create --product-id ai-tool --name "AI Tool" --starter-pack starter-pack.yaml
     """
     from pathlib import Path
     from runtime.adapters.filesystem_adapter import FilesystemAdapter
+    from cli.starter_pack_consumer import consume_starter_pack, format_product_brief_with_starter_pack, format_runstate_with_starter_pack
     import yaml
 
     fs = FilesystemAdapter()
@@ -42,6 +45,19 @@ def create(
         raise typer.Exit(1)
 
     console.print(Panel(f"Create Product: {name}", border_style="green"))
+
+    consumption = None
+    if starter_pack:
+        console.print(f"[blue]Consuming starter pack:[/blue] {starter_pack}")
+        consumption = consume_starter_pack(starter_pack)
+        
+        if not consumption.success:
+            console.print(f"[red]Starter pack error:[/red] {consumption.error}")
+            raise typer.Exit(1)
+        
+        if consumption.warnings:
+            for warning in consumption.warnings:
+                console.print(f"[yellow]Warning:[/yellow] {warning}")
 
     # Create directories
     fs.ensure_dir(product_dir)
@@ -63,6 +79,9 @@ def create(
         "success_signal": "DailyReviewPack generated with valid evidence",
         "created_at": datetime.now().isoformat(),
     }
+
+    if consumption and consumption.success:
+        product_brief = format_product_brief_with_starter_pack(product_brief, consumption)
 
     brief_path = product_dir / "product-brief.yaml"
     with open(brief_path, "w", encoding="utf-8") as f:
@@ -86,6 +105,9 @@ def create(
         "updated_at": datetime.now().isoformat(),
     }
 
+    if consumption and consumption.success:
+        runstate = format_runstate_with_starter_pack(runstate, consumption)
+
     runstate_path = product_dir / "runstate.md"
     yaml_content = yaml.dump(runstate, default_flow_style=False, sort_keys=False)
     markdown_content = f"# RunState\n\n```yaml\n{yaml_content}\n```\n"
@@ -94,6 +116,13 @@ def create(
         f.write(markdown_content)
 
     console.print(f"[green]Created:[/green] {runstate_path}")
+
+    if consumption and consumption.success:
+        console.print("\n[blue]Starter pack applied:[/blue]")
+        if consumption.advisory_context.get("rationale"):
+            console.print("[dim]Recommendation rationale available in product-brief[/dim]")
+        if consumption.runstate_hints.get("policy_mode_hint"):
+            console.print(f"[dim]Policy mode hint: {consumption.runstate_hints['policy_mode_hint']}[/dim]")
 
     console.print("\n[green]Product created successfully![/green]")
     console.print("Next: Run 'asyncdev new-feature' to add features")

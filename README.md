@@ -226,6 +226,7 @@ python -m pytest tests/ -v
 | 019c | ✅ Complete | Feedback Promotion / Issue Escalation - controlled promotion to formal follow-up |
 | 020 | ✅ Complete | Low-Interruption Execution Policy - auto-continue safe transitions, pause for risky |
 | 021 | ✅ Complete | Async Decision Channel - email-first decision requests with mock delivery |
+| 022 | ✅ Complete | Starter Pack Integration - consume advisor starter packs for product initialization |
 
 ---
 
@@ -270,6 +271,8 @@ python -m pytest tests/ -v
 ```bash
 asyncdev init
 asyncdev new-product
+asyncdev new-product create --product-id my-app --name "My App"
+asyncdev new-product create --product-id my-app --name "My App" --starter-pack starter-pack.yaml
 asyncdev new-feature
 asyncdev plan-day
 asyncdev run-day
@@ -285,6 +288,10 @@ asyncdev sqlite snapshot --project {id}
 asyncdev inspect-stop show --project {id}
 asyncdev inspect-stop history --project {id}
 asyncdev inspect-stop guidance --project {id}
+
+# Starter Pack Integration (amazing-skill-pack-advisor v1)
+# Use advisor-generated starter pack for product initialization
+asyncdev new-product create --product-id {id} --name "{name}" --starter-pack starter-pack.yaml
 
 # Feature 014: Archive Query
 asyncdev archive list
