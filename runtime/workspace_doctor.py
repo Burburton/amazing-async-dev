@@ -41,6 +41,10 @@ class DoctorDiagnosis:
     feedback_reason: str = ""
     suggested_feedback_command: str = ""
     
+    # Feedback draft fields (Feature 032)
+    feedback_draft_summary: str = ""
+    feedback_draft_fields: dict[str, Any] = field(default_factory=dict)
+    
     workspace_path: str = ""
 
 
@@ -280,19 +284,67 @@ def _apply_recovery_playbooks(diagnosis: DoctorDiagnosis, snapshot) -> None:
         diagnosis.fallback_next_step = "Use examples/docs to compare expected structure"
 
 
+def _build_feedback_draft(diagnosis: DoctorDiagnosis) -> tuple[str, dict[str, Any]]:
+    """Build lightweight feedback draft from doctor context."""
+    
+    draft_fields: dict[str, Any] = {
+        "source": "doctor",
+        "doctor_status": diagnosis.doctor_status,
+        "health_status": diagnosis.health_status,
+        "current_phase": diagnosis.current_phase,
+        "verification_status": diagnosis.verification_status,
+    }
+    
+    if diagnosis.product_id:
+        draft_fields["product_id"] = diagnosis.product_id
+    if diagnosis.feature_id:
+        draft_fields["feature_id"] = diagnosis.feature_id
+    if diagnosis.likely_cause:
+        draft_fields["likely_cause"] = diagnosis.likely_cause
+    if diagnosis.initialization_mode:
+        draft_fields["initialization_mode"] = diagnosis.initialization_mode
+    
+    if diagnosis.doctor_status == "ATTENTION_NEEDED" and diagnosis.verification_status == "failed":
+        draft_fields["suggested_category"] = "execution_pack"
+        draft_fields["suggested_tags"] = ["verification", "contract-mismatch", "tooling-friction"]
+        summary = f"Verification failure in {diagnosis.initialization_mode} initialization - likely contract mismatch or tooling friction"
+    elif diagnosis.doctor_status == "UNKNOWN":
+        draft_fields["suggested_category"] = "persistence"
+        draft_fields["suggested_tags"] = ["state-missing", "artifact-corruption", "initialization"]
+        summary = "Unknown workspace state - missing artifacts or initialization gaps"
+    else:
+        summary = f"Doctor identified {diagnosis.doctor_status} status requiring attention"
+    
+    return summary, draft_fields
+
+
 def _select_feedback_handoff(diagnosis: DoctorDiagnosis, snapshot) -> None:
     """Select feedback handoff suggestion for systemic friction scenarios."""
     
     if diagnosis.doctor_status == "ATTENTION_NEEDED" and diagnosis.verification_status == "failed":
         diagnosis.feedback_suggestion = "This may be worth capturing as workflow feedback."
         diagnosis.feedback_reason = "Verification failure often indicates contract mismatch, tooling friction, or documentation gaps."
-        diagnosis.suggested_feedback_command = f"asyncdev feedback record --scope product --project {diagnosis.product_id} --description 'Verification failure pattern'"
+        
+        summary, draft_fields = _build_feedback_draft(diagnosis)
+        diagnosis.feedback_draft_summary = summary
+        diagnosis.feedback_draft_fields = draft_fields
+        
+        escaped_summary = summary.replace('"', "'")
+        tags_str = ",".join(draft_fields.get("suggested_tags", []))
+        diagnosis.suggested_feedback_command = f'asyncdev feedback record --scope product --project {diagnosis.product_id} --description "{escaped_summary}" --tags {tags_str}'
         return
     
     if diagnosis.doctor_status == "UNKNOWN":
         diagnosis.feedback_suggestion = "This may be worth capturing as workflow feedback."
         diagnosis.feedback_reason = "Unknown workspace state often indicates missing state, artifact corruption, or initialization gaps."
-        diagnosis.suggested_feedback_command = "asyncdev feedback record --scope system --description 'Unknown workspace state pattern'"
+        
+        summary, draft_fields = _build_feedback_draft(diagnosis)
+        diagnosis.feedback_draft_summary = summary
+        diagnosis.feedback_draft_fields = draft_fields
+        
+        escaped_summary = summary.replace('"', "'")
+        tags_str = ",".join(draft_fields.get("suggested_tags", []))
+        diagnosis.suggested_feedback_command = f'asyncdev feedback record --scope system --description "{escaped_summary}" --tags {tags_str}'
         return
 
 
@@ -368,6 +420,16 @@ def format_diagnosis_markdown(diagnosis: DoctorDiagnosis) -> str:
             f"{diagnosis.feedback_suggestion}",
             "",
             f"**Why**: {diagnosis.feedback_reason}",
+        ])
+        
+        if diagnosis.feedback_draft_summary:
+            lines.extend([
+                "",
+                "### Feedback Draft Summary",
+                f"{diagnosis.feedback_draft_summary}",
+            ])
+        
+        lines.extend([
             "",
             "## Suggested Feedback Command",
             f"`{diagnosis.suggested_feedback_command}`"
@@ -412,5 +474,10 @@ def format_diagnosis_yaml(diagnosis: DoctorDiagnosis) -> str:
         data["feedback_suggestion"] = diagnosis.feedback_suggestion
         data["feedback_reason"] = diagnosis.feedback_reason
         data["suggested_feedback_command"] = diagnosis.suggested_feedback_command
+        
+        if diagnosis.feedback_draft_summary:
+            data["feedback_draft_summary"] = diagnosis.feedback_draft_summary
+        if diagnosis.feedback_draft_fields:
+            data["feedback_draft_fields"] = diagnosis.feedback_draft_fields
     
     return yaml.dump(data, default_flow_style=False, sort_keys=False)

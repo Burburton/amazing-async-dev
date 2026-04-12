@@ -1186,3 +1186,264 @@ updated_at: 2026-04-12T10:00:00Z
         feedback_files = list(feedback_dir.glob("*.yaml"))
         assert len(feedback_files) == 1
         assert feedback_files[0].name == "existing.yaml"
+
+
+class TestFeedbackDraft:
+    def test_verification_failed_draft_summary(self, tmp_path):
+        """ATTENTION_NEEDED + verification failed should include draft summary."""
+        project = tmp_path / "draft-verify-failed"
+        project.mkdir()
+        
+        (project / "execution-results").mkdir()
+        (project / "execution-results" / "exec-001.md").write_text("""---
+```yaml
+execution_id: exec-001
+status: failed
+completed_items: []
+issues_found:
+  - Compatibility mismatch
+```
+---
+""")
+        
+        (project / "runstate.md").write_text("""---
+```yaml
+project_id: draft-verify-failed
+feature_id: feature-001
+current_phase: executing
+active_task: verify
+task_queue: []
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Verification failed
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+""")
+        (project / "product-brief.yaml").write_text("product_id: draft-verify-failed\nname: Draft Verify Failed\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "ATTENTION_NEEDED"
+        assert diagnosis.verification_status == "failed"
+        assert diagnosis.feedback_draft_summary != ""
+        assert diagnosis.feedback_draft_fields != {}
+        assert "Verification failure" in diagnosis.feedback_draft_summary
+        assert diagnosis.feedback_draft_fields.get("source") == "doctor"
+        assert diagnosis.feedback_draft_fields.get("suggested_tags") is not None
+
+    def test_unknown_draft_summary(self, tmp_path):
+        """UNKNOWN status should include draft summary."""
+        project = tmp_path / "draft-unknown"
+        project.mkdir()
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "UNKNOWN"
+        assert diagnosis.feedback_draft_summary != ""
+        assert diagnosis.feedback_draft_fields != {}
+        assert "Unknown workspace state" in diagnosis.feedback_draft_summary
+        assert diagnosis.feedback_draft_fields.get("source") == "doctor"
+        assert diagnosis.feedback_draft_fields.get("suggested_category") == "persistence"
+
+    def test_healthy_no_draft_summary(self, tmp_path):
+        """HEALTHY status should NOT include draft summary."""
+        project = tmp_path / "draft-healthy"
+        project.mkdir()
+        
+        (project / "runstate.md").write_text("""---
+```yaml
+project_id: draft-healthy
+feature_id: feature-001
+current_phase: planning
+active_task: ""
+task_queue:
+  - create-schema
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Created feature
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+""")
+        (project / "product-brief.yaml").write_text("product_id: draft-healthy\nname: Draft Healthy\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "HEALTHY"
+        assert diagnosis.feedback_draft_summary == ""
+        assert diagnosis.feedback_draft_fields == {}
+
+    def test_completed_no_draft_summary(self, tmp_path):
+        """COMPLETED_PENDING_CLOSEOUT should NOT include draft summary."""
+        project = tmp_path / "draft-completed"
+        project.mkdir()
+        
+        (project / "runstate.md").write_text("""---
+```yaml
+project_id: draft-completed
+feature_id: feature-001
+current_phase: completed
+active_task: ""
+task_queue: []
+completed_outputs:
+  - schemas/test.yaml
+blocked_items: []
+decisions_needed: []
+last_action: Feature completed
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+""")
+        (project / "product-brief.yaml").write_text("product_id: draft-completed\nname: Draft Completed\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT"
+        assert diagnosis.feedback_draft_summary == ""
+        assert diagnosis.feedback_draft_fields == {}
+
+    def test_blocked_no_draft_summary(self, tmp_path):
+        """BLOCKED status should NOT include draft summary."""
+        project = tmp_path / "draft-blocked"
+        project.mkdir()
+        
+        (project / "runstate.md").write_text("""---
+```yaml
+project_id: draft-blocked
+feature_id: feature-001
+current_phase: blocked
+active_task: ""
+task_queue: []
+completed_outputs: []
+blocked_items:
+  - item: external-api
+    reason: API key pending
+decisions_needed: []
+last_action: Hit blocker
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+""")
+        (project / "product-brief.yaml").write_text("product_id: draft-blocked\nname: Draft Blocked\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "BLOCKED"
+        assert diagnosis.feedback_draft_summary == ""
+        assert diagnosis.feedback_draft_fields == {}
+
+
+class TestFeedbackDraftOutput:
+    def test_markdown_includes_draft_summary(self):
+        """Markdown output should include draft summary section."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="ATTENTION_NEEDED",
+            verification_status="failed",
+            feedback_suggestion="This may be worth capturing as workflow feedback.",
+            feedback_reason="Verification failure often indicates systemic friction.",
+            feedback_draft_summary="Verification failure in direct initialization - likely contract mismatch",
+            suggested_feedback_command='asyncdev feedback record --scope product --project my-app --description "Verification failure in direct initialization" --tags verification,contract-mismatch'
+        )
+        
+        output = format_diagnosis_markdown(diagnosis)
+        
+        assert "Feedback Suggestion" in output
+        assert "Feedback Draft Summary" in output
+        assert "Verification failure in direct initialization" in output
+        assert "Suggested Feedback Command" in output
+        assert "--tags verification" in output
+
+    def test_yaml_includes_draft_fields(self):
+        """YAML output should include draft fields."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="UNKNOWN",
+            feedback_suggestion="This may be worth capturing as workflow feedback.",
+            feedback_reason="Unknown state often indicates missing artifacts.",
+            feedback_draft_summary="Unknown workspace state - missing artifacts",
+            feedback_draft_fields={
+                "source": "doctor",
+                "doctor_status": "UNKNOWN",
+                "suggested_category": "persistence",
+                "suggested_tags": ["state-missing", "artifact-corruption"]
+            },
+            suggested_feedback_command='asyncdev feedback record --scope system --description "Unknown workspace state" --tags state-missing,artifact-corruption'
+        )
+        
+        output = format_diagnosis_yaml(diagnosis)
+        
+        assert "feedback_draft_summary:" in output
+        assert "feedback_draft_fields:" in output
+        assert "suggested_tags:" in output
+        assert "state-missing" in output
+
+    def test_yaml_without_draft_fields_clean(self):
+        """YAML output without draft should not have draft keys."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="HEALTHY",
+            product_id="healthy-app"
+        )
+        
+        output = format_diagnosis_yaml(diagnosis)
+        
+        assert "feedback_draft_summary:" not in output
+        assert "feedback_draft_fields:" not in output
+
+    def test_command_includes_prefilled_tags(self):
+        """Suggested command should include prefilled tags."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="ATTENTION_NEEDED",
+            verification_status="failed",
+            product_id="test-app",
+            initialization_mode="starter-pack",
+            feedback_suggestion="This may be worth capturing.",
+            feedback_reason="Verification failure.",
+            feedback_draft_summary="Verification failure in starter-pack initialization",
+            feedback_draft_fields={
+                "source": "doctor",
+                "suggested_tags": ["verification", "contract-mismatch", "tooling-friction"]
+            },
+            suggested_feedback_command='asyncdev feedback record --scope product --project test-app --description "Verification failure" --tags verification,contract-mismatch,tooling-friction'
+        )
+        
+        assert "--tags verification,contract-mismatch,tooling-friction" in diagnosis.suggested_feedback_command
+        assert "--description" in diagnosis.suggested_feedback_command
+        assert "--project test-app" in diagnosis.suggested_feedback_command
+
+    def test_draft_fields_contain_expected_keys(self, tmp_path):
+        """Draft fields should contain all expected keys."""
+        project = tmp_path / "draft-keys-test"
+        project.mkdir()
+        
+        (project / "execution-results").mkdir()
+        (project / "execution-results" / "exec-001.md").write_text("""---
+```yaml
+execution_id: exec-001
+status: failed
+```
+---
+""")
+        (project / "runstate.md").write_text("""---
+```yaml
+project_id: draft-keys
+feature_id: feature-001
+current_phase: executing
+decisions_needed: []
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+""")
+        (project / "product-brief.yaml").write_text("product_id: draft-keys\nname: Draft Keys\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        draft = diagnosis.feedback_draft_fields
+        
+        assert draft.get("source") == "doctor"
+        assert draft.get("doctor_status") == "ATTENTION_NEEDED"
+        assert draft.get("verification_status") == "failed"
+        assert draft.get("suggested_category") == "execution_pack"
+        assert draft.get("suggested_tags") is not None
+        assert len(draft.get("suggested_tags", [])) >= 2
