@@ -138,6 +138,8 @@ python cli/asyncdev.py new-product create --product-id test-verify --name "Test"
 | [examples/README.md](examples/README.md) | **Onboarding guide** - start here for first run |
 | [examples/single-feature-day-loop](examples/single-feature-day-loop/) | Default onboarding example with copy-paste commands |
 | [examples/snapshot-output.md](examples/snapshot-output.md) | Workspace snapshot examples for both initialization modes |
+| [examples/doctor-output.md](examples/doctor-output.md) | Doctor diagnosis examples for all health states |
+| [docs/doctor.md](docs/doctor.md) | Workspace diagnosis and next-action recommendations |
 | [docs/quick-start.md](docs/quick-start.md) | 5-minute guide with execution modes explained |
 | [docs/verify.md](docs/verify.md) | Smoke-verification for initialization |
 | [docs/operating-model.md](docs/operating-model.md) | Day loop phases and responsibilities |
@@ -354,8 +356,8 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 
 | Metric | Value |
 |--------|-------|
-| Features Complete | 28 (001-028) |
-| Tests Passing | 551 |
+| Features Complete | 29 (001-029) |
+| Tests Passing | 573 |
 | Package State | Functional alpha |
 | Coverage | CLI, state, policy, feedback, integration |
 
@@ -376,7 +378,7 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 | Archive & History | ✅ Done | Completion flow, query, summary (013-018) |
 | Feedback & Policy | ✅ Done | Issue capture, auto-continue, decisions (019-021) |
 | Integration | ✅ Done | Advisor starter pack consumption (022) |
-| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot (023-028) |
+| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot, doctor (023-029) |
 | Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
 
 ---
