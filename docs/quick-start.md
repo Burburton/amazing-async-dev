@@ -94,8 +94,8 @@ asyncdev run-day modes
 
 ## Next Steps
 
+- **Run the onboarding example**: [examples/single-feature-day-loop](../examples/single-feature-day-loop/) - complete the full day loop in 5-10 minutes
 - Read `docs/operating-model.md` for detailed workflow
-- Check `examples/single-feature-day-loop/` for demo
 - See `AGENTS.md` for AI execution rules
 
 ---

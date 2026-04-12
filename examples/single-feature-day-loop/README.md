@@ -1,196 +1,188 @@
 # Single Feature Day Loop Demo
 
-This example demonstrates the complete async development workflow: a bounded task executed through all four day loop phases.
+**The default onboarding example** - complete the full day loop in 5-10 minutes.
 
 ---
 
-## What This Demo Shows
+## Copy-Paste Command Sequence
 
-The day loop workflow in action:
+Run this from the repository root:
 
+```bash
+# 1. Initialize (creates projects/ directory)
+python cli/asyncdev.py init create
+
+# 2. Create demo product
+python cli/asyncdev.py new-product create --product-id demo-001 --name "Demo Product"
+
+# 3. Add feature
+python cli/asyncdev.py new-feature create --product-id demo-001 --feature-id hello-world --name "Hello World"
+
+# 4. Plan today's task
+python cli/asyncdev.py plan-day create --product-id demo-001 --feature-id hello-world --task "Create hello-world.txt with greeting message"
+
+# 5. Run (mock mode - no AI required)
+python cli/asyncdev.py run-day --product-id demo-001 --mode mock
+
+# 6. Review tonight
+python cli/asyncdev.py review-night generate --product-id demo-001
+
+# 7. Resume tomorrow
+python cli/asyncdev.py resume-next-day continue-loop --product-id demo-001 --decision approve
 ```
-plan-day → run-day → review-night → resume-next-day
-```
-
-Each phase produces structured artifacts:
-
-| Phase | Artifact Produced |
-|-------|-------------------|
-| plan-day | ExecutionPack |
-| run-day | ExecutionResult + output file |
-| review-night | DailyReviewPack |
-| resume-next-day | RunState updated |
 
 ---
 
-## Quick Start
+## Expected Output
 
-### Option 1: Python Script (Recommended)
+After successful execution, verify:
+
+```
+projects/demo-001/
+├── product-brief.yaml         # Your product definition
+├── runstate.md                # Shows: current_phase: reviewing
+├── features/hello-world/
+│   └── feature-spec.yaml      # Feature scope and acceptance criteria
+├── execution-packs/
+│   └── exec-YYYYMMDD-*.md     # Shows: task_id, goal, task_scope
+├── execution-results/
+│   └── exec-YYYYMMDD-*.md     # Shows: status: success, completed_items
+└── reviews/
+    └── YYYY-MM-DD-review.md   # Shows: what_was_completed, evidence
+```
+
+### Success Indicators
+
+Check these files for success markers:
+
+| File | Success Marker |
+|------|----------------|
+| `execution-results/*.md` | `status: success` |
+| `reviews/*.md` | `completed_items: [...]` with evidence |
+| `runstate.md` | `current_phase: reviewing` or `completed` |
+
+---
+
+## Alternative: Run Demo Script
 
 ```bash
 cd examples/single-feature-day-loop
 python demo-day-loop.py --verbose
 ```
 
-### Option 2: Shell Script
+This script runs a pre-configured demo with existing artifacts.
 
+---
+
+## Troubleshooting
+
+### "Product already exists"
+
+```
+Product already exists: projects/demo-001
+Use different --product-id or delete existing
+```
+
+**Fix**:
 ```bash
-cd examples/single-feature-day-loop
-bash demo-day-loop.sh
+rm -rf projects/demo-001
+# Then re-run new-product create
 ```
 
-### Option 3: Manual CLI Commands
+### "Feature not found"
 
+```
+Feature not found: hello-world
+```
+
+**Fix**: Create feature first:
 ```bash
-# From repository root
-python -m cli.asyncdev run-day mock-quick
-python -m cli.asyncdev review-night generate
-python -m cli.asyncdev resume-next-day continue-loop --decision approve
+python cli/asyncdev.py new-feature create --product-id demo-001 --feature-id hello-world --name "Hello World"
 ```
+
+### "Current phase is planning"
+
+```
+Cannot run-day: current_phase is planning
+```
+
+**Fix**: Run plan-day before run-day:
+```bash
+python cli/asyncdev.py plan-day create --product-id demo-001 --feature-id hello-world --task "..."
+```
+
+### "No execution packs"
+
+```
+No execution packs to run
+```
+
+**Fix**: Plan creates the execution pack:
+```bash
+python cli/asyncdev.py plan-day create --product-id demo-001 --feature-id hello-world --task "Create hello.txt"
+```
+
+### Wrong product ID
+
+Commands must use the same `--product-id` throughout. If you created `demo-001`, all subsequent commands must use `--product-id demo-001`.
 
 ---
 
-## Demo Project Structure
+## What This Demo Shows
+
+The day loop workflow:
 
 ```
-demo-product/
-├─ product-brief.yaml       # Product definition
-├─ feature-spec.yaml        # Feature definition
-├─ execution-packs/
-│  └─ exec-20260410-001.md  # Generated ExecutionPack
-├─ execution-results/
-│  └─ exec-20260410-001.md  # Generated ExecutionResult
-├─ reviews/
-│  └─ 2026-04-10-review.md  # Generated DailyReviewPack
-├─ runstate.md              # Current state
-├─ hello-world.txt          # Output file created
-└─ logs/
+plan-day → run-day → review-night → resume-next-day
 ```
+
+| Phase | What Happens |
+|-------|--------------|
+| plan-day | Creates ExecutionPack with bounded task |
+| run-day | Executes task (mock mode simulates success) |
+| review-night | Generates DailyReviewPack for review |
+| resume-next-day | Updates RunState, continues workflow |
 
 ---
 
-## Phase-by-Phase Walkthrough
-
-### Phase 1: plan-day
-
-Creates bounded ExecutionPack:
-
-```yaml
-execution_id: exec-20260410-001
-task_id: create-hello-world-file
-goal: Create hello-world.txt with greeting message
-task_scope:
-  - Create hello-world.txt
-  - Write greeting message
-  - Verify file content
-deliverables:
-  - item: hello-world.txt
-    path: hello-world.txt
-    type: file
-```
-
-### Phase 2: run-day (Mock Mode)
-
-MockLLMAdapter executes:
-
-```yaml
-status: success
-completed_items: [hello-world.txt]
-artifacts_created:
-  - name: hello-world.txt
-    path: hello-world.txt
-verification_result:
-  passed: 2
-  failed: 0
-```
-
-Output file created:
-```
-Hello from async dev day loop!
-```
-
-### Phase 3: review-night
-
-DailyReviewPack generated:
-
-```yaml
-date: 2026-04-10
-today_goal: Execution exec-20260410-001 completed with status: success
-what_was_completed:
-  - Created hello-world.txt with greeting message
-  - Verified file content
-evidence:
-  - item: hello-world.txt
-    verified: true
-risk_summary: No risks. Simple task completed successfully.
-```
-
-### Phase 4: resume-next-day
-
-RunState updated:
-
-```yaml
-current_phase: completed
-last_action: Day loop completed - feature done
-next_recommended_action: Feature complete. Start new feature or project.
-health_status: healthy
-```
-
----
-
-## Key Concepts Demonstrated
+## Key Concepts
 
 ### Bounded Execution
 
-ExecutionPack constrains AI:
-- `task_scope`: What to do
+ExecutionPack constrains AI scope:
+- `task_scope`: What to do (explicit list)
 - `constraints`: What NOT to do
 - `stop_conditions`: When to stop
 
 ### Evidence-Based Progress
 
-DailyReviewPack requires evidence:
+DailyReviewPack requires verification:
 - `verified: true` for each deliverable
-- `verification_note` explaining how verified
+- `verification_note`: How verified
 
 ### State-Based Resume
 
-RunState enables next-day continuation:
-- `current_phase`: Where we are
-- `completed_outputs`: What done
-- `next_recommended_action`: What next
-
----
-
-## Customizing This Demo
-
-To run a different demo:
-
-1. Edit `product-brief.yaml` with your product
-2. Edit `feature-spec.yaml` with your feature
-3. Modify `demo-day-loop.py` to change task scope
-4. Run with `--verbose` to see details
+RunState enables continuation:
+- `current_phase`: Where you are
+- `completed_outputs`: What's done
+- `next_recommended_action`: What's next
 
 ---
 
 ## Verification Checklist
 
-After running demo, verify:
+After running, check:
 
-- [ ] ExecutionPack saved to execution-packs/
-- [ ] ExecutionResult saved to execution-results/
-- [ ] DailyReviewPack saved to reviews/
-- [ ] RunState phase = completed
-- [ ] Output file (hello-world.txt) exists
-- [ ] All artifacts have valid YAML blocks
+- [ ] `execution-packs/exec-*.md` exists
+- [ ] `execution-results/exec-*.md` shows `status: success`
+- [ ] `reviews/*.md` shows `what_was_completed`
+- [ ] `runstate.md` shows `current_phase: reviewing` or `completed`
 
 ---
 
 ## Next Steps
 
-After this demo:
-
-1. Try with real feature (Feature 001/002)
-2. Add blocked scenario test
-3. Add decision-needed scenario
-4. Test with real AI execution (requires adapter impl)
+1. Run with a real task (change `--task` to your actual work)
+2. Try external tool mode: `--mode external`
+3. Create your own product with real features
+4. Read [docs/operating-model.md](../../docs/operating-model.md) for details

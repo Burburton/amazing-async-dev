@@ -86,8 +86,9 @@ Then open the generated `ExecutionPack.md` and hand it to your preferred AI tool
 
 | Resource | What you'll find |
 |----------|------------------|
+| [examples/README.md](examples/README.md) | **Onboarding guide** - start here for first run |
+| [examples/single-feature-day-loop](examples/single-feature-day-loop/) | Default onboarding example with copy-paste commands |
 | [docs/quick-start.md](docs/quick-start.md) | 5-minute guide with execution modes explained |
-| [examples/single-feature-day-loop/](examples/single-feature-day-loop/) | Full demo with all artifacts |
 | [docs/operating-model.md](docs/operating-model.md) | Day loop phases and responsibilities |
 | [AGENTS.md](AGENTS.md) | Rules for AI execution |
 
@@ -182,7 +183,9 @@ amazing-async-dev/
 ├─ cli/                # CLI commands (18 modules)
 ├─ tests/              # 533 pytest tests
 ├─ examples/
-│  ├─ single-feature-day-loop/  # Full demo
+│  ├─ README.md                  # Onboarding guide - start here
+│  ├─ single-feature-day-loop/   # Default onboarding example
+│  ├─ core-objects/              # Schema examples
 │  └─ pilot/                     # Advisor integration pilot
 ├─ projects/           # User products (created by CLI)
 └─ products/           # Product templates (placeholder)
