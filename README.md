@@ -82,6 +82,35 @@ Then open the generated `ExecutionPack.md` and hand it to your preferred AI tool
 
 ---
 
+## Initialization Modes
+
+`amazing-async-dev` supports two ways to start:
+
+### Mode A: Direct Initialization (Default)
+
+Create products and features directly:
+
+```bash
+python cli/asyncdev.py new-product create --product-id my-app --name "My App"
+python cli/asyncdev.py new-feature create --product-id my-app --feature-id feature-001 --name "First Feature"
+```
+
+This is the baseline path. No external tools required.
+
+### Mode B: Starter-Pack Initialization (Optional)
+
+Use a starter-pack file to pre-configure workflow hints:
+
+```bash
+python cli/asyncdev.py new-product create --product-id my-app --name "My App" --starter-pack starter-pack.yaml
+```
+
+This imports policy mode hints, workflow preferences, and recommended capabilities from a pre-generated pack.
+
+**Starter-pack mode is optional.** The [amazing-skill-pack-advisor](https://github.com/Burburton/amazing-skill-pack-advisor) is a first-party ecosystem tool that can generate compatible starter packs, but it is never required for async-dev usage.
+
+---
+
 ## Learn More
 
 | Resource | What you'll find |
@@ -326,6 +355,26 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 | Integration | ✅ Done | Advisor starter pack consumption (022) |
 | UX Docs | ✅ Done | First-run experience, drift repair, onboarding (023-025) |
 | Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
+
+---
+
+## Ecosystem
+
+`amazing-async-dev` is part of the amazing ecosystem, but works independently.
+
+### amazing-skill-pack-advisor (Optional)
+
+[amazing-skill-pack-advisor](https://github.com/Burburton/amazing-skill-pack-advisor) is a first-party ecosystem tool that helps with project intake and initialization planning. It can generate starter packs that async-dev consumes.
+
+**Key points:**
+- Advisor is **optional** - async-dev works without it
+- Advisor improves initialization quality, but is not required
+- The integration boundary is the `starter-pack` file format, not advisor internals
+- Any compatible provider could theoretically generate starter packs
+
+### Integration Contract
+
+The `starter-pack` schema defines the contract between any provider and async-dev. async-dev validates the schema, not the source.
 
 ---
 

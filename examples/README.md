@@ -6,11 +6,15 @@ This directory contains practical examples for learning `amazing-async-dev`.
 
 ## Available Examples
 
-| Example | Purpose | Audience |
-|---------|---------|----------|
-| [single-feature-day-loop](single-feature-day-loop/) | **Default onboarding example** - Complete day loop walkthrough | First-time users |
-| [core-objects](core-objects/) | Schema examples for each artifact type | Developers customizing artifacts |
-| [pilot](pilot/) | Advisor integration pilot artifacts | Integration testing |
+| Example | Mode | Purpose | Audience |
+|---------|------|---------|----------|
+| [single-feature-day-loop](single-feature-day-loop/) | **Direct** | Default onboarding - Complete day loop walkthrough | First-time users |
+| [core-objects](core-objects/) | Direct | Schema examples for each artifact type | Developers customizing artifacts |
+| [pilot](pilot/) | Starter-Pack | Advisor integration pilot artifacts | Integration testing |
+
+**Modes**: 
+- **Direct** = Uses async-dev standalone (no external dependencies)
+- **Starter-Pack** = Uses advisor-generated starter pack (optional enhancement)
 
 ---
 

@@ -100,4 +100,17 @@ asyncdev run-day modes
 
 ---
 
+## Optional: Starter-Pack Initialization
+
+For enhanced initialization with workflow hints, you can use a starter-pack:
+
+```bash
+# If you have a starter-pack.yaml (from advisor or other source)
+asyncdev new-product create --product-id my-app --name "My App" --starter-pack starter-pack.yaml
+```
+
+This is optional. The [amazing-skill-pack-advisor](https://github.com/Burburton/amazing-skill-pack-advisor) can generate compatible starter packs, but direct initialization works without it.
+
+---
+
 **Time investment**: 20-30 minutes review per day. AI handles the rest.
