@@ -137,6 +137,7 @@ python cli/asyncdev.py new-product create --product-id test-verify --name "Test"
 |----------|------------------|
 | [examples/README.md](examples/README.md) | **Onboarding guide** - start here for first run |
 | [examples/single-feature-day-loop](examples/single-feature-day-loop/) | Default onboarding example with copy-paste commands |
+| [examples/snapshot-output.md](examples/snapshot-output.md) | Workspace snapshot examples for both initialization modes |
 | [docs/quick-start.md](docs/quick-start.md) | 5-minute guide with execution modes explained |
 | [docs/verify.md](docs/verify.md) | Smoke-verification for initialization |
 | [docs/operating-model.md](docs/operating-model.md) | Day loop phases and responsibilities |
@@ -231,7 +232,7 @@ amazing-async-dev/
 ├─ templates/          # Fillable templates
 ├─ runtime/            # State management, adapters
 ├─ cli/                # CLI commands (18 modules)
-├─ tests/              # 533 pytest tests
+├─ tests/              # 551 pytest tests
 ├─ examples/
 │  ├─ README.md                  # Onboarding guide - start here
 │  ├─ single-feature-day-loop/   # Default onboarding example
@@ -258,7 +259,8 @@ python -m pytest tests/ -v
 | SQLite persistence | 20 | State store, recovery |
 | Policy & decisions | 71 | Auto-continue, email channel |
 | Integration | 18 | Advisor starter pack consumption |
-| **Total** | **533** | |
+| Snapshot | 18 | Workspace visibility, cross-repo state |
+| **Total** | **551** | |
 
 ---
 
@@ -352,8 +354,8 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 
 | Metric | Value |
 |--------|-------|
-| Features Complete | 27 (001-027) |
-| Tests Passing | 533 |
+| Features Complete | 28 (001-028) |
+| Tests Passing | 551 |
 | Package State | Functional alpha |
 | Coverage | CLI, state, policy, feedback, integration |
 
@@ -374,7 +376,7 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 | Archive & History | ✅ Done | Completion flow, query, summary (013-018) |
 | Feedback & Policy | ✅ Done | Issue capture, auto-continue, decisions (019-021) |
 | Integration | ✅ Done | Advisor starter pack consumption (022) |
-| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification (023-027) |
+| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot (023-028) |
 | Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
 
 ---
