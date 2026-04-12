@@ -9,12 +9,13 @@ This directory contains practical examples for learning `amazing-async-dev`.
 | Example | Mode | Purpose | Audience |
 |---------|------|---------|----------|
 | [single-feature-day-loop](single-feature-day-loop/) | **Direct** | Default onboarding - Complete day loop walkthrough | First-time users |
+| [verify-initialization](verify-initialization/) | Starter-Pack | Quick verification of starter-pack initialization | Integration testing |
 | [core-objects](core-objects/) | Direct | Schema examples for each artifact type | Developers customizing artifacts |
 | [pilot](pilot/) | Starter-Pack | Advisor integration pilot artifacts | Integration testing |
 
 **Modes**: 
 - **Direct** = Uses async-dev standalone (no external dependencies)
-- **Starter-Pack** = Uses advisor-generated starter pack (optional enhancement)
+- **Starter-Pack** = Uses starter-pack file (optional enhancement)
 
 ---
 

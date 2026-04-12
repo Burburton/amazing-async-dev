@@ -111,6 +111,26 @@ This imports policy mode hints, workflow preferences, and recommended capabiliti
 
 ---
 
+## Verify Your Setup
+
+Before starting real work, confirm initialization works:
+
+| Resource | Purpose |
+|----------|---------|
+| [docs/verify.md](docs/verify.md) | **Official verification guide** - smoke-test both initialization modes |
+| [examples/verify-initialization](examples/verify-initialization/) | Minimal starter pack for quick testing |
+
+Quick test:
+```bash
+# Direct mode (always works)
+python cli/asyncdev.py new-product create --product-id test-verify --name "Test"
+
+# Starter-pack mode (optional)
+python cli/asyncdev.py new-product create --product-id test-verify --name "Test" --starter-pack examples/verify-initialization/starter-pack.yaml
+```
+
+---
+
 ## Learn More
 
 | Resource | What you'll find |
@@ -118,6 +138,7 @@ This imports policy mode hints, workflow preferences, and recommended capabiliti
 | [examples/README.md](examples/README.md) | **Onboarding guide** - start here for first run |
 | [examples/single-feature-day-loop](examples/single-feature-day-loop/) | Default onboarding example with copy-paste commands |
 | [docs/quick-start.md](docs/quick-start.md) | 5-minute guide with execution modes explained |
+| [docs/verify.md](docs/verify.md) | Smoke-verification for initialization |
 | [docs/operating-model.md](docs/operating-model.md) | Day loop phases and responsibilities |
 | [AGENTS.md](AGENTS.md) | Rules for AI execution |
 
@@ -331,7 +352,7 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 
 | Metric | Value |
 |--------|-------|
-| Features Complete | 26 (001-026) |
+| Features Complete | 27 (001-027) |
 | Tests Passing | 533 |
 | Package State | Functional alpha |
 | Coverage | CLI, state, policy, feedback, integration |
@@ -353,7 +374,7 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 | Archive & History | ✅ Done | Completion flow, query, summary (013-018) |
 | Feedback & Policy | ✅ Done | Issue capture, auto-continue, decisions (019-021) |
 | Integration | ✅ Done | Advisor starter pack consumption (022) |
-| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning (023-026) |
+| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification (023-027) |
 | Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
 
 ---

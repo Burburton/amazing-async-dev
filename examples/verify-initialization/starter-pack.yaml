@@ -1,0 +1,34 @@
+project_profile:
+  summary: Verification test project - minimal starter pack for initialization validation
+  product_type: test_project
+  stage: verification
+  team_mode: solo
+required_skills:
+  - external-tool-mode
+optional_skills:
+  - enhanced-status
+deferred_skills:
+  - live-api-primary
+workflow_mode:
+  execution: external-tool-first
+  review: lightweight-summary
+  planning: archive-aware-planning
+  archive: minimal-archive
+  ergonomics: minimal-cli
+workflow_defaults:
+  policy_mode_hint: balanced
+  review_automation: true
+  archive_on_complete: false
+  decision_handling: pause_for_human
+integration_metadata:
+  contract_version: '1.0'
+  starter_pack_version: '2.0'
+  advisor_version: v1.0.0
+  generated_at: '2026-04-12T19:00:00Z'
+asyncdev_compatibility:
+  compatible: true
+  minimum_version: v0.19.0
+  recommended_version: v0.26.0
+  compatibility_notes: []
+  incompatible_fields: []
+notes: Minimal starter pack for verification testing. Compatible with async-dev v0.19.0+.
