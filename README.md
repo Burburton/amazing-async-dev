@@ -186,7 +186,8 @@ python -m pytest tests/ -v
 | `test_feedback_promotion.py` | 22 | Feedback promotion / issue escalation |
 | `test_execution_policy.py` | 38 | Execution policy / auto-continue rules |
 | `test_email_decision.py` | 33 | Async decision channel / email mock |
-| **Total** | **515** | |
+| `test_starter_pack_integration.py` | 18 | Advisor starter pack consumption / field mapping |
+| **Total** | **533** | |
 
 ### Test categories
 

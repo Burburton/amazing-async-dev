@@ -1,0 +1,32 @@
+product_type: "ai_tooling"
+
+technical_stack:
+  primary_language: "python"
+  framework: "typer"
+  persistence: "sqlite"
+  other:
+    - "pydantic"
+    - "yaml"
+    - "pytest"
+
+current_stage: "mvp"
+
+team_mode: "solo"
+
+preferences:
+  iteration_style: "fast_iteration"
+  review_discipline: "lightweight"
+  archive_discipline: "minimal"
+  automation_level: "low"
+  external_tool_first: true
+
+constraints:
+  daily_time_available: "limited_1h"
+  requirement_stability: "uncertain"
+  scope_stability: "unstable"
+  workflow_overhead_tolerance: "very_low"
+  external_dependencies:
+    - "github_api"
+    - "openai_api"
+
+notes: "v1.1 pilot intake for async-dev consumption validation. Realistic AI tooling project with solo builder constraints and minimal overhead requirements."
