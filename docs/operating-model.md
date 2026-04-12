@@ -175,6 +175,7 @@ The nightly pack now consolidates signals from Features 028–032 into one decis
 **Inputs**:
 - Human decisions (approve/revise/defer/redefine)
 - Latest RunState
+- Prior-night decision pack (Feature 034)
 
 **Outputs**:
 - New ExecutionPack
@@ -182,7 +183,28 @@ The nightly pack now consolidates signals from Features 028–032 into one decis
 
 **Purpose**: Continue from state, not from explanation
 
-**Human action**: Confirm continuation plan
+**Decision Pack Alignment (Feature 034)**:
+
+`resume-next-day` now consumes the enriched nightly decision pack from Feature 033 to provide seamless continuity between days:
+
+**Prior Night Context Displayed**:
+- Prior review date and doctor status
+- Prior recommended next action
+- Prior suggested command
+
+**Conditionally Shown**:
+- Prior recovery guidance (if still relevant)
+- Prior feedback handoff reminder (if applicable)
+- Prior closeout reminder (if pending)
+
+**Fallback Behavior**:
+- When no review pack exists, resume continues with existing state-based logic
+- When review pack is stale (prior day), warning is displayed
+- Graceful degradation preserves system usability
+
+**Key principle**: `review-night` creates the nightly decision artifact; `resume-next-day` consumes it to help the operator continue without re-reading multiple artifacts.
+
+**Human action**: Review prior context, confirm continuation plan
 
 ---
 
