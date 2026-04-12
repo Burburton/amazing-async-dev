@@ -108,6 +108,13 @@ class SQLiteAdapter:
                 product_id TEXT,
                 feature_id TEXT,
                 description TEXT NOT NULL,
+                context_summary TEXT NOT NULL,
+                suspected_problem TEXT,
+                temporary_fix TEXT,
+                reproduction_hint TEXT,
+                command_context TEXT,
+                expected_behavior TEXT,
+                actual_behavior TEXT,
                 self_corrected INTEGER NOT NULL DEFAULT 0,
                 requires_followup INTEGER NOT NULL DEFAULT 0,
                 confidence TEXT,
@@ -422,9 +429,11 @@ class SQLiteAdapter:
             """
             INSERT OR REPLACE INTO workflow_feedback
             (feedback_id, problem_domain, issue_type, detected_by, detected_in, product_id, feature_id,
-             description, self_corrected, requires_followup, confidence, escalation_recommendation, triage_note, triaged_at,
+             description, context_summary, suspected_problem, temporary_fix, reproduction_hint,
+             command_context, expected_behavior, actual_behavior,
+             self_corrected, requires_followup, confidence, escalation_recommendation, triage_note, triaged_at,
              promotion_status, promotion_id, resolution, status, priority, detected_at, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 feedback.get("feedback_id"),
@@ -435,6 +444,13 @@ class SQLiteAdapter:
                 feedback.get("product_id"),
                 feedback.get("feature_id"),
                 feedback.get("description"),
+                feedback.get("context_summary"),
+                feedback.get("suspected_problem"),
+                feedback.get("temporary_fix"),
+                feedback.get("reproduction_hint"),
+                feedback.get("command_context"),
+                feedback.get("expected_behavior"),
+                feedback.get("actual_behavior"),
                 1 if feedback.get("self_corrected") else 0,
                 1 if feedback.get("requires_followup") else 0,
                 feedback.get("confidence"),

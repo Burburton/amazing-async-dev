@@ -1,6 +1,6 @@
-# WorkflowFeedback Template (v2.0)
+# WorkflowFeedback Template (v2.2)
 
-> This template defines the structure of `WorkflowFeedback` — a lightweight record for workflow/system issues discovered during async-dev usage, with triage classification.
+> This template defines the structure of `WorkflowFeedback` — a lightweight repairable record for workflow/system issues discovered during async-dev usage, with triage classification.
 
 ---
 
@@ -9,11 +9,11 @@
 | Field | Value |
 |-------|-------|
 | Object Type | `WorkflowFeedback` |
-| Purpose | Capture workflow/system issues with triage classification |
+| Purpose | Capture workflow/system issues with repair context and triage classification |
 | Update Frequency | When resolution/triage changes |
 | Owner | Operator / AI executor |
-| Features | 019a - Capture, 019b - Triage |
-| Version | 2.0 |
+| Features | 019a - Capture + Repair Context, 019b - Triage, 019c - Promotion |
+| Version | 2.2 |
 
 ---
 
@@ -68,6 +68,12 @@
 - **Description**: Clear description of the workflow issue
 - **Example**: `ExecutionPack referenced wrong feature sequence, pointing to feature 002 instead of 003`
 
+### context_summary
+- **Type**: string
+- **Description**: What the system was doing when issue was detected - provides repair context
+- **Example**: `Reviewing the generated ExecutionPack before starting real execution`
+- **Critical**: Required for repair value - explains operational context at detection time
+
 ### self_corrected
 - **Type**: boolean
 - **Description**: Whether the issue was self-corrected during execution
@@ -83,6 +89,49 @@
 - **Type**: datetime (ISO 8601)
 - **Description**: When this issue was detected
 - **Example**: `2026-04-11T14:30:00`
+
+---
+
+## Strongly Recommended Fields (for Repair Value)
+
+These fields are not strictly required but strongly recommended for debugging and repair.
+
+### suspected_problem
+- **Type**: string
+- **Description**: What seems wrong - initial hypothesis about root cause
+- **Example**: `Feature sequencing logic allowed task to be labeled as feature 003 while foundational work not created`
+- **Recommendation**: Always provide when possible for repair value
+
+### temporary_fix
+- **Type**: string
+- **Description**: How the issue was worked around - immediate response
+- **Example**: `Operator manually stopped execution, reviewed ExecutionPack, corrected task flow`
+- **Recommendation**: Always provide when a workaround was applied
+
+### reproduction_hint
+- **Type**: string
+- **Description**: How to investigate or reproduce this issue later
+- **Example**: `Initialize a new product, generate early execution planning, inspect ExecutionPack for feature numbering assumptions`
+- **Recommendation**: Always provide to enable later investigation
+
+---
+
+## Optional Context Fields
+
+### command_context
+- **Type**: string
+- **Description**: CLI command that triggered or was running when issue detected
+- **Example**: `asyncdev run-day execute`
+
+### expected_behavior
+- **Type**: string
+- **Description**: What should have happened according to design
+- **Example**: `First executable feature in new product flow should be feature 001`
+
+### actual_behavior
+- **Type**: string
+- **Description**: What actually happened - the observed deviation
+- **Example**: `Generated ExecutionPack referenced feature 003 as current feature`
 
 ---
 
@@ -174,19 +223,56 @@
 ## Template Instances
 
 ```yaml
+# WorkflowFeedback Instance - async_dev Domain (Full Repair Context)
+feedback_id: "wf-20260411-001"
+problem_domain: "async_dev"
+issue_type: "execution_pack"
+detected_by: "operator"
+detected_in: "verification"
+description: "ExecutionPack referenced a later feature before foundational feature sequencing was established."
+context_summary: "Reviewing the generated ExecutionPack before starting real execution against the external repository."
+suspected_problem: "Feature sequencing logic in async-dev allowed current task to be labeled as feature 003 while foundational work had not yet been created."
+temporary_fix: "Operator manually stopped execution, reviewed the ExecutionPack, and corrected the task flow before continuing."
+reproduction_hint: "Initialize a new product, generate early execution planning, and inspect the produced ExecutionPack for feature numbering/order assumptions."
+command_context: "asyncdev run-day execute"
+expected_behavior: "The first executable feature in a new product flow should be feature 001 or a clearly justified initial feature."
+actual_behavior: "Generated ExecutionPack referenced feature 003 as the current feature."
+self_corrected: true
+requires_followup: true
+detected_at: "2026-04-11T23:48:03"
+```
+
+```yaml
 # WorkflowFeedback Instance - async_dev Domain (Triaged)
-feedback_id: "wf-YYYYMMDD-###"
+feedback_id: "wf-20260411-002"
 problem_domain: "async_dev"
 issue_type: "cli_behavior"
 detected_by: "operator"
 detected_in: "status command"
 description: "asyncdev status showed wrong phase"
+context_summary: "Running status check after execution completed."
+suspected_problem: "Phase tracking not updated after execution."
 self_corrected: true
 requires_followup: true
 confidence: "high"
 escalation_recommendation: "candidate_issue"
 triaged_at: "2026-04-11T15:00:00"
-triage_note: "Confirmed async-dev CLI bug"
+detected_at: "2026-04-11T14:30:00"
+```
+
+```yaml
+# WorkflowFeedback Instance - product Domain
+feedback_id: "wf-20260411-003"
+problem_domain: "product"
+issue_type: "execution_pack"
+detected_by: "operator"
+detected_in: "plan-day create"
+product_id: "my-app"
+feature_id: "001-core"
+description: "ExecutionPack referenced wrong feature"
+context_summary: "Creating execution plan for first feature."
+self_corrected: true
+requires_followup: true
 detected_at: "2026-04-11T14:30:00"
 ```
 
@@ -238,14 +324,17 @@ detected_at: "2026-04-11T14:30:00"
 ## CLI Usage
 
 ```bash
-# Record with auto-inferred domain
-asyncdev feedback record --type cli_behavior --in "status" --description "Wrong phase"
+# Record with required context_summary
+asyncdev feedback record --type cli_behavior --in "status" --description "Wrong phase" --context "Running status check after execution"
 
-# Record with explicit triage
-asyncdev feedback record --type cli_behavior --confidence high --escalation candidate_issue --description "CLI bug"
+# Record with strongly recommended repair fields
+asyncdev feedback record --type execution_pack --in "plan-day" --description "Wrong sequence" --context "Reviewing ExecutionPack" --suspected "Feature numbering bug" --workaround "Manual edit" --reproduce "Generate new ExecutionPack and inspect numbering"
+
+# Record with full context
+asyncdev feedback record --type cli_behavior --in "status" --description "Wrong phase" --context "Running status check" --command "asyncdev status" --expected "show executing phase" --actual "showed planning phase" --suspected "Phase tracking not updated"
 
 # Record product domain issue
-asyncdev feedback record --domain product --product my-app --type execution_pack --description "Wrong sequence"
+asyncdev feedback record --domain product --product my-app --type execution_pack --description "Wrong sequence" --context "Plan-day workflow" --suspected "Product-specific sequencing issue"
 
 # Triage existing feedback
 asyncdev feedback triage --feedback-id wf-001 --domain async_dev --confidence high --escalation candidate_issue
@@ -272,9 +361,12 @@ Before saving WorkflowFeedback, verify:
 - [ ] `problem_domain` is valid enum (`async_dev`, `product`, `uncertain`)
 - [ ] If `problem_domain` is `product` or `uncertain`, `product_id` is provided
 - [ ] `issue_type` is valid enum
+- [ ] `description` is non-empty
+- [ ] `context_summary` is non-empty (required for repair value)
 - [ ] `self_corrected` and `requires_followup` are boolean
 - [ ] `detected_at` is valid datetime
 - [ ] If triaged: `confidence` and `escalation_recommendation` are valid enums
+- [ ] (Recommended) `suspected_problem`, `temporary_fix`, `reproduction_hint` provided
 
 ---
 

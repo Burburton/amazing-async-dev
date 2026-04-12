@@ -145,12 +145,19 @@ class WorkflowFeedbackStore:
         detected_by: str,
         detected_in: str,
         description: str,
+        context_summary: str,
         self_corrected: bool,
         requires_followup: bool,
         problem_domain: str | None = None,
         product_id: str | None = None,
         feature_id: str | None = None,
         execution_id: str | None = None,
+        suspected_problem: str | None = None,
+        temporary_fix: str | None = None,
+        reproduction_hint: str | None = None,
+        command_context: str | None = None,
+        expected_behavior: str | None = None,
+        actual_behavior: str | None = None,
         impact: str | None = None,
         artifact_reference: dict[str, Any] | None = None,
         confidence: str | None = None,
@@ -170,11 +177,18 @@ class WorkflowFeedbackStore:
             detected_by: Who detected the issue
             detected_in: Context where detected
             description: Issue description
+            context_summary: What system was doing at detection (repair context)
             self_corrected: Whether issue was self-corrected
             requires_followup: Whether followup is needed
             product_id: Product ID (required for product/uncertain domain)
             feature_id: Optional feature ID
             execution_id: Optional execution ID
+            suspected_problem: Optional hypothesis about root cause (strongly recommended)
+            temporary_fix: Optional workaround description (strongly recommended)
+            reproduction_hint: Optional investigation guidance (strongly recommended)
+            command_context: Optional CLI command that triggered issue
+            expected_behavior: Optional what should have happened
+            actual_behavior: Optional what actually happened
             impact: Optional impact description
             artifact_reference: Optional artifact reference dict
             confidence: Confidence level (low/medium/high)
@@ -222,6 +236,7 @@ class WorkflowFeedbackStore:
             "detected_by": detected_by,
             "detected_in": detected_in,
             "description": description,
+            "context_summary": context_summary,
             "self_corrected": self_corrected,
             "requires_followup": requires_followup,
             "detected_at": detected_at,
@@ -233,6 +248,18 @@ class WorkflowFeedbackStore:
             feedback["feature_id"] = feature_id
         if execution_id:
             feedback["execution_id"] = execution_id
+        if suspected_problem:
+            feedback["suspected_problem"] = suspected_problem
+        if temporary_fix:
+            feedback["temporary_fix"] = temporary_fix
+        if reproduction_hint:
+            feedback["reproduction_hint"] = reproduction_hint
+        if command_context:
+            feedback["command_context"] = command_context
+        if expected_behavior:
+            feedback["expected_behavior"] = expected_behavior
+        if actual_behavior:
+            feedback["actual_behavior"] = actual_behavior
         if impact:
             feedback["impact"] = impact
         if artifact_reference:

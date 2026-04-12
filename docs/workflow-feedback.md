@@ -1,6 +1,6 @@
 # Workflow Feedback Capture, Triage & Promotion
 
-Feature 019a: Lightweight mechanism to capture workflow/system issues during async-dev usage.
+Feature 019a: Workflow feedback capture with repair context for system hardening.
 Feature 019b: Structured triage layer for workflow feedback classification.
 Feature 019c: Feedback promotion to formal follow-up records.
 
@@ -15,7 +15,12 @@ When using `amazing-async-dev` in real scenarios, you may notice issues with the
 - CLI commands show inconsistent behavior
 - Recovery guidance seems incorrect
 
-These issues are often worked around manually, then forgotten. This feature ensures they are captured explicitly for future hardening, with a triage layer to classify them properly, and a promotion mechanism to turn them into formal follow-up work.
+These issues are often worked around manually, then forgotten. This feature ensures they are:
+- **Captured with repair context** - what system was doing, suspected cause, workaround
+- **Triaged for classification** - domain, confidence, escalation recommendation
+- **Promoted when needed** - turned into formal follow-up work
+
+The repair context fields make feedback minimally repairable - enabling later debugging without blocking capture.
 
 ---
 
@@ -24,25 +29,37 @@ These issues are often worked around manually, then forgotten. This feature ensu
 ### Record a workflow issue
 
 ```bash
-# During execution, you notice an issue:
+# During execution, you notice an issue - with repair context:
 asyncdev feedback record \
   --domain product \
   --product my-app \
   --type execution_pack \
   --in "plan-day create" \
-  --description "ExecutionPack referenced wrong feature"
+  --description "ExecutionPack referenced wrong feature" \
+  --context "Creating execution plan for first feature" \
+  --suspected "Feature sequencing logic issue" \
+  --workaround "Manual correction of ExecutionPack"
 
 # System-level issue (CLI bug) - domain auto-inferred:
 asyncdev feedback record \
   --type cli_behavior \
   --in "status command" \
-  --description "asyncdev status showed wrong phase"
+  --description "asyncdev status showed wrong phase" \
+  --context "Running status check after execution completed"
+
+# Minimal capture (required fields only):
+asyncdev feedback record \
+  --type cli_behavior \
+  --in "status" \
+  --description "CLI bug" \
+  --context "Running status check"
 
 # Record with immediate triage:
 asyncdev feedback record \
   --type cli_behavior \
   --in "status" \
   --description "CLI bug" \
+  --context "Running status check" \
   --confidence high \
   --escalation candidate_issue
 ```
@@ -105,6 +122,48 @@ asyncdev feedback update --feedback-id wf-20260411-001 --resolution fixed --stat
 ```bash
 asyncdev feedback summary
 ```
+
+---
+
+## Repair Context Fields (Feature 019a Enhancement)
+
+### Why Repair Context?
+
+WorkflowFeedback was originally a simple alert record - it captured that a problem happened, but lacked context to understand:
+- What the system was doing at detection time
+- What seems wrong (initial hypothesis)
+- How it was worked around
+- How to investigate or reproduce later
+
+The repair context fields transform feedback from "something happened" to "minimally repairable investigation record."
+
+### Required Field: context_summary
+
+```bash
+--context "What system was doing at detection"
+```
+
+This field is **required** - it explains the operational context at detection time. Without it, feedback lacks situational awareness for debugging.
+
+Example: "Reviewing the generated ExecutionPack before starting real execution"
+
+### Strongly Recommended Fields
+
+| Field | CLI Option | Purpose |
+|-------|------------|---------|
+| `suspected_problem` | `--suspected` | Initial hypothesis about root cause |
+| `temporary_fix` | `--workaround` | How issue was worked around |
+| `reproduction_hint` | `--reproduce` | How to investigate/reproduce later |
+
+These are not strictly required but strongly recommended for debugging value.
+
+### Optional Context Fields
+
+| Field | CLI Option | Purpose |
+|-------|------------|---------|
+| `command_context` | `--command` | CLI command that triggered issue |
+| `expected_behavior` | `--expected` | What should have happened |
+| `actual_behavior` | `--actual` | What actually happened |
 
 ---
 

@@ -50,6 +50,7 @@ def setup_feedback_files(temp_dir):
         detected_by="operator",
         detected_in="status command",
         description="asyncdev status showed wrong phase",
+        context_summary="Running status check after execution",
         self_corrected=False,
         requires_followup=True,
         confidence="high",
@@ -63,6 +64,7 @@ def setup_feedback_files(temp_dir):
         detected_by="operator",
         detected_in="plan-day create",
         description="ExecutionPack referenced wrong feature",
+        context_summary="Creating execution plan for feature",
         self_corrected=True,
         requires_followup=True,
         product_id="test-product",
@@ -76,6 +78,7 @@ def setup_feedback_files(temp_dir):
         detected_by="operator",
         detected_in="git operations",
         description="Git integration issue, unclear source",
+        context_summary="Performing git operations",
         self_corrected=False,
         requires_followup=True,
         product_id="test-product",
@@ -115,8 +118,9 @@ class TestWorkflowFeedbackStore:
             issue_type="cli_behavior",
             detected_by="operator",
             detected_in="test",
-            description="Test 1",
-            self_corrected=False,
+description="Test 1",
+        context_summary="Test context",
+        self_corrected=False,
             requires_followup=True,
         )
         
@@ -125,8 +129,9 @@ class TestWorkflowFeedbackStore:
             issue_type="cli_behavior",
             detected_by="operator",
             detected_in="test",
-            description="Test 2",
-            self_corrected=False,
+description="Test 2",
+        context_summary="Test context",
+        self_corrected=False,
             requires_followup=True,
         )
         
@@ -142,8 +147,9 @@ class TestWorkflowFeedbackStore:
             issue_type="execution_pack",
             detected_by="operator",
             detected_in="plan-day",
-            description="Test feedback",
-            self_corrected=False,
+description="Test feedback",
+        context_summary="Test context",
+        self_corrected=False,
             requires_followup=True,
             product_id="test-product",
         )
@@ -162,8 +168,9 @@ class TestWorkflowFeedbackStore:
             issue_type="cli_behavior",
             detected_by="operator",
             detected_in="status command",
-            description="CLI bug",
-            self_corrected=True,
+description="CLI bug",
+        context_summary="Testing CLI behavior",
+        self_corrected=True,
             requires_followup=False,
         )
         
@@ -179,8 +186,9 @@ class TestWorkflowFeedbackStore:
             issue_type="repo_integration",
             detected_by="operator",
             detected_in="git ops",
-            description="Unclear issue source",
-            self_corrected=False,
+description="Unclear issue source",
+        context_summary="Test context",
+        self_corrected=False,
             requires_followup=True,
             product_id="test-product",
         )
@@ -198,8 +206,9 @@ class TestWorkflowFeedbackStore:
                 issue_type="execution_pack",
                 detected_by="operator",
                 detected_in="plan-day",
-                description="Test",
-                self_corrected=False,
+description="Test",
+        context_summary="Test context",
+        self_corrected=False,
                 requires_followup=True,
             )
 
@@ -213,8 +222,9 @@ class TestWorkflowFeedbackStore:
                 issue_type="repo_integration",
                 detected_by="operator",
                 detected_in="git ops",
-                description="Test",
-                self_corrected=False,
+description="Test",
+        context_summary="Test context",
+        self_corrected=False,
                 requires_followup=True,
             )
 
@@ -228,8 +238,9 @@ class TestWorkflowFeedbackStore:
                 issue_type="invalid_type",
                 detected_by="operator",
                 detected_in="test",
-                description="Test",
-                self_corrected=False,
+description="Test",
+        context_summary="Test context",
+        self_corrected=False,
                 requires_followup=True,
             )
 
@@ -243,8 +254,9 @@ class TestWorkflowFeedbackStore:
                 issue_type="cli_behavior",
                 detected_by="operator",
                 detected_in="test",
-                description="Test",
-                self_corrected=False,
+description="Test",
+        context_summary="Test context",
+        self_corrected=False,
                 requires_followup=True,
             )
 
@@ -257,8 +269,9 @@ class TestWorkflowFeedbackStore:
             issue_type="cli_behavior",
             detected_by="operator",
             detected_in="status",
-            description="CLI bug with triage",
-            self_corrected=False,
+description="CLI bug with triage",
+        context_summary="Testing CLI with triage",
+        self_corrected=False,
             requires_followup=True,
             confidence="high",
             escalation_recommendation="candidate_issue",
@@ -279,8 +292,9 @@ class TestWorkflowFeedbackStore:
             issue_type="cli_behavior",
             detected_by="operator",
             detected_in="test",
-            description="Test auto-inference",
-            self_corrected=False,
+description="Test auto-inference",
+        context_summary="Test context",
+        self_corrected=False,
             requires_followup=True,
         )
         
@@ -523,6 +537,7 @@ class TestTriageFeedback:
             detected_by="operator",
             detected_in="test",
             description="Test",
+            context_summary="Test context",
             self_corrected=False,
             requires_followup=True,
             product_id="test-product",
@@ -547,6 +562,7 @@ class TestTriageFeedback:
             detected_by="operator",
             detected_in="test",
             description="Test",
+            context_summary="Test context",
             self_corrected=False,
             requires_followup=True,
         )
@@ -570,6 +586,7 @@ class TestTriageFeedback:
             detected_by="operator",
             detected_in="test",
             description="Test",
+            context_summary="Test context",
             self_corrected=False,
             requires_followup=True,
         )
@@ -593,6 +610,7 @@ class TestTriageFeedback:
             detected_by="operator",
             detected_in="test",
             description="Test",
+            context_summary="Test context",
             self_corrected=False,
             requires_followup=True,
         )
@@ -616,6 +634,7 @@ class TestTriageFeedback:
             detected_by="operator",
             detected_in="test",
             description="Test",
+            context_summary="Test context",
             self_corrected=False,
             requires_followup=True,
             product_id="test-product",
@@ -646,6 +665,7 @@ class TestTriageFeedback:
             detected_by="operator",
             detected_in="test",
             description="Test",
+            context_summary="Test context",
             self_corrected=False,
             requires_followup=True,
         )
@@ -667,6 +687,7 @@ class TestTriageFeedback:
             detected_by="operator",
             detected_in="test",
             description="Test",
+            context_summary="Test context",
             self_corrected=False,
             requires_followup=True,
         )
@@ -688,6 +709,7 @@ class TestTriageFeedback:
             detected_by="operator",
             detected_in="test",
             description="Test",
+            context_summary="Test context",
             self_corrected=False,
             requires_followup=True,
         )
@@ -721,8 +743,9 @@ class TestWorkflowFeedbackSQLite:
             issue_type="execution_pack",
             detected_by="operator",
             detected_in="plan-day",
-            description="SQLite test",
-            self_corrected=False,
+description="SQLite test",
+        context_summary="Testing SQLite storage",
+        self_corrected=False,
             requires_followup=True,
             product_id="test-product",
         )
@@ -743,8 +766,9 @@ class TestWorkflowFeedbackSQLite:
             issue_type="cli_behavior",
             detected_by="operator",
             detected_in="test",
-            description="Feedback 1",
-            self_corrected=True,
+description="Feedback 1",
+        context_summary="Test context",
+        self_corrected=True,
             requires_followup=False,
         )
         
@@ -753,8 +777,9 @@ class TestWorkflowFeedbackSQLite:
             issue_type="persistence",
             detected_by="operator",
             detected_in="test",
-            description="Feedback 2",
-            self_corrected=False,
+description="Feedback 2",
+        context_summary="Test context",
+        self_corrected=False,
             requires_followup=True,
         )
         
@@ -773,8 +798,9 @@ class TestWorkflowFeedbackSQLite:
             issue_type="cli_behavior",
             detected_by="operator",
             detected_in="test",
-            description="SQLite triage test",
-            self_corrected=False,
+description="SQLite triage test",
+        context_summary="Testing SQLite triage",
+        self_corrected=False,
             requires_followup=True,
         )
         
@@ -903,6 +929,7 @@ class TestFeedbackCLI:
                 "--type", "execution_pack",
                 "--in", "plan-day",
                 "--description", "Test feedback",
+                "--context", "Testing feedback capture",
                 "--path", str(temp_dir),
             ],
         )
@@ -920,6 +947,7 @@ class TestFeedbackCLI:
                 "--type", "cli_behavior",
                 "--in", "status",
                 "--description", "CLI bug",
+                "--context", "Testing CLI behavior",
                 "--path", str(temp_dir),
             ],
         )
@@ -936,6 +964,7 @@ class TestFeedbackCLI:
                 "--type", "cli_behavior",
                 "--in", "status",
                 "--description", "Auto-inferred",
+                "--context", "Testing auto-inference",
                 "--path", str(temp_dir),
             ],
         )
@@ -954,6 +983,7 @@ class TestFeedbackCLI:
                 "--type", "cli_behavior",
                 "--in", "status",
                 "--description", "CLI bug with triage",
+                "--context", "Testing CLI with triage params",
                 "--confidence", "high",
                 "--escalation", "candidate_issue",
                 "--path", str(temp_dir),
@@ -974,6 +1004,7 @@ class TestFeedbackCLI:
                 "--type", "execution_pack",
                 "--in", "plan-day",
                 "--description", "Test",
+                "--context", "Test context",
                 "--path", str(temp_dir),
             ],
         )

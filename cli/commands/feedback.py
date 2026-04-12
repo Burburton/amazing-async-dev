@@ -34,9 +34,16 @@ def record(
     detected_by: str = typer.Option("operator", "--by", "-b", help="Who detected: operator, ai_executor, review_process, etc."),
     detected_in: str = typer.Option(..., "--in", "-i", help="Context where detected (workflow phase, command, file)"),
     description: str = typer.Option(..., "--description", help="Issue description"),
+    context_summary: str = typer.Option(..., "--context", help="What system was doing at detection (repair context)"),
     product: str = typer.Option(None, "--product", "-p", help="Product ID (required for product/uncertain domain)"),
     feature: str = typer.Option(None, "--feature", "-f", help="Feature ID (optional)"),
     execution: str = typer.Option(None, "--execution", "-e", help="Execution ID (optional)"),
+    suspected: str = typer.Option(None, "--suspected", help="Hypothesis about root cause (strongly recommended)"),
+    workaround: str = typer.Option(None, "--workaround", help="How issue was worked around (strongly recommended)"),
+    reproduce: str = typer.Option(None, "--reproduce", help="How to investigate/reproduce later (strongly recommended)"),
+    command_ctx: str = typer.Option(None, "--command", help="CLI command that triggered issue"),
+    expected: str = typer.Option(None, "--expected", help="What should have happened"),
+    actual: str = typer.Option(None, "--actual", help="What actually happened"),
     self_corrected: bool = typer.Option(False, "--self-corrected", help="Issue was self-corrected"),
     requires_followup: bool = typer.Option(True, "--followup/--no-followup", help="Requires follow-up attention"),
     confidence: str = typer.Option(None, "--confidence", "-c", help="Confidence: low, medium, high"),
@@ -45,15 +52,14 @@ def record(
     priority: str = typer.Option(None, "--priority", help="Priority: high, medium, low"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
-    """Record a workflow feedback item.
+    """Record a workflow feedback item with repair context.
 
-    problem_domain is auto-inferred from issue_type if not specified.
-    Self-corrected issues are still captured for system hardening.
+    context_summary is required for repair value - explains what system was doing.
+    suspected/workaround/reproduce are strongly recommended for debugging.
 
     Examples:
-        asyncdev feedback record --type cli_behavior --in "status" --description "Wrong phase"
-        asyncdev feedback record --domain product --product my-app --type execution_pack --description "Wrong sequence"
-        asyncdev feedback record --type cli_behavior --confidence high --escalation candidate_issue --description "CLI bug"
+        asyncdev feedback record --type cli_behavior --in "status" --description "Wrong phase" --context "Running status check"
+        asyncdev feedback record --domain product --product my-app --type execution_pack --description "Wrong sequence" --context "Reviewing ExecutionPack" --suspected "Feature numbering bug" --workaround "Manual edit"
     """
     root = Path.cwd() if path == Path("projects") else path
 
@@ -67,11 +73,18 @@ def record(
             detected_by=detected_by,
             detected_in=detected_in,
             description=description,
+            context_summary=context_summary,
             self_corrected=self_corrected,
             requires_followup=requires_followup,
             product_id=product,
             feature_id=feature,
             execution_id=execution,
+            suspected_problem=suspected,
+            temporary_fix=workaround,
+            reproduction_hint=reproduce,
+            command_context=command_ctx,
+            expected_behavior=expected,
+            actual_behavior=actual,
             impact=impact,
             confidence=confidence,
             escalation_recommendation=escalation,
@@ -89,6 +102,11 @@ def record(
         table.add_row("Detected By", feedback.get("detected_by", ""))
         table.add_row("Detected In", feedback.get("detected_in", ""))
         table.add_row("Description", feedback.get("description", "")[:50])
+        table.add_row("Context", feedback.get("context_summary", "")[:50])
+        if feedback.get("suspected_problem"):
+            table.add_row("Suspected", feedback.get("suspected_problem", "")[:50])
+        if feedback.get("temporary_fix"):
+            table.add_row("Workaround", feedback.get("temporary_fix", "")[:50])
         table.add_row("Self Corrected", str(feedback.get("self_corrected", False)))
         table.add_row("Requires Followup", str(feedback.get("requires_followup", True)))
         if feedback.get("confidence"):
