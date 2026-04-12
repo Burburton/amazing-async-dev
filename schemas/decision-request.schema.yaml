@@ -1,0 +1,341 @@
+schema_type: decision-request
+version: "1.0"
+description: Asynchronous decision request model for email-first human decision channel (Feature 021)
+
+required:
+  - decision_request_id
+  - product_id
+  - feature_id
+  - pause_reason_category
+  - decision_type
+  - question
+  - options
+  - recommendation
+  - reply_format_hint
+  - sent_at
+  - status
+
+optional:
+  - defer_impact
+  - recommended_next_action_after_reply
+  - expires_at
+  - delivery_channel
+  - resolved_at
+  - resolution
+  - reply_received_at
+  - reply_raw_text
+  - email_to
+  - email_subject
+  - email_sent_mock_path
+
+fields:
+  decision_request_id:
+    type: string
+    description: Unique identifier for this decision request
+    pattern: "dr-YYYYMMDD-###"
+    example: "dr-20260412-001"
+    required: true
+
+  product_id:
+    type: string
+    description: Product context for the decision
+    example: "amazing-skill-pack-advisor"
+    required: true
+
+  feature_id:
+    type: string
+    description: Feature context for the decision
+    example: "feature-002"
+    required: true
+
+  pause_reason_category:
+    type: enum
+    description: Category of pause reason (from Feature 020)
+    values:
+      - decision_required
+      - blocker
+      - risky_action
+      - scope_change
+      - policy_boundary
+    example: "decision_required"
+    required: true
+
+  decision_type:
+    type: enum
+    description: Type of decision needed
+    values:
+      - technical
+      - scope
+      - priority
+      - design
+      - risky_confirmation
+      - blocker_resolution
+      - other
+    example: "technical"
+    required: true
+
+  question:
+    type: string
+    description: The decision question to be answered
+    example: "Should we use YAML or JSON for schema format?"
+    required: true
+
+  options:
+    type: array
+    description: Available options for the decision
+    items_type: object
+    example:
+      - id: "A"
+        label: "Use YAML format"
+        description: "Human-readable, good for documentation"
+      - id: "B"
+        label: "Use JSON format"
+        description: "Machine-readable, better for tooling"
+    required: true
+
+  recommendation:
+    type: string
+    description: AI/system recommendation
+    example: "A - YAML is more readable for human review"
+    required: true
+
+  defer_impact:
+    type: string
+    description: What happens if decision is deferred
+    example: "Work can continue with YAML temporarily, but may need rework"
+    required: false
+
+  reply_format_hint:
+    type: string
+    description: Instructions for how to reply
+    example: "Reply with: DECISION A, DECISION B, DEFER, or RETRY"
+    required: true
+
+  recommended_next_action_after_reply:
+    type: string
+    description: What will happen after valid reply
+    example: "Continue with schema creation using chosen format"
+    required: false
+
+  expires_at:
+    type: datetime
+    description: When this request expires (optional)
+    example: "2026-04-13T23:59:59"
+    required: false
+
+  delivery_channel:
+    type: enum
+    description: Channel used for delivery
+    values:
+      - email
+      - mock_file
+      - console
+    example: "mock_file"
+    default: "mock_file"
+    required: false
+
+  sent_at:
+    type: datetime
+    description: When the request was sent
+    example: "2026-04-12T10:30:00"
+    required: true
+
+  status:
+    type: enum
+    description: Current status of the request
+    values:
+      - pending
+      - sent
+      - reply_received
+      - reply_validating
+      - reply_invalid
+      - resolved
+      - expired
+    example: "sent"
+    required: true
+
+  resolved_at:
+    type: datetime
+    description: When the decision was resolved
+    example: "2026-04-12T14:00:00"
+    required: false
+
+  resolution:
+    type: string
+    description: The resolution outcome
+    example: "DECISION A"
+    required: false
+
+  reply_received_at:
+    type: datetime
+    description: When reply was received
+    example: "2026-04-12T13:45:00"
+    required: false
+
+  reply_raw_text:
+    type: string
+    description: Raw reply text received
+    example: "DECISION A"
+    required: false
+
+  email_to:
+    type: string
+    description: Email recipient address
+    example: "operator@example.com"
+    required: false
+
+  email_subject:
+    type: string
+    description: Email subject line
+    example: "[async-dev] Decision needed: amazing-skill-pack-advisor / feature-002"
+    required: false
+
+  email_sent_mock_path:
+    type: string
+    description: Path to mock email file (for mock_file delivery)
+    example: ".runtime/email-outbox/dr-20260412-001.md"
+    required: false
+
+reply_commands:
+  description: Supported reply commands (strict grammar)
+  commands:
+    DECISION:
+      syntax: "DECISION <option-id>"
+      example: "DECISION A"
+      description: "Select option by id (A, B, C, etc)"
+    
+    APPROVE:
+      syntax: "APPROVE <action-type>"
+      example: "APPROVE PUSH"
+      description: "Approve risky action"
+    
+    DEFER:
+      syntax: "DEFER"
+      example: "DEFER"
+      description: "Defer decision, proceed with alternative"
+    
+    RETRY:
+      syntax: "RETRY"
+      example: "RETRY"
+      description: "Request retry of action"
+    
+    CONTINUE:
+      syntax: "CONTINUE"
+      example: "CONTINUE"
+      description: "Continue without change"
+
+state_transitions:
+  description: Valid status transitions
+  transitions:
+    pending_to_sent: "When email is sent"
+    sent_to_reply_received: "When reply is detected"
+    reply_received_to_reply_validating: "When parsing starts"
+    reply_validating_to_resolved: "When reply is valid"
+    reply_validating_to_reply_invalid: "When reply is invalid"
+    sent_to_expired: "When expires_at reached"
+    reply_invalid_to_resolved: "When valid retry received"
+
+integration_points:
+  - Feature 020 pause_reason_category
+  - RunState.decisions_needed
+  - RunState.decision_request_pending
+  - resume_next_day decision processing
+  - execution logging
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - decision_request_id
+    - product_id
+    - feature_id
+    - pause_reason_category
+    - decision_type
+    - question
+    - options
+    - recommendation
+    - reply_format_hint
+    - sent_at
+    - status
+  properties:
+    decision_request_id:
+      type: string
+      pattern: "^dr-[0-9]{8}-[0-9]{3}$"
+    product_id:
+      type: string
+    feature_id:
+      type: string
+    pause_reason_category:
+      enum:
+        - decision_required
+        - blocker
+        - risky_action
+        - scope_change
+        - policy_boundary
+    decision_type:
+      enum:
+        - technical
+        - scope
+        - priority
+        - design
+        - risky_confirmation
+        - blocker_resolution
+        - other
+    question:
+      type: string
+    options:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          label:
+            type: string
+          description:
+            type: string
+    recommendation:
+      type: string
+    defer_impact:
+      type: string
+    reply_format_hint:
+      type: string
+    recommended_next_action_after_reply:
+      type: string
+    expires_at:
+      type: string
+      format: date-time
+    delivery_channel:
+      enum:
+        - email
+        - mock_file
+        - console
+      default: mock_file
+    sent_at:
+      type: string
+      format: date-time
+    status:
+      enum:
+        - pending
+        - sent
+        - reply_received
+        - reply_validating
+        - reply_invalid
+        - resolved
+        - expired
+    resolved_at:
+      type: string
+      format: date-time
+    resolution:
+      type: string
+    reply_received_at:
+      type: string
+      format: date-time
+    reply_raw_text:
+      type: string
+    email_to:
+      type: string
+    email_subject:
+      type: string
+    email_sent_mock_path:
+      type: string

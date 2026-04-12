@@ -1,0 +1,154 @@
+schema_type: email-config
+version: "1.0"
+description: Email configuration for async decision channel (Feature 021)
+
+sensitive_fields:
+  description: "These fields should be set via environment variables, NOT in config file"
+  fields:
+    - smtp_password
+    - smtp_username (if different from from_address)
+  env_mapping:
+    smtp_password: ASYNCDEV_SMTP_PASSWORD
+    smtp_username: ASYNCDEV_SMTP_USERNAME
+
+non_sensitive_fields:
+  description: "These can be stored in .runtime/email-config.yaml"
+  fields:
+    - smtp_host
+    - smtp_port
+    - from_address
+    - to_address
+    - delivery_mode
+    - mock_outbox_path
+
+fields:
+  smtp_host:
+    type: string
+    description: SMTP server hostname
+    example: "smtp.gmail.com"
+    env_override: ASYNCDEV_SMTP_HOST
+
+  smtp_port:
+    type: integer
+    description: SMTP server port
+    example: 587
+    default: 587
+    env_override: ASYNCDEV_SMTP_PORT
+
+  smtp_username:
+    type: string
+    description: SMTP authentication username
+    example: "user@example.com"
+    env_override: ASYNCDEV_SMTP_USERNAME
+    sensitive: true
+
+  smtp_password:
+    type: string
+    description: SMTP authentication password
+    example: "secret"
+    env_override: ASYNCDEV_SMTP_PASSWORD
+    sensitive: true
+
+  smtp_use_tls:
+    type: boolean
+    description: Whether to use TLS
+    example: true
+    default: true
+
+  from_address:
+    type: string
+    description: Email sender address
+    example: "asyncdev@example.com"
+    env_override: ASYNCDEV_FROM_ADDRESS
+
+  to_address:
+    type: string
+    description: Default recipient for decision emails
+    example: "operator@example.com"
+    env_override: ASYNCDEV_TO_ADDRESS
+
+  delivery_mode:
+    type: enum
+    description: How emails are delivered
+    values:
+      - smtp
+      - mock_file
+      - console
+    example: "mock_file"
+    default: "mock_file"
+
+  mock_outbox_path:
+    type: string
+    description: Path for mock email files
+    example: ".runtime/email-outbox"
+    default: ".runtime/email-outbox"
+
+  email_subject_prefix:
+    type: string
+    description: Prefix for email subjects
+    example: "[async-dev]"
+    default: "[async-dev]"
+
+  request_timeout_seconds:
+    type: integer
+    description: SMTP connection timeout
+    example: 30
+    default: 30
+
+default_config:
+  delivery_mode: mock_file
+  mock_outbox_path: .runtime/email-outbox
+  email_subject_prefix: "[async-dev]"
+  smtp_port: 587
+  smtp_use_tls: true
+  request_timeout_seconds: 30
+
+config_file_location:
+  description: "Non-sensitive config stored in .runtime/email-config.yaml"
+  path: ".runtime/email-config.yaml"
+  
+environment_variables:
+  description: "Sensitive config via environment variables"
+  variables:
+    ASYNCDEV_SMTP_HOST: SMTP server host
+    ASYNCDEV_SMTP_PORT: SMTP server port
+    ASYNCDEV_SMTP_USERNAME: SMTP auth username
+    ASYNCDEV_SMTP_PASSWORD: SMTP auth password
+    ASYNCDEV_FROM_ADDRESS: Sender email address
+    ASYNCDEV_TO_ADDRESS: Recipient email address
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  properties:
+    smtp_host:
+      type: string
+    smtp_port:
+      type: integer
+      default: 587
+    smtp_username:
+      type: string
+    smtp_password:
+      type: string
+    smtp_use_tls:
+      type: boolean
+      default: true
+    from_address:
+      type: string
+    to_address:
+      type: string
+    delivery_mode:
+      enum:
+        - smtp
+        - mock_file
+        - console
+      default: mock_file
+    mock_outbox_path:
+      type: string
+      default: .runtime/email-outbox
+    email_subject_prefix:
+      type: string
+      default: "[async-dev]"
+    request_timeout_seconds:
+      type: integer
+      default: 30

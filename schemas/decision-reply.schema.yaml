@@ -1,0 +1,167 @@
+schema_type: decision-reply
+version: "1.0"
+description: Decision reply model for email reply parsing (Feature 021)
+
+required:
+  - decision_request_id
+  - reply_value
+  - reply_raw_text
+  - received_at
+  - parsed_result
+  - validation_status
+
+optional:
+  - applied_at
+  - error_message
+
+fields:
+  decision_request_id:
+    type: string
+    description: Links to the original decision request
+    pattern: "dr-YYYYMMDD-###"
+    example: "dr-20260412-001"
+    required: true
+
+  reply_value:
+    type: string
+    description: The parsed reply command
+    example: "DECISION A"
+    required: true
+
+  reply_raw_text:
+    type: string
+    description: Raw text from reply
+    example: "DECISION A"
+    required: true
+
+  received_at:
+    type: datetime
+    description: When reply was received
+    example: "2026-04-12T13:45:00"
+    required: true
+
+  parsed_result:
+    type: object
+    description: Structured parse result
+    properties:
+      command:
+        type: string
+        example: "DECISION"
+      argument:
+        type: string
+        example: "A"
+      is_valid:
+        type: boolean
+        example: true
+    required: true
+
+  validation_status:
+    type: enum
+    description: Result of validation
+    values:
+      - valid
+      - invalid_syntax
+      - invalid_option
+      - invalid_request_id
+      - duplicate_reply
+      - expired_request
+    example: "valid"
+    required: true
+
+  applied_at:
+    type: datetime
+    description: When reply was applied to RunState
+    example: "2026-04-12T14:00:00"
+    required: false
+
+  error_message:
+    type: string
+    description: Error message if validation failed
+    example: "Invalid option 'C', valid options are: A, B"
+    required: false
+
+reply_grammar:
+  description: Strict reply grammar specification
+  
+  commands:
+    DECISION:
+      regex: "^DECISION\\s+([A-Z])$"
+      captures: ["option_id"]
+      example: "DECISION A"
+      
+    APPROVE:
+      regex: "^APPROVE\\s+(\\w+)$"
+      captures: ["action_type"]
+      example: "APPROVE PUSH"
+      
+    DEFER:
+      regex: "^DEFER$"
+      captures: []
+      example: "DEFER"
+      
+    RETRY:
+      regex: "^RETRY$"
+      captures: []
+      example: "RETRY"
+      
+    CONTINUE:
+      regex: "^CONTINUE$"
+      captures: []
+      example: "CONTINUE"
+  
+  parsing_rules:
+    - case insensitive
+    - whitespace flexible
+    - only one command per reply
+    - no extra text allowed
+
+validation_rules:
+  - request must exist and be in 'sent' or 'reply_received' status
+  - option_id must match valid options for DECISION command
+  - action_type must match pending risky action for APPROVE command
+  - request must not be expired
+  - request must not have been already resolved
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - decision_request_id
+    - reply_value
+    - reply_raw_text
+    - received_at
+    - parsed_result
+    - validation_status
+  properties:
+    decision_request_id:
+      type: string
+      pattern: "^dr-[0-9]{8}-[0-9]{3}$"
+    reply_value:
+      type: string
+    reply_raw_text:
+      type: string
+    received_at:
+      type: string
+      format: date-time
+    parsed_result:
+      type: object
+      properties:
+        command:
+          type: string
+        argument:
+          type: string
+        is_valid:
+          type: boolean
+    validation_status:
+      enum:
+        - valid
+        - invalid_syntax
+        - invalid_option
+        - invalid_request_id
+        - duplicate_reply
+        - expired_request
+    applied_at:
+      type: string
+      format: date-time
+    error_message:
+      type: string

@@ -185,7 +185,8 @@ python -m pytest tests/ -v
 | `test_workflow_feedback.py` | 29 | Workflow feedback capture |
 | `test_feedback_promotion.py` | 22 | Feedback promotion / issue escalation |
 | `test_execution_policy.py` | 38 | Execution policy / auto-continue rules |
-| **Total** | **482** | |
+| `test_email_decision.py` | 33 | Async decision channel / email mock |
+| **Total** | **515** | |
 
 ### Test categories
 
@@ -224,6 +225,7 @@ python -m pytest tests/ -v
 | 019b | ✅ Complete | Workflow Feedback Triage - confidence levels, problem domain classification |
 | 019c | ✅ Complete | Feedback Promotion / Issue Escalation - controlled promotion to formal follow-up |
 | 020 | ✅ Complete | Low-Interruption Execution Policy - auto-continue safe transitions, pause for risky |
+| 021 | ✅ Complete | Async Decision Channel - email-first decision requests with mock delivery |
 
 ---
 
@@ -331,6 +333,13 @@ asyncdev policy scope-flag --set-flag true
 asyncdev policy scope-flag --clear
 asyncdev policy risky-actions --list
 asyncdev policy risky-actions --clear-all
+
+# Feature 021: Async Decision Channel
+asyncdev email-decision create --project my-app --feature 001 --question "YAML or JSON?" --options "A:YAML,B:JSON" --recommendation "A" --send
+asyncdev email-decision list --project my-app
+asyncdev email-decision show --project my-app --id dr-001
+asyncdev email-decision reply --project my-app --id dr-001 --command "DECISION A"
+asyncdev email-decision stats --project my-app
 ```
 
 ---
