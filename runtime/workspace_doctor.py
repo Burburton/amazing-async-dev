@@ -36,6 +36,11 @@ class DoctorDiagnosis:
     recovery_steps: list[str] = field(default_factory=list)
     fallback_next_step: str = ""
     
+    # Feedback handoff fields (Feature 031)
+    feedback_suggestion: str = ""
+    feedback_reason: str = ""
+    suggested_feedback_command: str = ""
+    
     workspace_path: str = ""
 
 
@@ -69,6 +74,7 @@ def diagnose_workspace(project_path: Path) -> DoctorDiagnosis:
     
     _apply_rules(diagnosis, snapshot)
     _apply_recovery_playbooks(diagnosis, snapshot)
+    _select_feedback_handoff(diagnosis, snapshot)
     
     return diagnosis
 
@@ -274,6 +280,22 @@ def _apply_recovery_playbooks(diagnosis: DoctorDiagnosis, snapshot) -> None:
         diagnosis.fallback_next_step = "Use examples/docs to compare expected structure"
 
 
+def _select_feedback_handoff(diagnosis: DoctorDiagnosis, snapshot) -> None:
+    """Select feedback handoff suggestion for systemic friction scenarios."""
+    
+    if diagnosis.doctor_status == "ATTENTION_NEEDED" and diagnosis.verification_status == "failed":
+        diagnosis.feedback_suggestion = "This may be worth capturing as workflow feedback."
+        diagnosis.feedback_reason = "Verification failure often indicates contract mismatch, tooling friction, or documentation gaps."
+        diagnosis.suggested_feedback_command = f"asyncdev feedback record --scope product --project {diagnosis.product_id} --description 'Verification failure pattern'"
+        return
+    
+    if diagnosis.doctor_status == "UNKNOWN":
+        diagnosis.feedback_suggestion = "This may be worth capturing as workflow feedback."
+        diagnosis.feedback_reason = "Unknown workspace state often indicates missing state, artifact corruption, or initialization gaps."
+        diagnosis.suggested_feedback_command = "asyncdev feedback record --scope system --description 'Unknown workspace state pattern'"
+        return
+
+
 def format_diagnosis_markdown(diagnosis: DoctorDiagnosis) -> str:
     """Format diagnosis as human-readable markdown."""
     lines = [
@@ -338,6 +360,19 @@ def format_diagnosis_markdown(diagnosis: DoctorDiagnosis) -> str:
                 f"**If This Fails, Try Next**: {diagnosis.fallback_next_step}"
             ])
     
+    if diagnosis.feedback_suggestion:
+        lines.extend([
+            "",
+            "## Feedback Suggestion",
+            "",
+            f"{diagnosis.feedback_suggestion}",
+            "",
+            f"**Why**: {diagnosis.feedback_reason}",
+            "",
+            "## Suggested Feedback Command",
+            f"`{diagnosis.suggested_feedback_command}`"
+        ])
+    
     lines.extend(["", f"[dim]Workspace: {diagnosis.workspace_path}[/dim]"])
     
     return "\n".join(lines)
@@ -372,5 +407,10 @@ def format_diagnosis_yaml(diagnosis: DoctorDiagnosis) -> str:
         data["what_to_check"] = diagnosis.what_to_check
         data["recovery_steps"] = diagnosis.recovery_steps
         data["fallback_next_step"] = diagnosis.fallback_next_step
+    
+    if diagnosis.feedback_suggestion:
+        data["feedback_suggestion"] = diagnosis.feedback_suggestion
+        data["feedback_reason"] = diagnosis.feedback_reason
+        data["suggested_feedback_command"] = diagnosis.suggested_feedback_command
     
     return yaml.dump(data, default_flow_style=False, sort_keys=False)

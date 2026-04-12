@@ -914,3 +914,275 @@ updated_at: 2026-04-12T10:00:00Z
         
         new_mtime = (project / "runstate.md").stat().st_mtime
         assert original_mtime == new_mtime
+
+
+class TestFeedbackHandoff:
+    def test_verification_failed_feedback_suggestion(self, tmp_path):
+        """ATTENTION_NEEDED + verification failed should suggest feedback handoff."""
+        project = tmp_path / "feedback-verify-failed"
+        project.mkdir()
+        
+        (project / "execution-results").mkdir()
+        (project / "execution-results" / "exec-001.md").write_text("""---
+```yaml
+execution_id: exec-001
+status: failed
+completed_items: []
+issues_found:
+  - Compatibility mismatch
+```
+---
+""")
+        
+        runstate_content = """---
+```yaml
+project_id: feedback-verify-failed
+feature_id: feature-001
+current_phase: executing
+active_task: verify
+task_queue: []
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Verification failed
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: feedback-verify-failed\nname: Feedback Verify Failed\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "ATTENTION_NEEDED"
+        assert diagnosis.verification_status == "failed"
+        assert diagnosis.feedback_suggestion != ""
+        assert diagnosis.feedback_reason != ""
+        assert diagnosis.suggested_feedback_command != ""
+        assert "feedback" in diagnosis.feedback_suggestion.lower()
+        assert "feedback record" in diagnosis.suggested_feedback_command.lower()
+
+    def test_unknown_feedback_suggestion(self, tmp_path):
+        """UNKNOWN status should suggest feedback handoff."""
+        project = tmp_path / "feedback-unknown"
+        project.mkdir()
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "UNKNOWN"
+        assert diagnosis.feedback_suggestion != ""
+        assert diagnosis.feedback_reason != ""
+        assert diagnosis.suggested_feedback_command != ""
+        assert "feedback" in diagnosis.feedback_suggestion.lower()
+        assert "feedback record" in diagnosis.suggested_feedback_command.lower()
+
+    def test_healthy_no_feedback_suggestion(self, tmp_path):
+        """HEALTHY status should NOT suggest feedback handoff."""
+        project = tmp_path / "feedback-healthy"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: feedback-healthy
+feature_id: feature-001
+current_phase: planning
+active_task: ""
+task_queue:
+  - create-schema
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Created feature
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: feedback-healthy\nname: Feedback Healthy\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "HEALTHY"
+        assert diagnosis.feedback_suggestion == ""
+        assert diagnosis.feedback_reason == ""
+        assert diagnosis.suggested_feedback_command == ""
+
+    def test_completed_no_feedback_suggestion(self, tmp_path):
+        """COMPLETED_PENDING_CLOSEOUT should NOT suggest feedback handoff."""
+        project = tmp_path / "feedback-completed"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: feedback-completed
+feature_id: feature-001
+current_phase: completed
+active_task: ""
+task_queue: []
+completed_outputs:
+  - schemas/test.yaml
+blocked_items: []
+decisions_needed: []
+last_action: Feature completed
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: feedback-completed\nname: Feedback Completed\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT"
+        assert diagnosis.feedback_suggestion == ""
+        assert diagnosis.feedback_reason == ""
+        assert diagnosis.suggested_feedback_command == ""
+
+    def test_blocked_no_feedback_suggestion(self, tmp_path):
+        """BLOCKED status should NOT suggest feedback handoff (one-off blocker)."""
+        project = tmp_path / "feedback-blocked"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: feedback-blocked
+feature_id: feature-001
+current_phase: blocked
+active_task: ""
+task_queue: []
+completed_outputs: []
+blocked_items:
+  - item: external-api
+    reason: API key pending
+decisions_needed: []
+last_action: Hit blocker
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: feedback-blocked\nname: Feedback Blocked\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "BLOCKED"
+        assert diagnosis.feedback_suggestion == ""
+        assert diagnosis.feedback_reason == ""
+        assert diagnosis.suggested_feedback_command == ""
+
+    def test_attention_not_run_no_feedback_suggestion(self, tmp_path):
+        """ATTENTION_NEEDED + not_run should NOT suggest feedback handoff."""
+        project = tmp_path / "feedback-not-run"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: feedback-not-run
+feature_id: ""
+current_phase: planning
+active_task: ""
+task_queue: []
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Created product
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: feedback-not-run\nname: Feedback Not Run\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "ATTENTION_NEEDED"
+        assert diagnosis.verification_status == "not_run"
+        assert diagnosis.feedback_suggestion == ""
+        assert diagnosis.feedback_reason == ""
+        assert diagnosis.suggested_feedback_command == ""
+
+
+class TestFeedbackHandoffOutput:
+    def test_markdown_includes_feedback_suggestion(self):
+        """Markdown output should include feedback suggestion section."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="ATTENTION_NEEDED",
+            verification_status="failed",
+            feedback_suggestion="This may be worth capturing as workflow feedback.",
+            feedback_reason="Verification failure often indicates systemic friction.",
+            suggested_feedback_command="asyncdev feedback record --scope product --description 'Verification failure'"
+        )
+        
+        output = format_diagnosis_markdown(diagnosis)
+        
+        assert "Feedback Suggestion" in output
+        assert "This may be worth capturing" in output
+        assert "**Why**" in output
+        assert "Suggested Feedback Command" in output
+        assert "feedback record" in output.lower()
+
+    def test_yaml_includes_feedback_fields(self):
+        """YAML output should include feedback fields."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="UNKNOWN",
+            feedback_suggestion="This may be worth capturing as workflow feedback.",
+            feedback_reason="Unknown state often indicates missing artifacts.",
+            suggested_feedback_command="asyncdev feedback record --scope system --description 'Unknown state'"
+        )
+        
+        output = format_diagnosis_yaml(diagnosis)
+        
+        assert "feedback_suggestion:" in output
+        assert "feedback_reason:" in output
+        assert "suggested_feedback_command:" in output
+        assert "workflow feedback" in output
+
+    def test_yaml_without_feedback_fields_clean(self):
+        """YAML output without feedback suggestion should not have feedback keys."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="HEALTHY",
+            product_id="healthy-app"
+        )
+        
+        output = format_diagnosis_yaml(diagnosis)
+        
+        assert "feedback_suggestion:" not in output
+        assert "feedback_reason:" not in output
+        assert "suggested_feedback_command:" not in output
+
+    def test_doctor_does_not_auto_create_feedback(self, tmp_path):
+        """Doctor should not automatically create feedback records."""
+        project = tmp_path / "feedback-no-auto-create"
+        project.mkdir()
+        
+        (project / "execution-results").mkdir()
+        (project / "execution-results" / "exec-001.md").write_text("""---
+```yaml
+execution_id: exec-001
+status: failed
+completed_items: []
+```
+---
+""")
+        
+        (project / "runstate.md").write_text("""---
+```yaml
+project_id: feedback-no-auto
+feature_id: feature-001
+current_phase: executing
+decisions_needed: []
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+""")
+        (project / "product-brief.yaml").write_text("product_id: feedback-no-auto\nname: No Auto\n")
+        
+        feedback_dir = project / "feedback"
+        feedback_dir.mkdir()
+        (feedback_dir / "existing.yaml").write_text("feedback_id: existing-001\n")
+        
+        diagnose_workspace(project)
+        
+        feedback_files = list(feedback_dir.glob("*.yaml"))
+        assert len(feedback_files) == 1
+        assert feedback_files[0].name == "existing.yaml"

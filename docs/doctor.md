@@ -109,9 +109,115 @@ For problematic scenarios, doctor adds:
 |---------|---------|
 | **Doctor Recovery** (030) | Immediate operator guidance for current state |
 | **Feedback Capture** (019) | System improvement, recurring issue tracking |
+| **Feedback Handoff** (031) | Bridge between diagnosis and feedback |
 
 - Doctor helps you **recover now**
 - Feedback helps you **improve later**
+- Feedback handoff suggests **when to capture**
+
+---
+
+## Feedback Handoff
+
+For scenarios that may indicate **systemic friction** or **recurring issues**, doctor may suggest capturing the problem as workflow feedback.
+
+### What Feedback Handoff Includes
+
+When appropriate, doctor adds:
+- **Feedback Suggestion**: "This may be worth capturing as workflow feedback"
+- **Why**: Explanation of why this issue may be systemic
+- **Suggested Feedback Command**: Recommended `asyncdev feedback record` command
+
+### When Feedback Handoff Appears
+
+Doctor suggests feedback handoff only for scenarios that often indicate **tooling, process, or documentation friction**:
+
+| Scenario | Why It May Be Systemic |
+|----------|------------------------|
+| Verification failed | Contract mismatch, tooling friction, documentation gaps |
+| Unknown state | Missing state, artifact corruption, initialization gaps |
+
+**Not all problematic states trigger feedback suggestion:**
+- BLOCKED (pending decision) → Local recovery, not systemic
+- COMPLETED_PENDING_CLOSEOUT → Normal workflow end, not friction
+- ATTENTION_NEEDED + not_run → One-time setup issue, not recurring
+
+### Feedback Handoff is Explicit and Optional
+
+- **No auto-capture**: Doctor never creates feedback records
+- **No auto-triage**: Doctor never triggers feedback workflows
+- **User-invoked**: You must run the suggested command manually
+- **Conservative**: Doctor under-suggests rather than over-suggests
+
+### Example with Feedback Handoff
+
+```bash
+asyncdev doctor show
+```
+
+Output for ATTENTION_NEEDED + verification failed:
+
+```
+# Workspace Health: ATTENTION_NEEDED
+
+**Initialization**: direct
+
+## Execution State
+- Product: my-app
+- Feature: feature-001
+- Phase: **executing**
+
+## Signals
+- Verification: failed
+- Pending Decisions: 0
+- Blocked Items: 0
+
+## Recommended Action
+Re-check initialization or re-run verification.
+
+## Suggested Command
+`asyncdev verify`
+
+## Why
+Direct mode initialization verification failed. Check manual setup.
+
+## Warnings
+- Do not proceed until verification succeeds.
+
+## Recovery Hints
+
+**Likely Cause**: Contract mismatch, missing artifact, invalid initialization, or configuration drift.
+
+**What To Check**:
+- latest verification output
+- starter-pack compatibility (if applicable)
+- required workspace files
+
+**Recovery Steps**:
+1. Inspect verification failure details
+2. Correct mismatch or missing inputs
+3. Rerun verification
+
+**If This Fails, Try Next**: Compare current workspace state with expected example or docs
+
+## Feedback Suggestion
+
+This may be worth capturing as workflow feedback.
+
+**Why**: Verification failure often indicates contract mismatch, tooling friction, or documentation gaps.
+
+## Suggested Feedback Command
+`asyncdev feedback record --scope product --project my-app --description 'Verification failure pattern'
+```
+
+---
+
+### How to Use Feedback Handoff
+
+1. See the feedback suggestion in doctor output
+2. Decide if this issue is worth capturing for improvement
+3. If yes, run the suggested `asyncdev feedback record` command manually
+4. If no, continue with recovery steps
 
 ---
 
