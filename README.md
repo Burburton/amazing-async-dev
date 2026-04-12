@@ -166,18 +166,26 @@ This system enforces:
 amazing-async-dev/
 ├─ README.md           # This file
 ├─ AGENTS.md           # AI execution rules
+├─ LICENSE             # MIT license
+├─ pyproject.toml      # Package config
+├─ .gitignore          # Git exclusions
 ├─ docs/
 │  ├─ quick-start.md   # 5-minute guide
 │  ├─ operating-model.md
 │  ├─ architecture.md
-│  └ terminology.md
-├─ schemas/            # Artifact schemas
+│  ├─ terminology.md
+│  ├─ real-asyncdev-consumption-pilot.md
+│  └─ contract-validation-report.md
+├─ schemas/            # Artifact schemas (14 files)
 ├─ templates/          # Fillable templates
-├─ runtime/            # State management logic
-├─ cli/                # CLI commands
-├─ tests/              # 533 tests
-└─ examples/
-   └─ single-feature-day-loop/  # Full demo
+├─ runtime/            # State management, adapters
+├─ cli/                # CLI commands (18 modules)
+├─ tests/              # 533 pytest tests
+├─ examples/
+│  ├─ single-feature-day-loop/  # Full demo
+│  └─ pilot/                     # Advisor integration pilot
+├─ projects/           # User products (created by CLI)
+└─ products/           # Product templates (placeholder)
 ```
 
 ---
@@ -287,13 +295,34 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 
 ---
 
+## Project Status
+
+| Metric | Value |
+|--------|-------|
+| Features Complete | 22 (001-022) |
+| Tests Passing | 533 |
+| Package State | Functional alpha |
+| Coverage | CLI, state, policy, feedback, integration |
+
+**What this means:**
+- All core features are implemented and tested
+- Package works for real async development workflows
+- Not formally released (no PyPI package, no version tag)
+- Suitable for early adopters willing to clone and run
+
+---
+
 ## Roadmap
 
-| Version | Focus |
-|---------|-------|
-| v0 | Local files, YAML artifacts, Python CLI |
-| v1 | SQLite state, recovery, policy modes |
-| v2 | Durable runtime, dashboard |
+| Milestone | Status | Description |
+|-----------|--------|-------------|
+| Core System | ✅ Done | Schemas, templates, day loop CLI (001-007) |
+| State & Recovery | ✅ Done | SQLite persistence, execution logging (008-012) |
+| Archive & History | ✅ Done | Completion flow, query, summary (013-018) |
+| Feedback & Policy | ✅ Done | Issue capture, auto-continue, decisions (019-021) |
+| Integration | ✅ Done | Advisor starter pack consumption (022) |
+| UX Docs | ✅ Done | First-run experience, drift repair (023-024) |
+| Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
 
 ---
 
