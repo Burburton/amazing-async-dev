@@ -33,8 +33,8 @@ class TestPolicyMode:
         assert PolicyMode.LOW_INTERRUPTION.value == "low_interruption"
 
     def test_default_policy_mode(self):
-        """Default policy mode should be conservative."""
-        assert DEFAULT_POLICY_MODE == PolicyMode.CONSERVATIVE
+        """Default policy mode should be balanced."""
+        assert DEFAULT_POLICY_MODE == PolicyMode.BALANCED
 
 
 class TestGetSetPolicyMode:

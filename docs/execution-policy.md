@@ -18,7 +18,7 @@ The execution policy system controls which workflow transitions can proceed auto
 | `balanced` | Auto-continue safe transitions, pause for decisions/risky | safe transitions |
 | `low_interruption` | Minimize interruptions, pause only blockers/risky | most transitions |
 
-**Default mode: `conservative`**
+**Default mode: `balanced`**
 
 ---
 

@@ -63,7 +63,7 @@ policy_modes:
       - scope_change_detected  # Major scope changes still need review
 
 # Default mode
-default_mode: "conservative"
+default_mode: "balanced"
 
 # Pause categories for structured display
 pause_categories:

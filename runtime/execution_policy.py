@@ -40,7 +40,7 @@ RISKY_ACTION_TYPES = {
     ActionType.REMOTE_STATE_CHANGE,
 }
 
-DEFAULT_POLICY_MODE = PolicyMode.CONSERVATIVE
+DEFAULT_POLICY_MODE = PolicyMode.BALANCED
 
 
 def get_policy_mode(runstate: dict[str, Any]) -> PolicyMode:
