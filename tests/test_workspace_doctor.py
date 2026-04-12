@@ -5,8 +5,13 @@
 from pathlib import Path
 import pytest
 import yaml
+from typer.testing import CliRunner
 
 from runtime.workspace_doctor import DoctorDiagnosis, diagnose_workspace, format_diagnosis_markdown, format_diagnosis_yaml
+from cli.asyncdev import app as asyncdev_app
+
+
+runner = CliRunner()
 
 
 class TestDoctorDiagnosisDataclass:
@@ -573,3 +578,26 @@ class TestFormatDiagnosis:
         parsed = yaml.safe_load(output)
         assert parsed["doctor_status"] == "HEALTHY"
         assert parsed["execution_state"]["product_id"] == "test-app"
+
+
+class TestDoctorCLI:
+    def test_doctor_help_works(self):
+        """Doctor command help should work."""
+        result = runner.invoke(asyncdev_app, ["doctor", "--help"])
+        
+        assert result.exit_code == 0
+        assert "diagnose" in result.output.lower() or "health" in result.output.lower()
+
+    def test_doctor_show_empty_workspace(self):
+        """Doctor show on empty workspace should return UNKNOWN."""
+        result = runner.invoke(asyncdev_app, ["doctor", "show", "--path", "nonexistent"])
+        
+        assert result.exit_code == 0
+        assert "UNKNOWN" in result.output
+
+    def test_doctor_yaml_format(self):
+        """Doctor with --format yaml should output YAML."""
+        result = runner.invoke(asyncdev_app, ["doctor", "show", "--format", "yaml", "--path", "nonexistent"])
+        
+        assert result.exit_code == 0
+        assert "doctor_status:" in result.output

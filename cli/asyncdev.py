@@ -11,7 +11,7 @@ from cli.commands import plan_day, run_day, review_night, resume_next_day
 from cli.commands import init, new_product, new_feature
 from cli.commands import complete_feature, archive_feature
 from cli.commands import sqlite_status, inspect_stop
-from cli.commands import backfill, archive, summary, feedback, policy, email_decision, snapshot
+from cli.commands import backfill, archive, summary, feedback, policy, email_decision, snapshot, doctor
 from cli.utils.output_formatter import print_next_step, print_phase_indicator
 from cli.utils.path_formatter import get_relative_path
 
@@ -52,6 +52,8 @@ app.add_typer(policy.app, name="policy", help="Execution policy configuration (F
 app.add_typer(email_decision.app, name="email-decision", help="Async decision channel (Feature 021)")
 
 app.add_typer(snapshot.app, name="snapshot", help="Workspace snapshot - comprehensive state view (Feature 028)")
+
+app.add_typer(doctor.app, name="doctor", help="Diagnose workspace health and recommend next action (Feature 029)")
 
 app.add_typer(sqlite_status.app, name="sqlite", help="SQLite state store queries")
 
