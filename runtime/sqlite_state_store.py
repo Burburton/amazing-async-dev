@@ -213,6 +213,39 @@ class SQLiteStateStore:
             date, product_id=product_id, problem_domain=problem_domain
         )
 
+    def save_promotion(self, promotion: dict[str, Any]) -> None:
+        self.sqlite.save_promotion(promotion)
+
+    def load_promotion(self, promotion_id: str) -> dict[str, Any] | None:
+        return self.sqlite.load_promotion(promotion_id)
+
+    def list_promotions(
+        self,
+        followup_status: str | None = None,
+        promotion_reason: str | None = None,
+        source_domain: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        return self.sqlite.list_promotions(
+            followup_status=followup_status,
+            promotion_reason=promotion_reason,
+            source_domain=source_domain,
+            limit=limit,
+        )
+
+    def count_promotions_by_date(self, date_str: str) -> int:
+        return self.sqlite.count_promotions_by_date(date_str)
+
+    def update_feedback_promotion_status(
+        self,
+        feedback_id: str,
+        promotion_status: str,
+        promotion_id: str | None = None,
+    ) -> None:
+        self.sqlite.update_feedback_promotion_status(
+            feedback_id, promotion_status, promotion_id
+        )
+
 
 def get_sqlite_state_store(project_path: Path | None = None) -> SQLiteStateStore:
     return SQLiteStateStore(project_path)

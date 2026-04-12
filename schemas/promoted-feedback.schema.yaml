@@ -1,0 +1,302 @@
+schema_type: promoted-feedback
+version: "1.0"
+description: Formalized follow-up record from triaged workflow feedback (Feature 019c)
+
+required:
+  - promotion_id
+  - source_feedback_id
+  - summary
+  - promoted_at
+
+optional:
+  - promotion_reason
+  - promotion_note
+  - source_problem_domain
+  - source_confidence
+  - source_escalation_recommendation
+  - source_issue_type
+  - source_description
+  - followup_status
+  - candidate_feature_followup
+  - artifact_reference
+  - addressed_at
+  - addressed_note
+
+fields:
+  promotion_id:
+    type: string
+    description: Unique identifier for this promoted follow-up record
+    pattern: "^promo-[0-9]{8}-[0-9]{3}$"
+    example: "promo-20260412-001"
+    required: true
+
+  source_feedback_id:
+    type: string
+    description: ID of the workflow feedback item that was promoted
+    pattern: "^wf-[0-9]{8}-[0-9]{3}$"
+    example: "wf-20260412-001"
+    required: true
+    notes: "Links back to original feedback for traceability"
+
+  summary:
+    type: string
+    description: Concise summary of what this follow-up addresses
+    example: "CLI status command shows wrong phase after execution"
+    required: true
+    notes: "Derived from source feedback but can be refined during promotion"
+
+  promotion_reason:
+    type: enum
+    description: Reason why this feedback was promoted
+    values:
+      - system_bug
+      - ux_issue
+      - workflow_improvement
+      - documentation_gap
+      - integration_issue
+      - other
+    example: "system_bug"
+    required: false
+    default: "system_bug"
+
+  promotion_note:
+    type: string
+    description: Optional explanation of promotion decision
+    example: "This affects multiple users and should be fixed in next release"
+    required: false
+    notes: "Optional but encouraged to provide context"
+
+  source_problem_domain:
+    type: enum
+    description: Problem domain from source feedback (preserved for reference)
+    values:
+      - async_dev
+      - product
+      - uncertain
+    example: "async_dev"
+    required: false
+    notes: "Preserved from triage for traceability"
+
+  source_confidence:
+    type: enum
+    description: Confidence level from source triage (preserved for reference)
+    values:
+      - low
+      - medium
+      - high
+    example: "high"
+    required: false
+
+  source_escalation_recommendation:
+    type: enum
+    description: Escalation recommendation from source triage (preserved for reference)
+    values:
+      - ignore
+      - track_only
+      - review_needed
+      - candidate_issue
+    example: "candidate_issue"
+    required: false
+
+  source_issue_type:
+    type: enum
+    description: Issue type from source feedback (preserved for reference)
+    values:
+      - sequencing
+      - planning
+      - execution_pack
+      - state_mismatch
+      - summary_review
+      - archive_history
+      - repo_integration
+      - recovery_logic
+      - cli_behavior
+      - persistence
+      - runtime
+      - other
+    example: "cli_behavior"
+    required: false
+
+  source_description:
+    type: string
+    description: Original description from source feedback (preserved for reference)
+    example: "asyncdev status showed wrong phase after execution completed"
+    required: false
+    notes: "Preserved for full traceability"
+
+  followup_status:
+    type: enum
+    description: Current status of follow-up work
+    values:
+      - open
+      - reviewed
+      - in_progress
+      - addressed
+      - closed
+    example: "open"
+    required: false
+    default: "open"
+    notes: |
+      - open: Promoted but not yet reviewed
+      - reviewed: Reviewed and confirmed as valid follow-up
+      - in_progress: Work being done on this issue
+      - addressed: Fix implemented, pending verification
+      - closed: Follow-up complete
+
+  candidate_feature_followup:
+    type: string
+    description: Optional feature ID that could address this follow-up
+    pattern: "^\\d{3}-[a-z0-9-]+$"
+    example: "020-cli-phase-fix"
+    required: false
+    notes: "Links to potential implementation feature"
+
+  artifact_reference:
+    type: object
+    description: Reference to relevant artifact(s)
+    example:
+      artifact_type: "execution-pack"
+      artifact_path: "projects/my-app/execution-packs/exec-20260412-001.md"
+    required: false
+    properties:
+      artifact_type:
+        type: string
+        enum: ["execution-pack", "execution-result", "runstate", "daily-review-pack", "feature-spec", "archive-pack", "other"]
+      artifact_path:
+        type: string
+      artifact_id:
+        type: string
+
+  promoted_at:
+    type: datetime
+    description: When this feedback was promoted
+    example: "2026-04-12T10:00:00"
+    required: true
+
+  addressed_at:
+    type: datetime
+    description: When this follow-up was addressed (if applicable)
+    example: "2026-04-15T14:30:00"
+    required: false
+
+  addressed_note:
+    type: string
+    description: Notes on how this follow-up was addressed
+    example: "Fixed in commit abc1234, released in v1.2.0"
+    required: false
+
+promotion_model:
+  description: |
+    Promotion creates formal follow-up records from triaged workflow feedback.
+    Purpose: provide explicit step between feedback triage and external issue creation.
+
+  boundaries:
+    - "promotion creates internal follow-up records, NOT external GitHub issues"
+    - "promotion requires triage first (confidence + escalation set)"
+    - "duplicate promotion is prevented - each feedback can only be promoted once"
+    - "source feedback gets promotion_status field updated after promotion"
+
+  stages:
+    capture: "workflow feedback recorded with issue details"
+    triage: "problem_domain, confidence, escalation added"
+    promotion: "formal follow-up record created from triaged feedback"
+    followup: "internal tracking until addressed"
+    external: "future: optional GitHub issue creation (not this feature)"
+
+storage:
+  location: ".runtime/feedback-promotions/{promotion_id}.yaml"
+  format: YAML
+  sqlite:
+    table: "promoted_feedback"
+    fields:
+      - promotion_id (primary key)
+      - source_feedback_id
+      - summary
+      - promotion_reason
+      - followup_status
+      - promoted_at
+      - source_problem_domain
+      - source_confidence
+      - source_escalation_recommendation
+
+integration_points:
+  workflow_feedback:
+    linkage: "source_feedback_id reference"
+    purpose: "Trace back to original feedback"
+    status_update: "feedback.promotion_status set after promotion"
+  daily_review_pack:
+    linkage: "promoted_feedback section with count and ids"
+    purpose: "Visibility in nightly review"
+  cli:
+    commands:
+      - "asyncdev feedback promote --feedback-id <id>"
+      - "asyncdev feedback promotions list"
+      - "asyncdev feedback promotions show --promotion-id <id>"
+
+validation:
+  - promotion_id must match pattern promo-YYYYMMDD-###
+  - source_feedback_id must reference existing triaged feedback
+  - source feedback must have triaged_at set (triaged)
+  - source feedback must not already have promotion_status=promoted
+  - summary must be non-empty
+  - followup_status must be valid enum
+  - promoted_at must be valid datetime
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - promotion_id
+    - source_feedback_id
+    - summary
+    - promoted_at
+  properties:
+    promotion_id:
+      type: string
+      pattern: "^promo-[0-9]{8}-[0-9]{3}$"
+    source_feedback_id:
+      type: string
+      pattern: "^wf-[0-9]{8}-[0-9]{3}$"
+    summary:
+      type: string
+    promotion_reason:
+      type: string
+      enum: ["system_bug", "ux_issue", "workflow_improvement", "documentation_gap", "integration_issue", "other"]
+    promotion_note:
+      type: string
+    source_problem_domain:
+      type: string
+      enum: ["async_dev", "product", "uncertain"]
+    source_confidence:
+      type: string
+      enum: ["low", "medium", "high"]
+    source_escalation_recommendation:
+      type: string
+      enum: ["ignore", "track_only", "review_needed", "candidate_issue"]
+    source_issue_type:
+      type: string
+      enum: ["sequencing", "planning", "execution_pack", "state_mismatch", "summary_review", "archive_history", "repo_integration", "recovery_logic", "cli_behavior", "persistence", "runtime", "other"]
+    source_description:
+      type: string
+    followup_status:
+      type: string
+      enum: ["open", "reviewed", "in_progress", "addressed", "closed"]
+    candidate_feature_followup:
+      type: string
+    artifact_reference:
+      type: object
+      properties:
+        artifact_type:
+          type: string
+        artifact_path:
+          type: string
+        artifact_id:
+          type: string
+    promoted_at:
+      type: string
+      format: date-time
+    addressed_at:
+      type: string
+      format: date-time
+    addressed_note:
+      type: string

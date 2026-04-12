@@ -114,12 +114,34 @@ class SQLiteAdapter:
                 escalation_recommendation TEXT,
                 triage_note TEXT,
                 triaged_at TEXT,
+                promotion_status TEXT DEFAULT 'none',
+                promotion_id TEXT,
                 resolution TEXT DEFAULT 'none',
                 status TEXT DEFAULT 'open',
                 priority TEXT,
                 detected_at TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS promoted_feedback (
+                promotion_id TEXT PRIMARY KEY,
+                source_feedback_id TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                promotion_reason TEXT DEFAULT 'system_bug',
+                promotion_note TEXT,
+                source_problem_domain TEXT,
+                source_confidence TEXT,
+                source_escalation_recommendation TEXT,
+                source_issue_type TEXT,
+                source_description TEXT,
+                followup_status TEXT DEFAULT 'open',
+                candidate_feature_followup TEXT,
+                artifact_type TEXT,
+                artifact_path TEXT,
+                promoted_at TEXT NOT NULL,
+                addressed_at TEXT,
+                addressed_note TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_events_feature ON execution_events(feature_id);
@@ -131,6 +153,9 @@ class SQLiteAdapter:
             CREATE INDEX IF NOT EXISTS idx_feedback_domain ON workflow_feedback(problem_domain);
             CREATE INDEX IF NOT EXISTS idx_feedback_followup ON workflow_feedback(requires_followup);
             CREATE INDEX IF NOT EXISTS idx_feedback_escalation ON workflow_feedback(escalation_recommendation);
+            CREATE INDEX IF NOT EXISTS idx_feedback_promotion ON workflow_feedback(promotion_status);
+            CREATE INDEX IF NOT EXISTS idx_promotion_feedback ON promoted_feedback(source_feedback_id);
+            CREATE INDEX IF NOT EXISTS idx_promotion_status ON promoted_feedback(followup_status);
         """)
         conn.commit()
 
@@ -398,8 +423,8 @@ class SQLiteAdapter:
             INSERT OR REPLACE INTO workflow_feedback
             (feedback_id, problem_domain, issue_type, detected_by, detected_in, product_id, feature_id,
              description, self_corrected, requires_followup, confidence, escalation_recommendation, triage_note, triaged_at,
-             resolution, status, priority, detected_at, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             promotion_status, promotion_id, resolution, status, priority, detected_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 feedback.get("feedback_id"),
@@ -416,6 +441,8 @@ class SQLiteAdapter:
                 feedback.get("escalation_recommendation"),
                 feedback.get("triage_note"),
                 feedback.get("triaged_at"),
+                feedback.get("promotion_status", "none"),
+                feedback.get("promotion_id"),
                 feedback.get("resolution", "none"),
                 feedback.get("status", "open"),
                 feedback.get("priority"),
@@ -534,3 +561,110 @@ class SQLiteAdapter:
             data["requires_followup"] = bool(data.get("requires_followup", 0))
             results.append(data)
         return results
+
+    def save_promotion(self, promotion: dict[str, Any]) -> None:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        now = datetime.now().isoformat()
+
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO promoted_feedback
+            (promotion_id, source_feedback_id, summary, promotion_reason, promotion_note,
+             source_problem_domain, source_confidence, source_escalation_recommendation,
+             source_issue_type, source_description, followup_status, candidate_feature_followup,
+             artifact_type, artifact_path, promoted_at, addressed_at, addressed_note)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                promotion.get("promotion_id"),
+                promotion.get("source_feedback_id"),
+                promotion.get("summary"),
+                promotion.get("promotion_reason", "system_bug"),
+                promotion.get("promotion_note"),
+                promotion.get("source_problem_domain"),
+                promotion.get("source_confidence"),
+                promotion.get("source_escalation_recommendation"),
+                promotion.get("source_issue_type"),
+                promotion.get("source_description"),
+                promotion.get("followup_status", "open"),
+                promotion.get("candidate_feature_followup"),
+                promotion.get("artifact_reference", {}).get("artifact_type"),
+                promotion.get("artifact_reference", {}).get("artifact_path"),
+                promotion.get("promoted_at", now),
+                promotion.get("addressed_at"),
+                promotion.get("addressed_note"),
+            ),
+        )
+        conn.commit()
+
+    def load_promotion(self, promotion_id: str) -> dict[str, Any] | None:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM promoted_feedback WHERE promotion_id = ?", (promotion_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+
+    def list_promotions(
+        self,
+        followup_status: str | None = None,
+        promotion_reason: str | None = None,
+        source_domain: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM promoted_feedback WHERE 1=1"
+        params: list[Any] = []
+
+        if followup_status:
+            query += " AND followup_status = ?"
+            params.append(followup_status)
+        if promotion_reason:
+            query += " AND promotion_reason = ?"
+            params.append(promotion_reason)
+        if source_domain:
+            query += " AND source_problem_domain = ?"
+            params.append(source_domain)
+
+        query += " ORDER BY promoted_at DESC LIMIT ?"
+        params.append(limit)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    def count_promotions_by_date(self, date_str: str) -> int:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM promoted_feedback WHERE promotion_id LIKE ?",
+            (f"promo-{date_str}-%",),
+        )
+        result = cursor.fetchone()
+        return result[0] if result else 0
+
+    def update_feedback_promotion_status(
+        self,
+        feedback_id: str,
+        promotion_status: str,
+        promotion_id: str | None = None,
+    ) -> None:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        now = datetime.now().isoformat()
+
+        if promotion_id:
+            cursor.execute(
+                "UPDATE workflow_feedback SET promotion_status = ?, promotion_id = ?, updated_at = ? WHERE feedback_id = ?",
+                (promotion_status, promotion_id, now, feedback_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE workflow_feedback SET promotion_status = ?, updated_at = ? WHERE feedback_id = ?",
+                (promotion_status, now, feedback_id),
+            )
+        conn.commit()

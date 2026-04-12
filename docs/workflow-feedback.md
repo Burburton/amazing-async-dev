@@ -1,7 +1,8 @@
-# Workflow Feedback Capture & Triage
+# Workflow Feedback Capture, Triage & Promotion
 
 Feature 019a: Lightweight mechanism to capture workflow/system issues during async-dev usage.
 Feature 019b: Structured triage layer for workflow feedback classification.
+Feature 019c: Feedback promotion to formal follow-up records.
 
 ---
 
@@ -14,7 +15,7 @@ When using `amazing-async-dev` in real scenarios, you may notice issues with the
 - CLI commands show inconsistent behavior
 - Recovery guidance seems incorrect
 
-These issues are often worked around manually, then forgotten. This feature ensures they are captured explicitly for future hardening, with a triage layer to classify them properly.
+These issues are often worked around manually, then forgotten. This feature ensures they are captured explicitly for future hardening, with a triage layer to classify them properly, and a promotion mechanism to turn them into formal follow-up work.
 
 ---
 
@@ -58,6 +59,16 @@ asyncdev feedback triage \
   --note "Confirmed async-dev CLI bug"
 ```
 
+### Promote to formal follow-up (Feature 019c)
+
+```bash
+# Promote triaged feedback to formal follow-up record:
+asyncdev feedback promote \
+  --feedback-id wf-20260411-001 \
+  --reason system_bug \
+  --note "Priority fix needed for CLI stability"
+```
+
 ### List feedback
 
 ```bash
@@ -93,6 +104,60 @@ asyncdev feedback update --feedback-id wf-20260411-001 --resolution fixed --stat
 
 ```bash
 asyncdev feedback summary
+```
+
+---
+
+## Promotion Model (Feature 019c)
+
+### What is Promotion?
+
+Promotion creates a **formal follow-up record** from triaged workflow feedback. It's the explicit step between triage and external issue creation.
+
+**Key boundaries:**
+- Promotion creates internal follow-up records, NOT external GitHub issues
+- Promotion requires triage first (confidence + escalation set)
+- Each feedback can only be promoted once (no duplicates)
+- Source feedback gets `promotion_status=promoted` after promotion
+
+### Promotion Reasons
+
+| Reason | When to use |
+|--------|-------------|
+| `system_bug` | Confirmed bug in async-dev system |
+| `ux_issue` | User experience problem |
+| `workflow_improvement` | Workflow enhancement opportunity |
+| `documentation_gap` | Missing or unclear documentation |
+| `integration_issue` | Integration problem |
+| `other` | Uncategorized |
+
+### Follow-up Status
+
+| Status | Meaning |
+|--------|---------|
+| `open` | Promoted but not yet reviewed |
+| `reviewed` | Reviewed and confirmed |
+| `in_progress` | Work being done |
+| `addressed` | Fix implemented |
+| `closed` | Follow-up complete |
+
+### Promotion Commands
+
+```bash
+# Promote triaged feedback
+asyncdev feedback promote --feedback-id wf-001 --reason system_bug --note "Priority fix"
+
+# List promotions
+asyncdev feedback promotions list
+
+# Filter by status
+asyncdev feedback promotions list --status open
+
+# Show promotion details
+asyncdev feedback promotions show --promotion-id promo-001
+
+# Update promotion status
+asyncdev feedback promotions update --promotion-id promo-001 --status addressed --note "Fixed"
 ```
 
 ---
@@ -234,7 +299,19 @@ workflow_feedback:
   review_needed_count: 0
 ```
 
-This ensures workflow issues are visible during nightly review with triage information.
+Promotions appear in `promotions` section:
+
+```yaml
+promotions:
+  promoted_count: 3
+  open_count: 2
+  promotion_ids:
+    - "promo-20260412-001"
+    - "promo-20260412-002"
+  summaries:
+    - "CLI status command shows wrong phase"
+    - "Persistence layer needs optimization"
+```
 
 ---
 
@@ -245,8 +322,9 @@ This ensures workflow issues are visible during nightly review with triage infor
 | `async_dev` | `.runtime/workflow-feedback/{id}.yaml` |
 | `product` | `projects/{product}/workflow-feedback/{id}.yaml` |
 | `uncertain` | `projects/{product}/workflow-feedback/{id}.yaml` |
+| **promotions** | `.runtime/feedback-promotions/{id}.yaml` |
 
-All feedback is also indexed in SQLite for quick queries.
+All feedback and promotions are indexed in SQLite for quick queries.
 
 ---
 
@@ -272,9 +350,24 @@ Do NOT record for:
 
 ---
 
+## Workflow Stages
+
+```
+capture → triage → promotion → follow-up → external
+```
+
+1. **capture**: Record the workflow issue with basic details
+2. **triage**: Add classification (domain, confidence, escalation)
+3. **promotion**: Create formal follow-up record (internal)
+4. **follow-up**: Track until addressed
+5. **external**: (future) Optional GitHub issue creation
+
+---
+
 ## See Also
 
-- `templates/workflow-feedback.template.md` - Full schema reference
-- `schemas/workflow-feedback.schema.yaml` - Validation rules
-- Feature spec: `docs/infra/amazing-async-dev-feature-019a-workflow-feedback-capture.md`
-- Feature spec: `docs/infra/amazing-async-dev-feature-019b-workflow-feedback-triage.md`
+- `templates/workflow-feedback.template.md` - Feedback schema reference
+- `templates/promoted-feedback.template.md` - Promotion schema reference
+- `schemas/workflow-feedback.schema.yaml` - Feedback validation rules
+- `schemas/promoted-feedback.schema.yaml` - Promotion validation rules
+- Feature specs: `docs/infra/amazing-async-dev-feature-019a*.md`, `docs/infra/amazing-async-dev-feature-019b*.md`, `docs/infra/amazing-async-dev-feature-019c*.md`

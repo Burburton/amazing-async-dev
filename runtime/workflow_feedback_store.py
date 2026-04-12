@@ -241,9 +241,10 @@ class WorkflowFeedbackStore:
             feedback["confidence"] = confidence
         if escalation_recommendation:
             feedback["escalation_recommendation"] = escalation_recommendation
+        if confidence or escalation_recommendation:
+            feedback["triaged_at"] = detected_at
         if triage_note:
             feedback["triage_note"] = triage_note
-            feedback["triaged_at"] = detected_at
         if resolution != "none":
             feedback["resolution"] = resolution
         if resolution_note:
@@ -600,6 +601,59 @@ class WorkflowFeedbackStore:
             "open_count": sum(1 for fb in feedbacks if fb.get("status", "open") == "open"),
             "candidate_issue_count": sum(1 for fb in feedbacks if fb.get("escalation_recommendation") == "candidate_issue"),
         }
+
+    def promote_feedback(
+        self,
+        feedback_id: str,
+        summary: str | None = None,
+        promotion_reason: str = "system_bug",
+        promotion_note: str | None = None,
+        candidate_feature: str | None = None,
+    ) -> dict[str, Any]:
+        """Promote a triaged feedback to formal follow-up.
+
+        Args:
+            feedback_id: The feedback ID to promote
+            summary: Summary for follow-up (defaults to source description)
+            promotion_reason: Reason for promotion
+            promotion_note: Optional explanation
+            candidate_feature: Optional feature ID for addressing
+
+        Returns:
+            The created promotion record
+
+        Raises:
+            ValueError: If feedback not found, not triaged, or already promoted
+        """
+        from runtime.feedback_promotion_store import FeedbackPromotionStore
+
+        feedback = self.load_feedback(feedback_id)
+        if not feedback:
+            raise ValueError(f"Feedback not found: {feedback_id}")
+
+        promotion_store = FeedbackPromotionStore(
+            runtime_path=self.runtime_path,
+            use_sqlite=self.use_sqlite,
+        )
+
+        promotion = promotion_store.promote_feedback(
+            source_feedback=feedback,
+            summary=summary,
+            promotion_reason=promotion_reason,
+            promotion_note=promotion_note,
+            candidate_feature=candidate_feature,
+        )
+
+        feedback["promotion_status"] = "promoted"
+        feedback["promotion_id"] = promotion["promotion_id"]
+
+        self._save_feedback_file(feedback)
+        if self.use_sqlite:
+            self._save_feedback_sqlite(feedback)
+
+        promotion_store.close()
+
+        return promotion
 
     def close(self) -> None:
         """Close SQLite connection if open."""

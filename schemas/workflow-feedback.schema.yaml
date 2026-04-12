@@ -1,6 +1,6 @@
 schema_type: workflow-feedback
-version: "2.0"
-description: Lightweight record for workflow/system issues with triage support (Feature 019a + 019b)
+version: "2.1"
+description: Lightweight record for workflow/system issues with triage and promotion support (Feature 019a + 019b + 019c)
 
 required:
   - feedback_id
@@ -27,6 +27,8 @@ optional:
   - resolution_note
   - status
   - priority
+  - promotion_status
+  - promotion_id
 
 fields:
   feedback_id:
@@ -252,11 +254,41 @@ fields:
     example: "medium"
     required: false
 
+  promotion_status:
+    type: enum
+    description: Whether this feedback has been promoted to formal follow-up
+    values:
+      - none
+      - promoted
+    example: "none"
+    required: false
+    default: "none"
+    notes: |
+      - none: Not promoted, still just captured feedback
+      - promoted: Has been promoted to PromotedFeedback record
+
+  promotion_id:
+    type: string
+    description: If promoted, reference to the promotion record ID
+    pattern: "^promo-[0-9]{8}-[0-9]{3}$"
+    example: "promo-20260412-001"
+    required: false
+    notes: "Set only when promotion_status=promoted"
+
   detected_at:
     type: datetime
     description: When this issue was detected
     example: "2026-04-11T14:30:00"
     required: true
+
+promotion_model:
+  description: |
+    Promotion creates formal follow-up from triaged feedback (Feature 019c).
+    Each feedback can only be promoted once (no duplicates).
+  requirements:
+    - "feedback must be triaged before promotion"
+    - "promotion_status is set to 'promoted' after successful promotion"
+    - "promotion_id field added to feedback record after promotion"
 
 triage_model:
   description: |
@@ -540,6 +572,12 @@ json_schema:
         - high
         - medium
         - low
+    promotion_status:
+      type: string
+      enum: ["none", "promoted"]
+    promotion_id:
+      type: string
+      pattern: "^promo-[0-9]{8}-[0-9]{3}$"
     detected_at:
       type: string
       format: date-time

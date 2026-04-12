@@ -183,7 +183,8 @@ python -m pytest tests/ -v
 | `test_ux_improvements.py` | 13 | UX improvements (status, paths, next-step) |
 | `test_backfill.py` | 17 | Historical archive backfill |
 | `test_workflow_feedback.py` | 29 | Workflow feedback capture |
-| **Total** | **394** | |
+| `test_feedback_promotion.py` | 22 | Feedback promotion / issue escalation |
+| **Total** | **444** | |
 
 ### Test categories
 
@@ -219,6 +220,8 @@ python -m pytest tests/ -v
 | 017 | ✅ Complete | Archive-aware Plan Agent - history-aware planning |
 | 018 | ✅ Complete | Limited Batch Operations - batch status, archive, backfill, summary |
 | 019a | ✅ Complete | Workflow Feedback Capture - lightweight issue capture for system hardening |
+| 019b | ✅ Complete | Workflow Feedback Triage - confidence levels, problem domain classification |
+| 019c | ✅ Complete | Feedback Promotion / Issue Escalation - controlled promotion to formal follow-up |
 
 ---
 
@@ -306,6 +309,17 @@ asyncdev feedback list --followup-needed
 asyncdev feedback show --feedback-id {id}
 asyncdev feedback update --feedback-id {id} --resolution fixed
 asyncdev feedback summary
+
+# Feature 019b: Workflow Feedback Triage
+asyncdev feedback triage --feedback-id {id} --confidence high --domain async_dev --escalation-recommendation candidate_issue
+asyncdev feedback triage --feedback-id {id} --confidence uncertain --triage-note "Needs review"
+
+# Feature 019c: Feedback Promotion
+asyncdev feedback promote --feedback-id {id} --reason system_bug --note "Priority fix"
+asyncdev feedback promotions list
+asyncdev feedback promotions list --status open --reason system_bug
+asyncdev feedback promotions show --promotion-id {id}
+asyncdev feedback promotions update --promotion-id {id} --status addressed --note "Fixed"
 ```
 
 ---

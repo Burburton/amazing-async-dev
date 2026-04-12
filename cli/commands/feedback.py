@@ -190,8 +190,10 @@ def triage(
             "candidate_issue": "Candidate for formal async-dev issue",
         }
 
-        console.print(f"\n[dim]Domain: {domain_desc.get(updated.get('problem_domain'), '')}[/dim]")
-        console.print(f"[dim]Escalation: {escalation_desc.get(updated.get('escalation_recommendation'), '')}[/dim]")
+        domain_val = updated.get("problem_domain") or ""
+        escalation_val = updated.get("escalation_recommendation") or ""
+        console.print(f"\n[dim]Domain: {domain_desc.get(domain_val, '')}[/dim]")
+        console.print(f"[dim]Escalation: {escalation_desc.get(escalation_val, '')}[/dim]")
 
         store.close()
 
@@ -561,6 +563,271 @@ def summary(
         command="asyncdev feedback list --followup-needed",
         hints=["Use --escalation candidate_issue to find potential issues"],
     )
+
+
+@app.command()
+def promote(
+    feedback_id: str = typer.Option(..., "--feedback-id", "-f", help="Feedback ID to promote"),
+    summary: str = typer.Option(None, "--summary", "-s", help="Summary for follow-up (defaults to source description)"),
+    reason: str = typer.Option("system_bug", "--reason", "-r", help="Promotion reason: system_bug, ux_issue, workflow_improvement, documentation_gap, integration_issue, other"),
+    note: str = typer.Option(None, "--note", "-n", help="Optional promotion note"),
+    feature: str = typer.Option(None, "--feature", help="Optional candidate feature ID"),
+    product: str = typer.Option(None, "--product", "-p", help="Product ID (if feedback is product domain)"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Promote a triaged workflow feedback to formal follow-up.
+
+    Feedback must be triaged first (have confidence and escalation set).
+
+    Examples:
+        asyncdev feedback promote --feedback-id wf-20260412-001
+        asyncdev feedback promote --feedback-id wf-001 --reason system_bug --note "Priority fix"
+    """
+    root = Path.cwd() if path == Path("projects") else path
+
+    project_path = path / product if product else None
+    store = WorkflowFeedbackStore(project_path=project_path, runtime_path=root / ".runtime")
+
+    try:
+        promotion = store.promote_feedback(
+            feedback_id=feedback_id,
+            summary=summary,
+            promotion_reason=reason,
+            promotion_note=note,
+            candidate_feature=feature,
+        )
+
+        console.print(Panel(f"Feedback Promoted: {promotion['promotion_id']}", border_style="green"))
+
+        table = Table(show_header=False)
+        table.add_column("Field", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Promotion ID", promotion.get("promotion_id", ""))
+        table.add_row("Source Feedback", promotion.get("source_feedback_id", ""))
+        table.add_row("Summary", promotion.get("summary", "")[:60])
+        table.add_row("Reason", promotion.get("promotion_reason", ""))
+        if promotion.get("promotion_note"):
+            table.add_row("Note", promotion.get("promotion_note", "")[:50])
+        table.add_row("Status", promotion.get("followup_status", "open"))
+        table.add_row("Promoted At", promotion.get("promoted_at", "")[:19])
+
+        console.print(table)
+
+        console.print(f"\n[dim]path: {get_relative_path(root / '.runtime' / 'feedback-promotions', root)}[/dim]")
+
+        print_next_step(
+            action="View all promotions",
+            command="asyncdev feedback promotions list",
+            hints=[
+                "Use --status open to see pending follow-ups",
+                "This is an internal follow-up record, not a GitHub issue",
+            ],
+        )
+
+    except ValueError as e:
+        console.print(f"[red]Promotion error: {e}[/red]")
+        store.close()
+        raise typer.Exit(1)
+
+    store.close()
+
+
+promotions_app = typer.Typer(help="Manage promoted feedback records")
+app.add_typer(promotions_app, name="promotions")
+
+
+@promotions_app.command("list")
+def list_promotions(
+    status: str = typer.Option(None, "--status", "-s", help="Filter by followup status: open, reviewed, in_progress, addressed, closed"),
+    reason: str = typer.Option(None, "--reason", "-r", help="Filter by promotion reason"),
+    domain: str = typer.Option(None, "--domain", "-d", help="Filter by source problem domain"),
+    limit: int = typer.Option(20, "--limit", "-l", help="Maximum results"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """List promoted feedback records.
+
+    Examples:
+        asyncdev feedback promotions list
+        asyncdev feedback promotions list --status open
+        asyncdev feedback promotions list --reason system_bug
+    """
+    root = Path.cwd() if path == Path("projects") else path
+
+    from runtime.feedback_promotion_store import FeedbackPromotionStore
+
+    promotion_store = FeedbackPromotionStore(runtime_path=root / ".runtime")
+
+    promotions = promotion_store.list_promotions(
+        followup_status=status,
+        promotion_reason=reason,
+        source_domain=domain,
+        limit=limit,
+    )
+
+    if not promotions:
+        console.print("[dim]No promotions found[/dim]")
+        if status:
+            console.print(f"[dim]Status: {status}[/dim]")
+        console.print(f"[dim]path: {get_relative_path(root / '.runtime' / 'feedback-promotions', root)}[/dim]")
+        promotion_store.close()
+        return
+
+    title = "Promoted Feedback"
+    if status:
+        title += f" ({status})"
+    if reason:
+        title += f" [{reason}]"
+
+    console.print(Panel(title, border_style="green"))
+
+    table = Table(show_header=True)
+    table.add_column("Promotion ID", style="cyan", width=18)
+    table.add_column("Source", style="dim", width=16)
+    table.add_column("Reason", style="yellow", width=18)
+    table.add_column("Status", style="green", width=14)
+    table.add_column("Summary", width=40)
+
+    for promo in promotions:
+        table.add_row(
+            promo.get("promotion_id", ""),
+            promo.get("source_feedback_id", ""),
+            promo.get("promotion_reason", ""),
+            promo.get("followup_status", "open"),
+            promo.get("summary", "")[:40],
+        )
+
+    console.print(table)
+
+    console.print(f"\n[dim]Total: {len(promotions)} items[/dim]")
+    if domain:
+        console.print(f"[dim]Source domain: {domain}[/dim]")
+    console.print(f"[dim]path: {get_relative_path(root / '.runtime' / 'feedback-promotions', root)}[/dim]")
+
+    promotion_store.close()
+
+    print_next_step(
+        action="Inspect specific promotion",
+        command="asyncdev feedback promotions show --promotion-id <id>",
+    )
+
+
+@promotions_app.command("show")
+def show_promotion(
+    promotion_id: str = typer.Option(..., "--promotion-id", "-p", help="Promotion ID to show"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Show detailed promotion record.
+
+    Example:
+        asyncdev feedback promotions show --promotion-id promo-20260412-001
+    """
+    root = Path.cwd() if path == Path("projects") else path
+
+    from runtime.feedback_promotion_store import FeedbackPromotionStore
+
+    promotion_store = FeedbackPromotionStore(runtime_path=root / ".runtime")
+
+    promotion = promotion_store.load_promotion(promotion_id)
+
+    if not promotion:
+        console.print(f"[red]Promotion not found: {promotion_id}[/red]")
+        promotion_store.close()
+        raise typer.Exit(1)
+
+    console.print(Panel(f"Promoted Feedback: {promotion_id}", border_style="green"))
+
+    table = Table(show_header=False)
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", style="green")
+
+    table.add_row("Promotion ID", promotion.get("promotion_id", ""))
+    table.add_row("Source Feedback", promotion.get("source_feedback_id", ""))
+    table.add_row("Summary", promotion.get("summary", ""))
+    table.add_row("Reason", promotion.get("promotion_reason", ""))
+    table.add_row("Status", promotion.get("followup_status", "open"))
+
+    console.print(table)
+
+    console.print("\n[bold]Source Triage Information:[/bold]")
+    triage_table = Table(show_header=False)
+    triage_table.add_column("Field", style="cyan")
+    triage_table.add_column("Value", style="dim")
+
+    triage_table.add_row("Problem Domain", promotion.get("source_problem_domain", ""))
+    triage_table.add_row("Confidence", promotion.get("source_confidence", ""))
+    triage_table.add_row("Escalation", promotion.get("source_escalation_recommendation", ""))
+    triage_table.add_row("Issue Type", promotion.get("source_issue_type", ""))
+    triage_table.add_row("Original Description", promotion.get("source_description", "")[:60])
+
+    console.print(triage_table)
+
+    if promotion.get("promotion_note"):
+        console.print(f"\n[bold]Promotion Note:[/bold]\n{promotion.get('promotion_note', '')}")
+
+    console.print(f"\n[dim]Promoted at: {promotion.get('promoted_at', '')[:19]}[/dim]")
+    console.print(f"[dim]path: {get_relative_path(root / '.runtime' / 'feedback-promotions', root)}[/dim]")
+
+    promotion_store.close()
+
+    print_next_step(
+        action="View source feedback",
+        command=f"asyncdev feedback show --feedback-id {promotion.get('source_feedback_id', '')}",
+        hints=["Use update command to change followup status"],
+    )
+
+
+@promotions_app.command("update")
+def update_promotion(
+    promotion_id: str = typer.Option(..., "--promotion-id", "-p", help="Promotion ID to update"),
+    status: str = typer.Option(None, "--status", "-s", help="New followup status: open, reviewed, in_progress, addressed, closed"),
+    note: str = typer.Option(None, "--note", "-n", help="Note on how addressed"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Update promotion followup status.
+
+    Example:
+        asyncdev feedback promotions update --promotion-id promo-001 --status addressed --note "Fixed in commit abc123"
+    """
+    root = Path.cwd() if path == Path("projects") else path
+
+    from runtime.feedback_promotion_store import FeedbackPromotionStore
+
+    promotion_store = FeedbackPromotionStore(runtime_path=root / ".runtime")
+
+    try:
+        updated = promotion_store.update_promotion(
+            promotion_id=promotion_id,
+            followup_status=status,
+            addressed_note=note,
+        )
+
+        if not updated:
+            console.print(f"[red]Promotion not found: {promotion_id}[/red]")
+            promotion_store.close()
+            raise typer.Exit(1)
+
+        console.print(Panel(f"Promotion Updated: {promotion_id}", border_style="green"))
+
+        table = Table(show_header=False)
+        table.add_column("Field", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Promotion ID", updated.get("promotion_id", ""))
+        table.add_row("Status", updated.get("followup_status", ""))
+        if updated.get("addressed_note"):
+            table.add_row("Note", updated.get("addressed_note", "")[:50])
+        if updated.get("addressed_at"):
+            table.add_row("Addressed At", updated.get("addressed_at", "")[:19])
+
+        console.print(table)
+
+    except ValueError as e:
+        console.print(f"[red]Validation error: {e}[/red]")
+        promotion_store.close()
+        raise typer.Exit(1)
+
+    promotion_store.close()
 
 
 if __name__ == "__main__":
