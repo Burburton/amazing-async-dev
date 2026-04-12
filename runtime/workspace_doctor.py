@@ -172,3 +172,77 @@ def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
         diagnosis.recommended_action = "Check workspace state."
         diagnosis.suggested_command = f"asyncdev status --project {snapshot.product_id}"
         diagnosis.rationale = "Workspace is healthy."
+
+
+def format_diagnosis_markdown(diagnosis: DoctorDiagnosis) -> str:
+    """Format diagnosis as human-readable markdown."""
+    lines = [
+        f"# Workspace Health: {diagnosis.doctor_status}",
+        "",
+        f"**Initialization**: {diagnosis.initialization_mode}",
+    ]
+    
+    if diagnosis.initialization_mode == "starter-pack" and diagnosis.provider_linkage.get("detected"):
+        if diagnosis.provider_linkage.get("product_type"):
+            lines.append(f"  Provider Context: {diagnosis.provider_linkage.get('product_type')}")
+        hints = diagnosis.provider_linkage.get("workflow_hints", {})
+        if hints.get("policy_mode"):
+            lines.append(f"  Policy Mode: {hints.get('policy_mode')}")
+    
+    lines.extend([
+        "",
+        "## Execution State",
+        f"- Product: {diagnosis.product_id or 'N/A'}",
+        f"- Feature: {diagnosis.feature_id or 'N/A'}",
+        f"- Phase: **{diagnosis.current_phase or 'N/A'}**",
+        "",
+        "## Signals",
+        f"- Verification: {diagnosis.verification_status}",
+        f"- Pending Decisions: {diagnosis.pending_decisions}",
+        f"- Blocked Items: {diagnosis.blocked_items_count}",
+        "",
+        "## Recommended Action",
+        f"{diagnosis.recommended_action}",
+        "",
+        "## Suggested Command",
+        f"`{diagnosis.suggested_command}`",
+        "",
+        "## Why",
+        f"{diagnosis.rationale}",
+    ])
+    
+    if diagnosis.warnings:
+        lines.extend(["", "## Warnings"])
+        for warning in diagnosis.warnings:
+            lines.append(f"- {warning}")
+    
+    lines.extend(["", f"[dim]Workspace: {diagnosis.workspace_path}[/dim]"])
+    
+    return "\n".join(lines)
+
+
+def format_diagnosis_yaml(diagnosis: DoctorDiagnosis) -> str:
+    """Format diagnosis as YAML for machine consumption."""
+    data = {
+        "doctor_status": diagnosis.doctor_status,
+        "health_status": diagnosis.health_status,
+        "initialization_mode": diagnosis.initialization_mode,
+        "provider_linkage": diagnosis.provider_linkage,
+        "execution_state": {
+            "product_id": diagnosis.product_id,
+            "feature_id": diagnosis.feature_id,
+            "current_phase": diagnosis.current_phase,
+        },
+        "signals": {
+            "verification_status": diagnosis.verification_status,
+            "pending_decisions": diagnosis.pending_decisions,
+            "blocked_items_count": diagnosis.blocked_items_count,
+        },
+        "recommended_action": diagnosis.recommended_action,
+        "suggested_command": diagnosis.suggested_command,
+        "rationale": diagnosis.rationale,
+        "warnings": diagnosis.warnings,
+        "workspace_path": diagnosis.workspace_path,
+    }
+    
+    return yaml.dump(data, default_flow_style=False, sort_keys=False)

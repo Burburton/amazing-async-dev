@@ -4,8 +4,9 @@
 
 from pathlib import Path
 import pytest
+import yaml
 
-from runtime.workspace_doctor import DoctorDiagnosis, diagnose_workspace
+from runtime.workspace_doctor import DoctorDiagnosis, diagnose_workspace, format_diagnosis_markdown, format_diagnosis_yaml
 
 
 class TestDoctorDiagnosisDataclass:
@@ -507,3 +508,68 @@ starter_pack_context:
         assert diagnosis.initialization_mode == "starter-pack"
         assert "starter-pack" in diagnosis.suggested_command.lower() or "compatibility" in diagnosis.rationale.lower()
         assert len(diagnosis.warnings) >= 1
+
+
+class TestFormatDiagnosis:
+    def test_format_markdown_contains_all_fields(self):
+        """Markdown format should contain all key fields."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="HEALTHY",
+            product_id="my-app",
+            feature_id="feature-001",
+            current_phase="planning",
+            recommended_action="Plan a task",
+            suggested_command="asyncdev plan-day create",
+            rationale="Workspace is healthy"
+        )
+        
+        output = format_diagnosis_markdown(diagnosis)
+        
+        assert "HEALTHY" in output
+        assert "my-app" in output
+        assert "feature-001" in output
+        assert "planning" in output
+        assert "Plan a task" in output
+        assert "asyncdev plan-day create" in output
+
+    def test_format_yaml_contains_all_fields(self):
+        """YAML format should contain all key fields."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="BLOCKED",
+            product_id="blocked-app",
+            pending_decisions=2,
+            recommended_action="Respond to decisions",
+            suggested_command="asyncdev resume",
+            rationale="2 decisions pending"
+        )
+        
+        output = format_diagnosis_yaml(diagnosis)
+        
+        assert "doctor_status: BLOCKED" in output
+        assert "product_id: blocked-app" in output
+        assert "pending_decisions: 2" in output
+
+    def test_format_markdown_with_warnings(self):
+        """Markdown format should include warnings."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="BLOCKED",
+            warnings=["Do not proceed", "Contact admin"]
+        )
+        
+        output = format_diagnosis_markdown(diagnosis)
+        
+        assert "Do not proceed" in output
+        assert "Contact admin" in output
+
+    def test_format_yaml_valid_yaml(self):
+        """YAML format should be valid YAML."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="HEALTHY",
+            product_id="test-app"
+        )
+        
+        output = format_diagnosis_yaml(diagnosis)
+        
+        parsed = yaml.safe_load(output)
+        assert parsed["doctor_status"] == "HEALTHY"
+        assert parsed["execution_state"]["product_id"] == "test-app"
