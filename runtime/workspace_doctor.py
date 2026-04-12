@@ -114,8 +114,61 @@ def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
         diagnosis.warnings = ["Do not continue until blockers are resolved."]
         return
     
+    if snapshot.verification_status == "failed":
+        diagnosis.doctor_status = "ATTENTION_NEEDED"
+        diagnosis.health_status = "warning"
+        diagnosis.recommended_action = "Re-check initialization or re-run verification."
+        
+        if snapshot.initialization_mode == "starter-pack":
+            diagnosis.suggested_command = "Check starter-pack.yaml for contract_version and asyncdev_compatibility"
+            diagnosis.rationale = "Starter-pack initialization verification failed. Check provider/input compatibility."
+            diagnosis.warnings = ["Do not proceed until verification succeeds."]
+        else:
+            diagnosis.suggested_command = f"asyncdev new-product create --project {snapshot.product_id} --name 'Retry'"
+            diagnosis.rationale = "Direct mode initialization verification failed. Check manual setup."
+            diagnosis.warnings = ["Do not proceed until verification succeeds."]
+        return
+    
+    if snapshot.current_phase == "completed":
+        diagnosis.doctor_status = "COMPLETED_PENDING_CLOSEOUT"
+        diagnosis.health_status = "healthy"
+        diagnosis.recommended_action = "Archive completed feature."
+        diagnosis.suggested_command = f"asyncdev archive-feature create --project {snapshot.product_id} --feature {snapshot.feature_id}"
+        diagnosis.rationale = "Feature work complete but not archived."
+        return
+    
+    if snapshot.current_phase == "archived":
+        diagnosis.doctor_status = "COMPLETED_PENDING_CLOSEOUT"
+        diagnosis.health_status = "healthy"
+        diagnosis.recommended_action = "Start a new feature."
+        diagnosis.suggested_command = f"asyncdev new-feature create --project {snapshot.product_id} --feature feature-new --name 'New Feature'"
+        diagnosis.rationale = "Previous feature archived. Ready to start new work."
+        return
+    
+    if not snapshot.feature_id:
+        diagnosis.doctor_status = "ATTENTION_NEEDED"
+        diagnosis.health_status = "warning"
+        diagnosis.recommended_action = "Create or select a feature."
+        diagnosis.suggested_command = f"asyncdev new-feature create --project {snapshot.product_id} --feature feature-001 --name 'First Feature'"
+        diagnosis.rationale = "Product exists but no active feature selected."
+        return
+    
     diagnosis.doctor_status = "HEALTHY"
     diagnosis.health_status = "healthy"
-    diagnosis.recommended_action = "Check workspace state."
-    diagnosis.suggested_command = f"asyncdev status --project {snapshot.product_id}"
-    diagnosis.rationale = "Workspace has sufficient metadata."
+    
+    if snapshot.current_phase == "planning":
+        diagnosis.recommended_action = "Plan a bounded task for execution."
+        diagnosis.suggested_command = f"asyncdev plan-day create --project {snapshot.product_id} --feature {snapshot.feature_id} --task 'Your task'"
+        diagnosis.rationale = "Workspace is in planning phase. Create an ExecutionPack."
+    elif snapshot.current_phase == "executing":
+        diagnosis.recommended_action = "Continue execution or wait for completion."
+        diagnosis.suggested_command = f"asyncdev status --project {snapshot.product_id}"
+        diagnosis.rationale = "Feature is executing, no blockers."
+    elif snapshot.current_phase == "reviewing":
+        diagnosis.recommended_action = "Review latest artifacts and make decisions."
+        diagnosis.suggested_command = f"asyncdev review-night show --project {snapshot.product_id}"
+        diagnosis.rationale = "Workspace is in reviewing phase."
+    else:
+        diagnosis.recommended_action = "Check workspace state."
+        diagnosis.suggested_command = f"asyncdev status --project {snapshot.product_id}"
+        diagnosis.rationale = "Workspace is healthy."

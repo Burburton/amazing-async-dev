@@ -146,3 +146,271 @@ name: Blocked Phase Test
         assert diagnosis.doctor_status == "BLOCKED"
         assert diagnosis.blocked_items_count >= 1
         assert "unblock" in diagnosis.suggested_command.lower()
+
+    def test_verification_failed_returns_attention(self, tmp_path):
+        """Verification failure should return ATTENTION_NEEDED."""
+        project = tmp_path / "verify-failed-project"
+        project.mkdir()
+        
+        results_dir = project / "execution-results"
+        results_dir.mkdir()
+        
+        result_content = """---
+```yaml
+execution_id: exec-failed
+status: failed
+completed_items: []
+issues_found:
+  - Compatibility mismatch
+```
+---
+"""
+        (results_dir / "exec-001.md").write_text(result_content)
+        
+        runstate_content = """---
+```yaml
+project_id: verify-failed
+feature_id: feature-001
+current_phase: executing
+active_task: verify
+task_queue: []
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Verification failed
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: verify-failed
+name: Verify Failed Test
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "ATTENTION_NEEDED"
+        assert diagnosis.verification_status == "failed"
+
+    def test_no_feature_returns_attention(self, tmp_path):
+        """No active feature should return ATTENTION_NEEDED."""
+        project = tmp_path / "no-feature-project"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: no-feature
+feature_id: ""
+current_phase: planning
+active_task: ""
+task_queue: []
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Created product
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: no-feature
+name: No Feature Test
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "ATTENTION_NEEDED"
+        assert "feature" in diagnosis.recommended_action.lower()
+
+    def test_completed_returns_pending_closeout(self, tmp_path):
+        """Completed feature should return COMPLETED_PENDING_CLOSEOUT."""
+        project = tmp_path / "completed-project"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: completed-test
+feature_id: feature-001
+current_phase: completed
+active_task: ""
+task_queue: []
+completed_outputs:
+  - schemas/test.yaml
+blocked_items: []
+decisions_needed: []
+last_action: Feature completed
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: completed-test
+name: Completed Test
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT"
+        assert "archive" in diagnosis.suggested_command.lower()
+
+    def test_archived_returns_pending_closeout(self, tmp_path):
+        """Archived feature should return COMPLETED_PENDING_CLOSEOUT."""
+        project = tmp_path / "archived-project"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: archived-test
+feature_id: feature-001
+current_phase: archived
+active_task: ""
+task_queue: []
+completed_outputs:
+  - schemas/test.yaml
+blocked_items: []
+decisions_needed: []
+last_action: Feature archived
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: archived-test
+name: Archived Test
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT"
+
+    def test_healthy_planning_returns_healthy(self, tmp_path):
+        """Planning phase with no issues should return HEALTHY."""
+        project = tmp_path / "healthy-planning"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: healthy-planning
+feature_id: feature-001
+current_phase: planning
+active_task: ""
+task_queue:
+  - create-schema
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Created feature
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: healthy-planning
+name: Healthy Planning Test
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "HEALTHY"
+        assert "plan" in diagnosis.suggested_command.lower()
+
+    def test_healthy_executing_returns_healthy(self, tmp_path):
+        """Executing phase should return HEALTHY."""
+        project = tmp_path / "healthy-executing"
+        project.mkdir()
+        
+        results_dir = project / "execution-results"
+        results_dir.mkdir()
+        
+        result_content = """---
+```yaml
+execution_id: exec-001
+status: success
+completed_items:
+  - Created schema
+```
+---
+"""
+        (results_dir / "exec-001.md").write_text(result_content)
+        
+        runstate_content = """---
+```yaml
+project_id: healthy-executing
+feature_id: feature-001
+current_phase: executing
+active_task: create-schema
+task_queue: []
+completed_outputs:
+  - schemas/test.yaml
+blocked_items: []
+decisions_needed: []
+last_action: Started execution
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: healthy-executing
+name: Healthy Executing Test
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "HEALTHY"
+        assert diagnosis.verification_status == "success"
+
+    def test_healthy_reviewing_returns_healthy(self, tmp_path):
+        """Reviewing phase should return HEALTHY."""
+        project = tmp_path / "healthy-reviewing"
+        project.mkdir()
+        
+        reviews_dir = project / "reviews"
+        reviews_dir.mkdir()
+        
+        review_content = """---
+```yaml
+review_id: review-001
+status: pending_review
+```
+---
+"""
+        (reviews_dir / "2026-04-12-review.md").write_text(review_content)
+        
+        runstate_content = """---
+```yaml
+project_id: healthy-reviewing
+feature_id: feature-001
+current_phase: reviewing
+active_task: ""
+task_queue: []
+completed_outputs:
+  - schemas/test.yaml
+blocked_items: []
+decisions_needed: []
+last_action: Generated review pack
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: healthy-reviewing
+name: Healthy Reviewing Test
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "HEALTHY"
