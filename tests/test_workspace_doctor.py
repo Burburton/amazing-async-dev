@@ -67,3 +67,82 @@ class TestDiagnoseWorkspace:
         
         assert diagnosis.doctor_status == "UNKNOWN"
         assert diagnosis.workspace_path == str(missing)
+
+    def test_pending_decision_returns_blocked(self, tmp_path):
+        """Pending decisions should return BLOCKED status."""
+        project = tmp_path / "blocked-project"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: blocked-test
+feature_id: feature-001
+current_phase: reviewing
+active_task: review-work
+task_queue: []
+completed_outputs: []
+open_questions: []
+blocked_items: []
+decisions_needed:
+  - decision: architecture-choice
+    options:
+      - Option A
+      - Option B
+    impact: system design
+last_action: Generated review pack
+next_recommended_action: Respond to pending decision
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: blocked-test
+name: Blocked Test
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "BLOCKED"
+        assert diagnosis.pending_decisions == 1
+        assert "resume" in diagnosis.suggested_command.lower()
+        assert len(diagnosis.warnings) >= 1
+
+    def test_blocked_phase_returns_blocked(self, tmp_path):
+        """Blocked phase should return BLOCKED status."""
+        project = tmp_path / "blocked-phase-project"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: blocked-phase-test
+feature_id: feature-001
+current_phase: blocked
+active_task: ""
+task_queue: []
+completed_outputs: []
+open_questions: []
+blocked_items:
+  - item: external-api
+    reason: API key pending
+    since: 2026-04-12T09:00:00Z
+decisions_needed: []
+last_action: Hit blocker
+next_recommended_action: Resolve blocker
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        
+        brief_content = """product_id: blocked-phase-test
+name: Blocked Phase Test
+"""
+        (project / "product-brief.yaml").write_text(brief_content)
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "BLOCKED"
+        assert diagnosis.blocked_items_count >= 1
+        assert "unblock" in diagnosis.suggested_command.lower()

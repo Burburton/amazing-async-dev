@@ -57,19 +57,61 @@ def diagnose_workspace(project_path: Path) -> DoctorDiagnosis:
     diagnosis.verification_status = snapshot.verification_status
     diagnosis.pending_decisions = snapshot.pending_decisions
     
+    runstate = _load_runstate(project_path)
+    blocked_items = runstate.get("blocked_items", [])
+    diagnosis.blocked_items_count = len(blocked_items) if blocked_items else 0
+    
     _apply_rules(diagnosis, snapshot)
     
     return diagnosis
 
 
+def _load_runstate(project_path: Path) -> dict:
+    """Load runstate data from runstate.md."""
+    runstate_path = project_path / "runstate.md"
+    
+    if not runstate_path.exists():
+        return {}
+    
+    with open(runstate_path, encoding="utf-8") as f:
+        content = f.read()
+    
+    yaml_block_start = content.find("```yaml")
+    yaml_block_end = content.find("```", yaml_block_start + 7)
+    
+    if yaml_block_start == -1 or yaml_block_end == -1:
+        return {}
+    
+    yaml_content = content[yaml_block_start + 7:yaml_block_end].strip()
+    return yaml.safe_load(yaml_content) or {}
+
+
 def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
-    """Apply recommendation rules to classify health."""
+    """Apply recommendation rules in priority order."""
     
     if not snapshot.product_id or snapshot.current_phase in ["unknown", "none", ""]:
         diagnosis.doctor_status = "UNKNOWN"
         diagnosis.recommended_action = "Initialize workspace first."
         diagnosis.suggested_command = "asyncdev init create"
         diagnosis.rationale = "Insufficient workspace metadata."
+        return
+    
+    if snapshot.pending_decisions > 0:
+        diagnosis.doctor_status = "BLOCKED"
+        diagnosis.health_status = "blocked"
+        diagnosis.recommended_action = "Respond to pending decisions before resuming."
+        diagnosis.suggested_command = f"asyncdev resume-next-day continue-loop --project {snapshot.product_id}"
+        diagnosis.rationale = f"Human decision required ({snapshot.pending_decisions} pending)."
+        diagnosis.warnings = ["Do not continue until decisions are resolved."]
+        return
+    
+    if snapshot.current_phase == "blocked":
+        diagnosis.doctor_status = "BLOCKED"
+        diagnosis.health_status = "blocked"
+        diagnosis.recommended_action = "Resolve blockers before resuming execution."
+        diagnosis.suggested_command = f"asyncdev resume-next-day unblock --project {snapshot.product_id}"
+        diagnosis.rationale = "Workspace is explicitly blocked."
+        diagnosis.warnings = ["Do not continue until blockers are resolved."]
         return
     
     diagnosis.doctor_status = "HEALTHY"
