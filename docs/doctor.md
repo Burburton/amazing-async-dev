@@ -70,6 +70,102 @@ When your workspace was initialized from a starter pack, doctor:
 - **No state mutation**: Doctor only reads, never writes
 - **Explicit commands**: Every suggestion is a real CLI command
 - **Clear warnings**: When you shouldn't auto-proceed, doctor tells you
+- **No auto-execution**: Doctor never triggers verify, feedback capture, or issue escalation
+
+---
+
+## Recovery Playbooks
+
+When the workspace is in a problematic state, doctor provides **recovery hints** to help you diagnose and resolve issues.
+
+### What Recovery Hints Include
+
+For problematic scenarios, doctor adds:
+- **Likely Cause**: Why this state likely occurred
+- **What To Check**: Items to inspect first
+- **Recovery Steps**: Ordered actions to resolve
+- **If This Fails, Try Next**: Fallback if primary recovery fails
+
+### Supported Recovery Scenarios
+
+| Scenario | Trigger | Recovery Focus |
+|----------|---------|----------------|
+| BLOCKED + pending decision | `pending_decisions > 0` | Decision resolution |
+| BLOCKED phase | `current_phase = blocked` | Blocker removal |
+| ATTENTION_NEEDED + not_run | `verification_status = not_run` | Validation |
+| ATTENTION_NEEDED + failed | `verification_status = failed` | Compatibility fix |
+| COMPLETED_PENDING_CLOSEOUT | `current_phase = completed/archived` | Archive/closeout |
+| UNKNOWN | Missing or unreadable state | State restoration |
+
+### When Recovery Hints Appear
+
+- Only for problematic states (BLOCKED, ATTENTION_NEEDED, COMPLETED_PENDING_CLOSEOUT, UNKNOWN)
+- HEALTHY workspaces get no recovery hints (clean output)
+- Hints are deterministic, derived from current state
+
+### Recovery vs Feedback Mechanism
+
+| Feature | Purpose |
+|---------|---------|
+| **Doctor Recovery** (030) | Immediate operator guidance for current state |
+| **Feedback Capture** (019) | System improvement, recurring issue tracking |
+
+- Doctor helps you **recover now**
+- Feedback helps you **improve later**
+
+---
+
+## Example with Recovery Hints
+
+```bash
+asyncdev doctor show
+```
+
+Output for BLOCKED state:
+
+```
+# Workspace Health: BLOCKED
+
+**Initialization**: direct
+
+## Execution State
+- Product: my-app
+- Feature: feature-002
+- Phase: **reviewing**
+
+## Signals
+- Verification: success
+- Pending Decisions: 2
+- Blocked Items: 0
+
+## Recommended Action
+Respond to pending decisions before resuming.
+
+## Suggested Command
+`asyncdev resume-next-day continue-loop --project my-app`
+
+## Why
+Human decision required (2 pending).
+
+## Warnings
+- Do not continue until decisions are resolved.
+
+## Recovery Hints
+
+**Likely Cause**: Workflow cannot safely continue until human decision is resolved.
+
+**What To Check**:
+- decision request details
+- blocking phase context
+- latest review artifacts
+
+**Recovery Steps**:
+1. Inspect pending decision request
+2. Confirm required human input
+3. Resolve decision or resume with explicit command
+
+**If This Fails, Try Next**: Review latest nightly pack or unblock instructions
+```
 
 ---
 

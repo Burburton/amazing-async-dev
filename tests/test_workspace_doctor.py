@@ -601,3 +601,316 @@ class TestDoctorCLI:
         
         assert result.exit_code == 0
         assert "doctor_status:" in result.output
+
+
+class TestRecoveryPlaybooks:
+    def test_blocked_pending_decision_recovery_hints(self, tmp_path):
+        """BLOCKED + pending decision should include recovery hints."""
+        project = tmp_path / "blocked-decision"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: blocked-decision
+feature_id: feature-001
+current_phase: reviewing
+active_task: review-work
+task_queue: []
+completed_outputs: []
+blocked_items: []
+decisions_needed:
+  - decision: architecture-choice
+    options:
+      - Option A
+      - Option B
+last_action: Generated review pack
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: blocked-decision\nname: Blocked Decision\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "BLOCKED"
+        assert diagnosis.likely_cause != ""
+        assert len(diagnosis.what_to_check) >= 1
+        assert len(diagnosis.recovery_steps) >= 1
+        assert diagnosis.fallback_next_step != ""
+        assert "decision" in diagnosis.likely_cause.lower()
+
+    def test_blocked_phase_recovery_hints(self, tmp_path):
+        """BLOCKED phase should include recovery hints."""
+        project = tmp_path / "blocked-phase"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: blocked-phase
+feature_id: feature-001
+current_phase: blocked
+active_task: ""
+task_queue: []
+completed_outputs: []
+blocked_items:
+  - item: external-api
+    reason: API key pending
+decisions_needed: []
+last_action: Hit blocker
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: blocked-phase\nname: Blocked Phase\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "BLOCKED"
+        assert diagnosis.likely_cause != ""
+        assert len(diagnosis.what_to_check) >= 1
+        assert len(diagnosis.recovery_steps) >= 1
+        assert diagnosis.fallback_next_step != ""
+        assert "block" in diagnosis.likely_cause.lower()
+
+    def test_attention_not_run_recovery_hints(self, tmp_path):
+        """ATTENTION_NEEDED + verification not_run should include recovery hints."""
+        project = tmp_path / "attention-not-run"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: attention-not-run
+feature_id: ""
+current_phase: planning
+active_task: ""
+task_queue: []
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Created product
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: attention-not-run\nname: Attention Not Run\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "ATTENTION_NEEDED"
+        assert diagnosis.verification_status == "not_run"
+        assert diagnosis.likely_cause != ""
+        assert len(diagnosis.what_to_check) >= 1
+        assert len(diagnosis.recovery_steps) >= 1
+        assert diagnosis.fallback_next_step != ""
+        assert "validat" in diagnosis.likely_cause.lower()
+
+    def test_attention_failed_recovery_hints(self, tmp_path):
+        """ATTENTION_NEEDED + verification failed should include recovery hints."""
+        project = tmp_path / "attention-failed"
+        project.mkdir()
+        
+        (project / "execution-results").mkdir()
+        (project / "execution-results" / "exec-001.md").write_text("""---
+```yaml
+execution_id: exec-001
+status: failed
+completed_items: []
+issues_found:
+  - Compatibility mismatch
+```
+---
+""")
+        
+        runstate_content = """---
+```yaml
+project_id: attention-failed
+feature_id: feature-001
+current_phase: executing
+active_task: verify
+task_queue: []
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Verification failed
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: attention-failed\nname: Attention Failed\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "ATTENTION_NEEDED"
+        assert diagnosis.verification_status == "failed"
+        assert diagnosis.likely_cause != ""
+        assert len(diagnosis.what_to_check) >= 1
+        assert len(diagnosis.recovery_steps) >= 1
+        assert diagnosis.fallback_next_step != ""
+        assert "mismatch" in diagnosis.likely_cause.lower() or "missing" in diagnosis.likely_cause.lower()
+
+    def test_completed_closeout_recovery_hints(self, tmp_path):
+        """COMPLETED_PENDING_CLOSEOUT should include recovery hints."""
+        project = tmp_path / "completed-closeout"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: completed-closeout
+feature_id: feature-001
+current_phase: completed
+active_task: ""
+task_queue: []
+completed_outputs:
+  - schemas/test.yaml
+blocked_items: []
+decisions_needed: []
+last_action: Feature completed
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: completed-closeout\nname: Completed Closeout\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT"
+        assert diagnosis.likely_cause != ""
+        assert len(diagnosis.what_to_check) >= 1
+        assert len(diagnosis.recovery_steps) >= 1
+        assert diagnosis.fallback_next_step != ""
+        assert "closure" in diagnosis.likely_cause.lower() or "closeout" in diagnosis.likely_cause.lower()
+
+    def test_unknown_recovery_hints(self, tmp_path):
+        """UNKNOWN status should include recovery hints."""
+        project = tmp_path / "unknown-state"
+        project.mkdir()
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "UNKNOWN"
+        assert diagnosis.likely_cause != ""
+        assert len(diagnosis.what_to_check) >= 1
+        assert len(diagnosis.recovery_steps) >= 1
+        assert diagnosis.fallback_next_step != ""
+        assert "missing" in diagnosis.likely_cause.lower()
+
+    def test_healthy_no_recovery_hints(self, tmp_path):
+        """HEALTHY status should NOT include recovery hints."""
+        project = tmp_path / "healthy-no-hints"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: healthy-no-hints
+feature_id: feature-001
+current_phase: planning
+active_task: ""
+task_queue:
+  - create-schema
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Created feature
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: healthy-no-hints\nname: Healthy No Hints\n")
+        
+        diagnosis = diagnose_workspace(project)
+        
+        assert diagnosis.doctor_status == "HEALTHY"
+        assert diagnosis.likely_cause == ""
+        assert diagnosis.what_to_check == []
+        assert diagnosis.recovery_steps == []
+        assert diagnosis.fallback_next_step == ""
+
+
+class TestRecoveryOutputIntegration:
+    def test_markdown_includes_recovery_hints(self):
+        """Markdown output should include recovery hints section."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="BLOCKED",
+            likely_cause="Decision pending",
+            what_to_check=["decision request", "review context"],
+            recovery_steps=["Inspect decision", "Resolve"],
+            fallback_next_step="Check nightly pack"
+        )
+        
+        output = format_diagnosis_markdown(diagnosis)
+        
+        assert "Recovery Hints" in output
+        assert "Likely Cause" in output
+        assert "What To Check" in output
+        assert "Recovery Steps" in output
+        assert "If This Fails, Try Next" in output
+        assert "decision pending" in output.lower()
+
+    def test_yaml_includes_recovery_fields(self):
+        """YAML output should include recovery fields."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="ATTENTION_NEEDED",
+            likely_cause="Verification failed",
+            what_to_check=["verification output", "compatibility"],
+            recovery_steps=["Inspect failure", "Fix mismatch"],
+            fallback_next_step="Check docs"
+        )
+        
+        output = format_diagnosis_yaml(diagnosis)
+        
+        assert "likely_cause:" in output
+        assert "what_to_check:" in output
+        assert "recovery_steps:" in output
+        assert "fallback_next_step:" in output
+        assert "Verification failed" in output
+
+    def test_yaml_without_recovery_fields_clean(self):
+        """YAML output without recovery hints should not have recovery keys."""
+        diagnosis = DoctorDiagnosis(
+            doctor_status="HEALTHY",
+            product_id="healthy-app"
+        )
+        
+        output = format_diagnosis_yaml(diagnosis)
+        
+        assert "likely_cause:" not in output
+        assert "what_to_check:" not in output
+        assert "recovery_steps:" not in output
+
+
+class TestRecoveryBoundary:
+    def test_doctor_does_not_mutate_state(self, tmp_path):
+        """Doctor should not modify any workspace state."""
+        project = tmp_path / "boundary-no-mutate"
+        project.mkdir()
+        
+        runstate_content = """---
+```yaml
+project_id: boundary-no-mutate
+feature_id: feature-001
+current_phase: executing
+active_task: test
+task_queue: []
+completed_outputs: []
+blocked_items: []
+decisions_needed: []
+last_action: Started
+updated_at: 2026-04-12T10:00:00Z
+```
+---
+"""
+        (project / "runstate.md").write_text(runstate_content)
+        (project / "product-brief.yaml").write_text("product_id: boundary-no-mutate\nname: Boundary\n")
+        
+        original_mtime = (project / "runstate.md").stat().st_mtime
+        
+        diagnose_workspace(project)
+        
+        new_mtime = (project / "runstate.md").stat().st_mtime
+        assert original_mtime == new_mtime

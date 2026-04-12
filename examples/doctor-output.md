@@ -194,6 +194,146 @@ workspace_path: projects/my-app
 
 ---
 
+## Recovery Hints Examples
+
+### BLOCKED - Pending Decision with Recovery Hints
+
+```
+# Workspace Health: BLOCKED
+
+**Initialization**: direct
+
+## Execution State
+- Product: blocked-app
+- Feature: feature-002
+- Phase: **reviewing**
+
+## Signals
+- Verification: success
+- Pending Decisions: 2
+- Blocked Items: 0
+
+## Recommended Action
+Respond to pending decisions before resuming.
+
+## Suggested Command
+`asyncdev resume-next-day continue-loop --project blocked-app`
+
+## Why
+Human decision required (2 pending).
+
+## Warnings
+- Do not continue until decisions are resolved.
+
+## Recovery Hints
+
+**Likely Cause**: Workflow cannot safely continue until human decision is resolved.
+
+**What To Check**:
+- decision request details
+- blocking phase context
+- latest review artifacts
+
+**Recovery Steps**:
+1. Inspect pending decision request
+2. Confirm required human input
+3. Resolve decision or resume with explicit command
+
+**If This Fails, Try Next**: Review latest nightly pack or unblock instructions
+
+[dim]Workspace: projects/blocked-app[/dim]
+```
+
+---
+
+### ATTENTION_NEEDED - Verification Failed with Recovery Hints
+
+```
+# Workspace Health: ATTENTION_NEEDED
+
+**Initialization**: starter-pack
+  Provider Context: ai_tooling
+  Policy Mode: balanced
+
+## Execution State
+- Product: verify-failed
+- Feature: feature-001
+- Phase: **executing**
+
+## Signals
+- Verification: failed
+- Pending Decisions: 0
+- Blocked Items: 0
+
+## Recommended Action
+Re-check initialization or re-run verification.
+
+## Suggested Command
+`Check starter-pack.yaml for contract_version and asyncdev_compatibility`
+
+## Why
+Starter-pack initialization verification failed. Check provider/input compatibility.
+
+## Warnings
+- Do not proceed until verification succeeds.
+
+## Recovery Hints
+
+**Likely Cause**: Contract mismatch, missing artifact, invalid initialization, or configuration drift.
+
+**What To Check**:
+- latest verification output
+- starter-pack compatibility (if applicable)
+- required workspace files
+
+**Recovery Steps**:
+1. Inspect verification failure details
+2. Correct mismatch or missing inputs
+3. Rerun verification
+
+**If This Fails, Try Next**: Compare current workspace state with expected example or docs
+
+[dim]Workspace: projects/verify-failed[/dim]
+```
+
+---
+
+### YAML with Recovery Fields
+
+```yaml
+doctor_status: BLOCKED
+health_status: blocked
+initialization_mode: direct
+provider_linkage:
+  detected: false
+execution_state:
+  product_id: blocked-app
+  feature_id: feature-002
+  current_phase: reviewing
+signals:
+  verification_status: success
+  pending_decisions: 2
+  blocked_items_count: 0
+recommended_action: Respond to pending decisions before resuming.
+suggested_command: asyncdev resume-next-day continue-loop --project blocked-app
+rationale: Human decision required (2 pending).
+warnings:
+  - Do not continue until decisions are resolved.
+likely_cause: Workflow cannot safely continue until human decision is resolved.
+what_to_check:
+  - decision request details
+  - blocking phase context
+  - latest review artifacts
+recovery_steps:
+  - Inspect pending decision request
+  - Confirm required human input
+  - Resolve decision or resume with explicit command
+fallback_next_step: Review latest nightly pack or unblock instructions
+workspace_path: projects/blocked-app
+```
+
+---
+
 ## Usage
 
 ```bash

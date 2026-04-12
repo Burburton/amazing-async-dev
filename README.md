@@ -356,10 +356,10 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 
 | Metric | Value |
 |--------|-------|
-| Features Complete | 29 (001-029) |
-| Tests Passing | 573 |
+| Features Complete | 30 (001-030) |
+| Tests Passing | 584 |
 | Package State | Functional alpha |
-| Coverage | CLI, state, policy, feedback, integration |
+| Coverage | CLI, state, policy, feedback, integration, doctor recovery |
 
 **What this means:**
 - All core features are implemented and tested
@@ -378,7 +378,7 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 | Archive & History | ✅ Done | Completion flow, query, summary (013-018) |
 | Feedback & Policy | ✅ Done | Issue capture, auto-continue, decisions (019-021) |
 | Integration | ✅ Done | Advisor starter pack consumption (022) |
-| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot, doctor (023-029) |
+| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot, doctor, recovery (023-030) |
 | Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
 
 ---
