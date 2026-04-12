@@ -137,20 +137,34 @@ This document describes how `amazing-async-dev` operates in practice — the dai
 **Inputs**:
 - ExecutionResult
 - RunState
+- Workspace snapshot (Feature 028)
+- Doctor diagnosis (Feature 029)
 
 **Outputs**:
-- DailyReviewPack (human-readable summary)
+- DailyReviewPack (enriched nightly operator pack)
 
-**Purpose**: Compress all daytime activity into a 20–30 minute review
+**Purpose**: Compress all daytime activity into a 20–30 minute review with consolidated operator signals
 
-**Pack structure**:
-- What was completed (with evidence)
-- Problems found
-- Blocked items
-- Decisions needed (with options)
-- Tomorrow's plan
+**Enriched Pack Structure** (Feature 033):
 
-**Human action**: Read, decide, annotate
+The nightly pack now consolidates signals from Features 028–032 into one decision-oriented artifact:
+
+**Always shown**:
+- Execution summary (what was completed, evidence)
+- Workspace position (product, feature, phase, initialization mode)
+- Doctor status (HEALTHY, ATTENTION_NEEDED, BLOCKED, etc.)
+- Recommended next action with suggested command
+
+**Shown only when applicable**:
+- Recovery guidance (for ATTENTION_NEEDED/BLOCKED scenarios)
+- Verification status warnings
+- Feedback handoff suggestion (for systemic friction scenarios)
+- Feedback draft summary (prefilled feedback context)
+- Closeout reminder (when feature complete but not archived)
+
+**Key principle**: `review-night` is the primary nightly decision artifact. It assembles signals from snapshot/doctor/recovery/handoff logic without replacing standalone `doctor` or `status` commands.
+
+**Human action**: Read consolidated signals, decide, annotate
 
 ---
 

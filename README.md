@@ -262,7 +262,8 @@ python -m pytest tests/ -v
 | Policy & decisions | 71 | Auto-continue, email channel |
 | Integration | 18 | Advisor starter pack consumption |
 | Snapshot | 18 | Workspace visibility, cross-repo state |
-| **Total** | **551** | |
+| Review-night | 21 | Enriched operator pack, doctor integration |
+| **Total** | **614** | |
 
 ---
 
@@ -356,10 +357,10 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 
 | Metric | Value |
 |--------|-------|
-| Features Complete | 32 (001-032) |
-| Tests Passing | 604 |
+| Features Complete | 33 (001-033) |
+| Tests Passing | 614 |
 | Package State | Functional alpha |
-| Coverage | CLI, state, policy, feedback, integration, doctor, doctor recovery, feedback handoff, feedback draft |
+| Coverage | CLI, state, policy, feedback, integration, doctor, doctor recovery, feedback handoff, feedback draft, review-night enriched |
 
 **What this means:**
 - All core features are implemented and tested
@@ -378,7 +379,7 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 | Archive & History | ✅ Done | Completion flow, query, summary (013-018) |
 | Feedback & Policy | ✅ Done | Issue capture, auto-continue, decisions (019-021) |
 | Integration | ✅ Done | Advisor starter pack consumption (022) |
-| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot, doctor, recovery, feedback handoff, feedback draft (023-032) |
+| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot, doctor, recovery, feedback handoff, feedback draft, review-night enriched (023-033) |
 | Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
 
 ---
