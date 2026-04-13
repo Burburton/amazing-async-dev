@@ -1,9 +1,12 @@
 """plan-day command - Generate ExecutionPack for today's bounded task.
 
 Feature 017: Enhanced with archive-aware, decision-aware, blocker-aware planning.
+Feature 035: Enhanced with resume-context-aware morning replan alignment.
 """
 
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -19,9 +22,106 @@ from runtime.plan_aware_agent import (
 )
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import get_relative_path
+from cli.commands.resume_next_day import (
+    _load_latest_review_pack,
+    _extract_continuation_context,
+)
 
 app = typer.Typer(help="Plan today's bounded execution task")
 console = Console()
+
+
+PLANNING_MODES = {
+    "continue_work": "Normal continuation of work",
+    "recover_and_continue": "Recovery-oriented bounded plan",
+    "verification_first": "Verification-first bounded plan",
+    "closeout_first": "Closeout-first bounded plan",
+    "blocked_waiting_for_decision": "Blocked state requires decision before execution",
+}
+
+
+def _infer_planning_mode(resume_context: dict[str, Any]) -> str:
+    """Infer planning mode from resume context using rule-based mapping."""
+    doctor_status = resume_context.get("prior_doctor_status", "")
+    
+    if doctor_status == "HEALTHY":
+        return "continue_work"
+    
+    if doctor_status == "BLOCKED":
+        return "blocked_waiting_for_decision"
+    
+    if doctor_status == "COMPLETED_PENDING_CLOSEOUT":
+        return "closeout_first"
+    
+    if resume_context.get("prior_recovery_summary"):
+        return "recover_and_continue"
+    
+    if resume_context.get("prior_closeout_reminder"):
+        return "closeout_first"
+    
+    if doctor_status == "ATTENTION_NEEDED":
+        return "recover_and_continue"
+    
+    return "continue_work"
+
+
+def _get_planning_rationale(mode: str, resume_context: dict[str, Any]) -> dict[str, Any]:
+    """Generate rationale explaining why this planning mode was chosen."""
+    rationale: dict[str, Any] = {
+        "mode": mode,
+        "mode_description": PLANNING_MODES.get(mode, ""),
+        "reasons": [],
+    }
+    
+    doctor_status = resume_context.get("prior_doctor_status", "")
+    if doctor_status:
+        rationale["reasons"].append(f"Prior doctor status: {doctor_status}")
+    
+    if resume_context.get("prior_recommended_action"):
+        rationale["prior_recommendation"] = resume_context.get("prior_recommended_action")
+    
+    if resume_context.get("prior_recovery_summary"):
+        rationale["recovery_context"] = resume_context.get("prior_recovery_summary", {}).get("likely_cause", "")
+        rationale["reasons"].append("Recovery guidance present from prior night")
+    
+    if resume_context.get("prior_closeout_reminder"):
+        rationale["closeout_context"] = resume_context.get("prior_closeout_reminder", {}).get("status", "")
+        rationale["reasons"].append("Closeout reminder present from prior night")
+    
+    if resume_context.get("is_stale"):
+        rationale["warnings"] = ["Resume context may be outdated, current state preferred"]
+    
+    return rationale
+
+
+def _display_resume_context_for_planning(resume_context: dict[str, Any], mode: str) -> None:
+    """Display resume context before plan preview."""
+    console.print("\n[bold cyan]Resume Context for Planning[/bold cyan]")
+    
+    console.print(f"  Prior Review Date: {resume_context.get('prior_review_timestamp', 'N/A')}")
+    
+    doctor_status = resume_context.get("prior_doctor_status", "")
+    if doctor_status:
+        console.print(f"  Prior Doctor Status: {doctor_status}")
+    
+    if resume_context.get("prior_recommended_action"):
+        console.print(f"  Prior Recommendation: {resume_context.get('prior_recommended_action')}")
+    
+    console.print(f"\n  [bold green]Inferred Planning Mode: {mode}[/bold green]")
+    console.print(f"  [dim]{PLANNING_MODES.get(mode, '')}[/dim]")
+    
+    if resume_context.get("prior_recovery_summary"):
+        recovery = resume_context.get("prior_recovery_summary", {})
+        console.print(f"\n  [bold yellow]Recovery Guidance:[/bold yellow]")
+        console.print(f"  Likely Cause: {recovery.get('likely_cause', '')}")
+    
+    if resume_context.get("prior_closeout_reminder"):
+        closeout = resume_context.get("prior_closeout_reminder", {})
+        console.print(f"\n  [bold blue]Closeout Reminder:[/bold blue]")
+        console.print(f"  Status: {closeout.get('status', '')}")
+    
+    if resume_context.get("is_stale"):
+        console.print(f"\n  [dim yellow]Note: Resume context may be outdated[/dim yellow]")
 
 
 @app.command()
@@ -40,12 +140,28 @@ def create(
     - Accounts for unresolved decisions
     - Accounts for blockers
     - Provides rationale for recommendation
+    
+    Enhanced with resume-context-aware planning (Feature 035):
+    - Consumes prior-night decision context from Feature 034
+    - Infers planning mode from resume context
+    - Shapes bounded plan based on recovery/verification/closeout signals
     """
     project_path = path / project
     store = StateStore(project_path)
     logger = get_logger(project_path)
     runstate = store.load_runstate()
     root = Path.cwd() if path == Path("projects") else path
+    
+    resume_context: dict[str, Any] = {}
+    planning_mode = "continue_work"
+    planning_rationale: dict[str, Any] = {}
+    
+    review_pack = _load_latest_review_pack(project_path)
+    if review_pack:
+        resume_context = _extract_continuation_context(review_pack)
+        planning_mode = _infer_planning_mode(resume_context)
+        planning_rationale = _get_planning_rationale(planning_mode, resume_context)
+        _display_resume_context_for_planning(resume_context, planning_mode)
 
     if runstate is None:
         console.print("[yellow]No existing RunState found. Creating new one.[/yellow]")
@@ -127,6 +243,36 @@ def create(
             "decision_summary": planning_context.get("decision_constraints", {}),
             "blocker_summary": planning_context.get("blocker_constraints", {}),
         }
+    
+    if resume_context:
+        execution_pack["planning_mode"] = planning_mode
+        execution_pack["resume_context_status"] = "found"
+        execution_pack["planning_rationale"] = planning_rationale
+        
+        if planning_rationale.get("prior_recommendation"):
+            execution_pack["prior_recommended_next_action"] = planning_rationale.get("prior_recommendation")
+        
+        if resume_context.get("prior_doctor_status"):
+            execution_pack["prior_doctor_status"] = resume_context.get("prior_doctor_status")
+        
+        if resume_context.get("prior_recovery_summary"):
+            execution_pack["plan_recovery_flag"] = True
+        
+        if resume_context.get("prior_closeout_reminder"):
+            execution_pack["plan_closeout_flag"] = True
+    
+    if planning_mode == "blocked_waiting_for_decision":
+        execution_pack["safe_to_execute"] = False
+        execution_pack["preconditions"] = execution_pack.get("preconditions", [])
+        execution_pack["preconditions"].append("Resolve pending decisions before execution")
+    
+    if planning_mode == "recover_and_continue":
+        execution_pack["constraints"] = execution_pack.get("constraints", [])
+        execution_pack["constraints"].append("Prioritize recovery steps from prior night")
+    
+    if planning_mode == "closeout_first":
+        execution_pack["constraints"] = execution_pack.get("constraints", [])
+        execution_pack["constraints"].append("Complete closeout before new work")
 
     table = Table(title="ExecutionPack Preview")
     table.add_column("Field", style="cyan")
@@ -137,12 +283,18 @@ def create(
     table.add_row("task_id", execution_pack["task_id"])
     table.add_row("goal", execution_pack["goal"])
     
+    if execution_pack.get("planning_mode"):
+        table.add_row("planning_mode", execution_pack.get("planning_mode"))
+    
     safe_status = execution_pack.get("safe_to_execute", True)
     safe_color = "green" if safe_status else "yellow"
     table.add_row("safe_to_execute", f"[{safe_color}]{safe_status}[/{safe_color}]")
     
     if execution_pack.get("estimated_scope"):
         table.add_row("estimated_scope", execution_pack.get("estimated_scope", "N/A"))
+    
+    if resume_context.get("prior_doctor_status"):
+        table.add_row("prior_doctor_status", resume_context.get("prior_doctor_status"))
 
     console.print(table)
 
