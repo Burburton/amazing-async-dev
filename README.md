@@ -264,7 +264,8 @@ python -m pytest tests/ -v
 | Snapshot | 18 | Workspace visibility, cross-repo state |
 | Review-night | 21 | Enriched operator pack, doctor integration |
 | Resume-next-day | 33 | Decision pack alignment, prior context |
-| **Total** | **627** | |
+| Plan-day | 27 | Resume context alignment, planning mode inference |
+| **Total** | **644** | |
 
 ---
 
@@ -358,10 +359,10 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 
 | Metric | Value |
 |--------|-------|
-| Features Complete | 34 (001-034) |
-| Tests Passing | 627 |
+| Features Complete | 35 (001-035) |
+| Tests Passing | 644 |
 | Package State | Functional alpha |
-| Coverage | CLI, state, policy, feedback, integration, doctor, doctor recovery, feedback handoff, feedback draft, review-night enriched, resume-next-day decision pack alignment |
+| Coverage | CLI, state, policy, feedback, integration, doctor, doctor recovery, feedback handoff, feedback draft, review-night enriched, resume-next-day alignment, plan-day resume context |
 
 **What this means:**
 - All core features are implemented and tested
@@ -380,7 +381,7 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 | Archive & History | ✅ Done | Completion flow, query, summary (013-018) |
 | Feedback & Policy | ✅ Done | Issue capture, auto-continue, decisions (019-021) |
 | Integration | ✅ Done | Advisor starter pack consumption (022) |
-| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot, doctor, recovery, feedback handoff, feedback draft, review-night enriched, resume-next-day alignment (023-034) |
+| UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot, doctor, recovery, feedback handoff, feedback draft, review-night enriched, resume-next-day alignment, plan-day resume context (023-035) |
 | Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
 
 ---

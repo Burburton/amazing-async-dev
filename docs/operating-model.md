@@ -87,16 +87,39 @@ This document describes how `amazing-async-dev` operates in practice — the dai
 - ProductBrief (product context)
 - FeatureSpec (feature context)
 - RunState (current state)
+- Resume context (Feature 035)
 
 **Outputs**:
 - Updated RunState (with new task_queue)
 - ExecutionPack (bounded task for today)
+
+**Resume Context Alignment (Feature 035)**:
+
+`plan-day` now consumes the enriched resume context from Feature 034 to shape the bounded daily plan:
+
+**Planning Modes Inferred**:
+- `continue_work` - Normal continuation (HEALTHY doctor status)
+- `recover_and_continue` - Recovery-oriented plan (ATTENTION_NEEDED with recovery)
+- `closeout_first` - Closeout before new work (COMPLETED_PENDING_CLOSEOUT)
+- `blocked_waiting_for_decision` - Cannot proceed (BLOCKED state)
+- `verification_first` - Verification-first plan (verification concerns)
+
+**Resume Context Displayed**:
+- Prior review date and doctor status
+- Prior recommended next action
+- Inferred planning mode with rationale
+
+**Plan Shaping**:
+- Blocked mode: adds precondition "Resolve pending decisions"
+- Recovery mode: adds constraint "Prioritize recovery steps"
+- Closeout mode: adds constraint "Complete closeout before new work"
 
 **Rules**:
 - Only one main goal per day
 - Task must fit in half-day to one-day
 - Over-large tasks are split
 - Do not start if key decisions are pending
+- Graceful fallback when no resume context exists
 
 **Human action**: Approve or adjust the proposed plan
 
