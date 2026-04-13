@@ -131,10 +131,37 @@ This document describes how `amazing-async-dev` operates in practice — the dai
 
 **Inputs**:
 - ExecutionPack (bounded task definition)
+- Planning intent from Feature 035
 
 **Outputs**:
 - ExecutionResult (structured outcome)
 - Updated RunState
+
+**Execution Intent Alignment (Feature 036)**:
+
+`run-day` now consumes planning intent from the ExecutionPack to execute more faithfully:
+
+**Intent Displayed Before Execution**:
+- Planning mode (continue_work, recover_and_continue, verification_first, closeout_first, blocked_waiting_for_decision)
+- Bounded target reminder
+- Prior doctor status when available
+- Alignment status (aligned, blocked-context, special-mode)
+
+**Drift Warnings**:
+- Blocked mode + forward execution → warns about decisions needed
+- Closeout-first mode + expansion work → warns about premature expansion
+- Verification-first mode + non-verification work → warns about missing verification
+- Recovery-first mode + no recovery task → warns about addressing recovery first
+- Prior BLOCKED status → warns to verify blockers resolved
+
+**Execution Behavior by Mode**:
+- `continue_work`: Normal execution, no special warnings
+- `recover_and_continue`: Prioritize recovery-compatible actions first
+- `verification_first`: Prioritize verification before implementation
+- `closeout_first`: Prioritize archive/review/finalization before new work
+- `blocked_waiting_for_decision`: Warns against forward execution, suggests decision resolution
+
+**Key principle**: `plan-day` decides the bounded target; `run-day` executes in alignment with that target. Lightweight guardrails prevent obvious drift without blocking execution.
 
 **AI must**:
 - Stay inside task_scope
