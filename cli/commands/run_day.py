@@ -4,9 +4,12 @@ Modes:
 - external (default): Generate ExecutionPack for external tools
 - live: Direct API execution via BailianLLMAdapter
 - mock: Testing and demonstration
+
+Feature 036: Enhanced with planning intent alignment and drift warnings.
 """
 
 from pathlib import Path
+from typing import Any
 import subprocess
 import typer
 from rich.console import Console
@@ -22,6 +25,134 @@ from cli.utils.path_formatter import get_relative_path
 app = typer.Typer(help="Run today's execution task")
 console = Console()
 store = StateStore()
+
+
+PLANNING_MODE_INTENT = {
+    "continue_work": "Normal bounded execution toward today's target",
+    "recover_and_continue": "Recovery-oriented execution - address recovery concerns first",
+    "verification_first": "Verification-first execution - complete verification before expansion",
+    "closeout_first": "Closeout-first execution - complete closeout before new work",
+    "blocked_waiting_for_decision": "Blocked context - decisions required before forward execution",
+}
+
+
+def _extract_execution_intent(execution_pack: dict[str, Any]) -> dict[str, Any]:
+    """Extract planning intent from ExecutionPack."""
+    intent: dict[str, Any] = {
+        "has_planning_context": False,
+        "planning_mode": execution_pack.get("planning_mode", ""),
+        "bounded_target": execution_pack.get("goal", ""),
+        "prior_doctor_status": execution_pack.get("prior_doctor_status", ""),
+        "prior_recommendation": execution_pack.get("prior_recommended_next_action", ""),
+    }
+    
+    if execution_pack.get("planning_mode"):
+        intent["has_planning_context"] = True
+        intent["intent_summary"] = PLANNING_MODE_INTENT.get(
+            execution_pack.get("planning_mode", ""),
+            "Execution following daily plan"
+        )
+    
+    if execution_pack.get("plan_recovery_flag"):
+        intent["recovery_flag"] = True
+    
+    if execution_pack.get("plan_closeout_flag"):
+        intent["closeout_flag"] = True
+    
+    if execution_pack.get("safe_to_execute") is False:
+        intent["blocked_flag"] = True
+    
+    return intent
+
+
+def _display_execution_intent(intent: dict[str, Any]) -> None:
+    """Display execution intent summary before execution."""
+    if not intent.get("has_planning_context"):
+        return
+    
+    console.print("\n[bold cyan]Execution Intent[/bold cyan]")
+    
+    planning_mode = intent.get("planning_mode", "")
+    if planning_mode:
+        console.print(f"  Planning Mode: [green]{planning_mode}[/green]")
+    
+    if intent.get("intent_summary"):
+        console.print(f"  Intent: {intent.get('intent_summary')}")
+    
+    bounded_target = intent.get("bounded_target", "")
+    if bounded_target:
+        console.print(f"  Bounded Target: {bounded_target}")
+    
+    prior_status = intent.get("prior_doctor_status", "")
+    if prior_status:
+        console.print(f"  Prior Doctor Status: {prior_status}")
+    
+    prior_rec = intent.get("prior_recommendation", "")
+    if prior_rec:
+        console.print(f"  Prior Recommendation: {prior_rec}")
+    
+    alignment_status = "aligned"
+    if intent.get("blocked_flag"):
+        alignment_status = "blocked-context"
+        console.print(f"\n  [bold red]Alignment Status: {alignment_status}[/bold red]")
+    elif intent.get("recovery_flag") or intent.get("closeout_flag"):
+        alignment_status = "special-mode"
+        console.print(f"\n  [bold yellow]Alignment Status: {alignment_status}[/bold yellow]")
+    else:
+        console.print(f"\n  [bold green]Alignment Status: {alignment_status}[/bold green]")
+
+
+def _check_drift_warnings(intent: dict[str, Any], execution_pack: dict[str, Any]) -> list[str]:
+    """Check for potential drift between planning mode and execution."""
+    warnings = []
+    
+    planning_mode = intent.get("planning_mode", "")
+    
+    if planning_mode == "blocked_waiting_for_decision":
+        warnings.append("Workspace is blocked - forward execution may not be appropriate")
+        warnings.append("Consider resolving pending decisions before proceeding")
+    
+    if planning_mode == "closeout_first":
+        task_scope = execution_pack.get("task_scope", [])
+        for task in task_scope:
+            task_lower = task.lower()
+            if any(word in task_lower for word in ["implement", "add", "create", "build", "new"]):
+                if "closeout" not in task_lower and "archive" not in task_lower:
+                    warnings.append("Closeout-first mode: new expansion work detected before closeout")
+    
+    if planning_mode == "verification_first":
+        task_scope = execution_pack.get("task_scope", [])
+        for task in task_scope:
+            task_lower = task.lower()
+            if "verify" not in task_lower and "check" not in task_lower and "test" not in task_lower:
+                warnings.append("Verification-first mode: non-verification work may be premature")
+    
+    if planning_mode == "recover_and_continue":
+        task_scope = execution_pack.get("task_scope", [])
+        has_recovery_task = False
+        for task in task_scope:
+            task_lower = task.lower()
+            if any(word in task_lower for word in ["fix", "resolve", "recover", "repair", "unblock"]):
+                has_recovery_task = True
+        if not has_recovery_task and not intent.get("recovery_flag"):
+            warnings.append("Recovery-first mode: ensure recovery concerns are addressed first")
+    
+    if intent.get("prior_doctor_status") == "BLOCKED" and not intent.get("blocked_flag"):
+        warnings.append("Prior doctor status was BLOCKED - verify blockers are resolved")
+    
+    return warnings
+
+
+def _display_drift_warnings(warnings: list[str]) -> None:
+    """Display drift warnings if present."""
+    if not warnings:
+        return
+    
+    console.print("\n[bold yellow]Execution Alignment Notes[/bold yellow]")
+    for warning in warnings:
+        console.print(f"  [yellow]•[/yellow] {warning}")
+    
+    console.print("\n  [dim]Execution continues under operator control[/dim]")
 
 
 @app.command()
@@ -98,6 +229,11 @@ def _run_external_mode(
         console.print(f"[red]ExecutionPack not found: {execution_id}[/red]")
         logger.close()
         raise typer.Exit(1)
+    
+    intent = _extract_execution_intent(execution_pack)
+    _display_execution_intent(intent)
+    warnings = _check_drift_warnings(intent, execution_pack)
+    _display_drift_warnings(warnings)
 
     engine.output_dir = store.execution_packs_path
 
@@ -178,6 +314,11 @@ def _run_live_mode(
         console.print(f"[red]ExecutionPack not found: {execution_id}[/red]")
         logger.close()
         raise typer.Exit(1)
+    
+    intent = _extract_execution_intent(execution_pack)
+    _display_execution_intent(intent)
+    warnings = _check_drift_warnings(intent, execution_pack)
+    _display_drift_warnings(warnings)
 
     prep = engine.prepare(execution_pack)
     if prep.get("status") != "ready":
@@ -280,18 +421,32 @@ def _run_mock_mode(
         product_id = "demo-product-001"
 
     if execution_id is None:
-        execution_id = "exec-test-001"
+        packs = list(store.execution_packs_path.glob("exec-*.md"))
+        if packs:
+            execution_id = packs[-1].stem
 
-    test_pack = {
-        "execution_id": execution_id,
-        "feature_id": "001-test",
-        "task_id": "test-task",
-        "goal": "Test execution flow",
-        "task_scope": ["test"],
-        "deliverables": [{"item": "test-output", "path": "test.md", "type": "file"}],
-        "verification_steps": ["Check output"],
-        "stop_conditions": ["Complete"],
-    }
+    execution_pack = None
+    if execution_id and execution_id != "exec-test-001":
+        execution_pack = store.load_execution_pack(execution_id)
+    
+    if execution_pack:
+        intent = _extract_execution_intent(execution_pack)
+        _display_execution_intent(intent)
+        warnings = _check_drift_warnings(intent, execution_pack)
+        _display_drift_warnings(warnings)
+        test_pack = execution_pack
+    else:
+        execution_id = "exec-test-001"
+        test_pack = {
+            "execution_id": execution_id,
+            "feature_id": "001-test",
+            "task_id": "test-task",
+            "goal": "Test execution flow",
+            "task_scope": ["test"],
+            "deliverables": [{"item": "test-output", "path": "test.md", "type": "file"}],
+            "verification_steps": ["Check output"],
+            "stop_conditions": ["Complete"],
+        }
 
     result = engine.run(test_pack)
 
