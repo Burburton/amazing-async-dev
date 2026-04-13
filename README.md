@@ -153,12 +153,14 @@ python cli/asyncdev.py new-product create --product-id test-verify --name "Test"
 plan-day → run-day → review-night → resume-next-day
 ```
 
-| Phase | When | What you do |
-|-------|------|-------------|
-| Morning | 5 min | Define today's bounded task |
-| Daytime | 0 min | AI executes autonomously |
-| Evening | 20-30 min | Review DailyReviewPack, decide next steps |
-| Next day | 2 min | Resume from state, no re-explanation |
+**Canonical Loop (Verified)** — The validated operator daily rhythm:
+
+| Phase | When | What you do | CLI Command |
+|-------|------|-------------|-------------|
+| Morning | 5 min | Define today's bounded task | `plan-day create --project <id>` |
+| Daytime | 0 min | AI executes autonomously | `run-day execute --project <id>` |
+| Evening | 20-30 min | Review DailyReviewPack, decide next steps | `review-night generate --project <id>` |
+| Next day | 2 min | Resume from state, no re-explanation | `resume-next-day continue-loop --project <id>` |
 
 **Time investment**: ~30 minutes per day. AI handles the rest.
 
@@ -234,7 +236,7 @@ amazing-async-dev/
 ├─ templates/          # Fillable templates
 ├─ runtime/            # State management, adapters
 ├─ cli/                # CLI commands (18 modules)
-├─ tests/              # 551 pytest tests
+├─ tests/              # 670 pytest tests
 ├─ examples/
 │  ├─ README.md                  # Onboarding guide - start here
 │  ├─ single-feature-day-loop/   # Default onboarding example
@@ -360,15 +362,54 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 | Metric | Value |
 |--------|-------|
 | Features Complete | 36 (001-036) |
-| Tests Passing | 666 |
+| Tests Passing | 670 |
 | Package State | Functional alpha |
+| Canonical Loop | ✅ Verified (3-day dogfooding) |
 | Coverage | CLI, state, policy, feedback, integration, doctor, doctor recovery, feedback handoff, feedback draft, review-night enriched, resume-next-day alignment, plan-day resume context, run-day intent alignment |
 
 **What this means:**
 - All core features are implemented and tested
 - Package works for real async development workflows
+- Canonical operator loop validated through real dogfooding
+- UX hardening applied (run-day --project parameter)
 - Not formally released (no PyPI package, no version tag)
 - Suitable for early adopters willing to clone and run
+
+---
+
+## Milestone Checkpoints
+
+### 026–036 Milestone — Canonical Loop Verified and Hardened (2026-04-13)
+
+**Status**: ✅ COMPLETED
+
+This milestone marks the completion and validation of Features 026–036:
+
+| Deliverable | Status |
+|-------------|--------|
+| Canonical loop defined | ✅ `docs/infra/canonical-operator-loop-v1.md` |
+| Documentation aligned | ✅ `docs/infra/documentation-alignment-notes-v1.md` |
+| 3-day dogfooding completed | ✅ `docs/infra/dogfooding-final-summary.md` |
+| Friction classified | ✅ No capability gaps found |
+| UX hardening applied | ✅ run-day --project parameter added |
+| Loop Journal Viewer | ✅ Functional ecosystem tool |
+
+**Key Findings from Dogfooding**:
+- `review-night` → `resume-next-day` → `plan-day` → `run-day` works correctly
+- Resume-next-day significantly reduces context reconstruction
+- Planning mode inference (continue_work, recover_and_continue, etc.) works
+- Execution intent alignment helps stay on bounded target
+- No capability gaps — only UX consistency issue (fixed)
+
+**Canonical Loop Commands** (all now support `--project`):
+```bash
+asyncdev review-night generate --project <id>
+asyncdev resume-next-day continue-loop --project <id> --decision approve
+asyncdev plan-day create --project <id> --feature <fid> --task "..."
+asyncdev run-day execute --project <id> --mode external
+```
+
+**Next Phase**: Use validated loop in real projects, capture friction, open features only when true gaps identified.
 
 ---
 
@@ -382,6 +423,7 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 | Feedback & Policy | ✅ Done | Issue capture, auto-continue, decisions (019-021) |
 | Integration | ✅ Done | Advisor starter pack consumption (022) |
 | UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot, doctor, recovery, feedback handoff, feedback draft, review-night enriched, resume-next-day alignment, plan-day resume context, run-day intent alignment (023-036) |
+| **026–036 Validation** | ✅ **Done** | **Canonical loop verified, dogfooding completed, UX hardened** |
 | Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
 
 ---

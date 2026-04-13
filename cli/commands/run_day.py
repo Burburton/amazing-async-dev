@@ -6,6 +6,7 @@ Modes:
 - mock: Testing and demonstration
 
 Feature 036: Enhanced with planning intent alignment and drift warnings.
+Hardening: Added --project parameter for canonical loop consistency.
 """
 
 from pathlib import Path
@@ -24,7 +25,6 @@ from cli.utils.path_formatter import get_relative_path
 
 app = typer.Typer(help="Run today's execution task")
 console = Console()
-store = StateStore()
 
 
 PLANNING_MODE_INTENT = {
@@ -157,6 +157,7 @@ def _display_drift_warnings(warnings: list[str]) -> None:
 
 @app.command()
 def execute(
+    project: str = typer.Option(None, help="Project ID to execute"),
     execution_id: str = typer.Option(None, help="Execution ID to run"),
     mode: str = typer.Option(
         "external",
@@ -167,8 +168,19 @@ def execute(
         help="Trigger external tool after preparing pack (external mode only)"
     ),
     dry_run: bool = typer.Option(False, help="Preview without saving"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Execute today's bounded task with selected engine."""
+    if project:
+        project_path = path / project
+        if not project_path.exists():
+            console.print(f"[red]Project not found: {project}[/red]")
+            console.print(f"[yellow]Path checked: {project_path}[/yellow]")
+            raise typer.Exit(1)
+        store = StateStore(project_path)
+    else:
+        store = StateStore()
+    
     logger = get_logger(store.project_path)
     
     runstate = store.load_runstate()
@@ -179,7 +191,7 @@ def execute(
         ExecutionEventType.RUN_DAY_STARTED,
         feature_id=feature_id,
         product_id=product_id,
-        event_data={"execution_id": execution_id, "mode": mode},
+        event_data={"execution_id": execution_id, "mode": mode, "project": project},
     )
     
     available = get_available_modes()
@@ -197,11 +209,11 @@ def execute(
     ))
 
     if mode == "external":
-        return _run_external_mode(execution_id, engine, trigger, dry_run, logger, feature_id, product_id)
+        return _run_external_mode(execution_id, engine, trigger, dry_run, logger, feature_id, product_id, store)
     elif mode == "live":
-        return _run_live_mode(execution_id, engine, dry_run, logger, feature_id, product_id)
+        return _run_live_mode(execution_id, engine, dry_run, logger, feature_id, product_id, store)
     elif mode == "mock":
-        return _run_mock_mode(execution_id, engine, dry_run, logger, feature_id, product_id)
+        return _run_mock_mode(execution_id, engine, dry_run, logger, feature_id, product_id, store)
 
 
 def _run_external_mode(
@@ -212,6 +224,7 @@ def _run_external_mode(
     logger,
     feature_id: str,
     product_id: str,
+    store: StateStore,
 ) -> None:
     """Execute in external tool mode."""
     root = Path.cwd()
@@ -291,6 +304,7 @@ def _run_live_mode(
     logger,
     feature_id: str,
     product_id: str,
+    store: StateStore,
 ) -> None:
     """Execute in live API mode."""
     root = Path.cwd()
@@ -395,6 +409,7 @@ def _run_mock_mode(
     logger,
     feature_id: str,
     product_id: str,
+    store: StateStore,
 ) -> None:
     """Execute in mock mode for testing."""
     root = Path.cwd()
@@ -403,8 +418,8 @@ def _run_mock_mode(
     if runstate is None:
         console.print("[yellow]Creating minimal RunState for test[/yellow]")
         runstate = {
-            "project_id": "demo-product-001",
-            "feature_id": "001-test",
+            "project_id": product_id or "demo-product-001",
+            "feature_id": feature_id or "001-test",
             "current_phase": "executing",
             "active_task": "test-task",
             "task_queue": [],
@@ -417,8 +432,8 @@ def _run_mock_mode(
             "updated_at": "",
         }
         store.save_runstate(runstate)
-        feature_id = "001-test"
-        product_id = "demo-product-001"
+        feature_id = feature_id or "001-test"
+        product_id = product_id or "demo-product-001"
 
     if execution_id is None:
         packs = list(store.execution_packs_path.glob("exec-*.md"))
@@ -535,9 +550,12 @@ def _trigger_external_tool(pack_path: str) -> None:
 
 
 @app.command()
-def mock_quick():
+def mock_quick(
+    project: str = typer.Option(None, help="Project ID to execute"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
     """Quick mock execution for testing the full flow."""
-    execute(mode="mock", execution_id="exec-test-001", trigger=False, dry_run=False)
+    execute(project=project, mode="mock", execution_id="exec-test-001", trigger=False, dry_run=False, path=path)
 
 
 @app.command()

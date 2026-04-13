@@ -48,6 +48,47 @@ class TestRunDayExecute:
         
         assert "Dry run" in result.output
 
+    def test_project_parameter_with_valid_project(self, setup_product):
+        """run-day --project should scope execution to specified project."""
+        project_path = setup_product
+        
+        result = runner.invoke(app, [
+            "execute",
+            "--project", "test-product",
+            "--mode", "mock",
+            "--path", str(project_path.parent),
+        ])
+        
+        assert result.exit_code == 0
+
+    def test_project_parameter_with_invalid_project(self, temp_dir):
+        """run-day --project with invalid project should error."""
+        result = runner.invoke(app, [
+            "execute",
+            "--project", "nonexistent-project",
+            "--mode", "mock",
+            "--path", str(temp_dir),
+        ])
+        
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower() or "Project not found" in result.output
+
+    def test_project_parameter_in_help(self):
+        """run-day execute --help should show --project parameter."""
+        result = runner.invoke(app, ["execute", "--help"])
+        
+        assert result.exit_code == 0
+        assert "--project" in result.output
+
+    def test_fallback_without_project(self):
+        """run-day without --project should use default behavior."""
+        result = runner.invoke(app, [
+            "execute",
+            "--mode", "mock",
+        ])
+        
+        assert result.exit_code == 0
+
 
 class TestExecutionIntentHelpers:
     """Tests for execution intent helper functions - Feature 036."""
