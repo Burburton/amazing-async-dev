@@ -1,6 +1,6 @@
 schema_type: execution-result
-version: "1.0"
-description: Structured outcome of a daytime execution run
+version: "1.1"
+description: Structured outcome of a daytime execution run with checkpoint semantics (Feature 037)
 
 required:
   - execution_id
@@ -19,6 +19,8 @@ optional:
   - notes
   - warnings
   - duration
+  - checkpoint_type
+  - continuation_decision
 
 fields:
   execution_id:
@@ -146,6 +148,21 @@ fields:
     type: duration
     description: Total execution time
     example: "2h30m"
+    required: false
+
+  checkpoint_type:
+    type: string
+    description: Type of checkpoint event (Feature 037)
+    example: "iteration_completed"
+    required: false
+
+  continuation_decision:
+    type: object
+    description: Continuation evaluation result (Feature 037)
+    example:
+      state: "continue"
+      next_stage: "execution_pack_generation"
+      reason: "Checkpoint reached. No stop conditions apply."
     required: false
 
 lifecycle:

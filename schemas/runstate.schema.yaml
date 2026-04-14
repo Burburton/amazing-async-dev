@@ -1,6 +1,6 @@
 schema_type: runstate
-version: "1.1"
-description: Current execution state of a project or feature for pause/resume with policy integration (Feature 020)
+version: "1.2"
+description: Current execution state of a project or feature for pause/resume with policy integration (Feature 020) and continuation semantics (Feature 037)
 
 required:
   - project_id
@@ -23,6 +23,10 @@ optional:
   - policy_mode
   - scope_change_flag
   - pending_risky_actions
+  - continuity_context
+  - continuation_allowed
+  - next_intended_stage
+  - continuation_candidate_actions
 
 fields:
   project_id:
@@ -174,6 +178,38 @@ fields:
       - action_type: "git_push"
         target: "origin/main"
         requires_confirmation: true
+    required: false
+
+  continuity_context:
+    type: object
+    description: Continuity artifact surviving checkpoint boundaries (Feature 037)
+    example:
+      latest_checkpoint: "exec-20260414-001"
+      latest_checkpoint_type: "iteration_completed"
+      continuation_allowed: true
+      next_intended_stage: "execution_pack_generation"
+    required: false
+
+  continuation_allowed:
+    type: boolean
+    description: Whether continuation is permitted after current checkpoint (Feature 037)
+    example: true
+    required: false
+    default: true
+
+  next_intended_stage:
+    type: string
+    description: Next canonical stage to enter if continuation is allowed (Feature 037)
+    example: "execution_pack_generation"
+    required: false
+
+  continuation_candidate_actions:
+    type: array
+    description: Candidate next actions after checkpoint evaluation (Feature 037)
+    items_type: string
+    example:
+      - "asyncdev plan-day create"
+      - "Enter dogfood stage"
     required: false
 
 lifecycle:
