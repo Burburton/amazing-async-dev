@@ -168,7 +168,7 @@ def render_timeline_table(entries: list[JournalEntry]) -> Table:
         summary_preview = entry.summary[:50] + "..." if len(entry.summary) > 50 else entry.summary
         source_preview = Path(entry.source_path).name
 
-        status_marker = "" if entry.parse_status == "success" else "[red]⚠[/red] "
+        status_marker = "" if entry.parse_status == "success" else "[red]![/red] "
 
         table.add_row(
             entry.day or "unknown",
@@ -266,19 +266,19 @@ def display_day_detail(project_path: Path, day: str) -> None:
         artifact_label = ARTIFACT_LABELS.get(artifact_type, artifact_type.upper())
 
         if artifact_type in entries_by_type and entries_by_type[artifact_type]:
-            console.print(f"[bold {type_color}]━━━ {artifact_label} ━━━[/bold {type_color}]")
+            console.print(f"[bold {type_color}]--- {artifact_label} ---[/bold {type_color}]")
             for entry in entries_by_type[artifact_type]:
                 console.print(render_entry_detail(entry))
                 displayed_count += 1
         else:
-            console.print(f"[dim {type_color}]━━━ {artifact_label} ━━━[/dim {type_color}]")
+            console.print(f"[dim {type_color}]--- {artifact_label} ---[/dim {type_color}]")
             console.print(f"[dim]No {artifact_label} artifacts for this day[/dim]\n")
 
     other_types = [t for t in entries_by_type.keys() if t not in DAY_DETAIL_ORDER]
     for artifact_type in other_types:
         type_color = ARTIFACT_COLORS.get(artifact_type, "white")
         artifact_label = ARTIFACT_LABELS.get(artifact_type, artifact_type.upper())
-        console.print(f"[bold {type_color}]━━━ {artifact_label} ━━━[/bold {type_color}]")
+        console.print(f"[bold {type_color}]--- {artifact_label} ---[/bold {type_color}]")
         for entry in entries_by_type[artifact_type]:
             console.print(render_entry_detail(entry))
             displayed_count += 1
@@ -315,7 +315,7 @@ def display_feature_timeline(project_path: Path, feature_id: str) -> None:
 
     for day in sorted_days:
         day_entries = grouped_by_day[day]
-        console.print(f"\n[bold blue]━━━ {day} ({len(day_entries)} entries) ━━━[/bold blue]")
+        console.print(f"\n[bold blue]--- {day} ({len(day_entries)} entries) ---[/bold blue]")
 
         entries_by_type: dict[str, list[JournalEntry]] = {}
         for entry in day_entries:
