@@ -1,6 +1,7 @@
 """resume-next-day command - Continue from human decisions.
 
 Feature 034: Enriched with prior-night decision pack alignment.
+Feature 037: Integrated continuation semantics for checkpoint-based progression.
 """
 
 from datetime import datetime
@@ -22,6 +23,13 @@ from runtime.recovery_classifier import (
     RecoveryClassification,
     ResumeEligibility,
 )
+from runtime.continuation_evaluator import (
+    evaluate_continuation,
+    apply_continuation_decision_to_runstate,
+    get_continuation_summary,
+    should_auto_proceed_to_next_stage,
+)
+from runtime.continuation_types import ExecutionState
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import get_relative_path
 
@@ -292,6 +300,17 @@ def continue_loop(
     console.print(f"[bold]Next Task:[/bold] {runstate.get('active_task', 'None')}")
     console.print(f"[bold]Queue:[/bold] {len(runstate.get('task_queue', []))} pending")
     console.print(f"[bold]Completed:[/bold] {len(runstate.get('completed_outputs', []))} outputs")
+    
+    continuity_context = runstate.get("continuity_context", {})
+    if continuity_context:
+        console.print("\n[bold cyan]Continuation Status[/bold cyan]")
+        continuation_allowed = continuity_context.get("continuation_allowed", True)
+        status_color = "green" if continuation_allowed else "red"
+        console.print(f"  Continuation Allowed: [{status_color}]{continuation_allowed}[/{status_color}]")
+        if continuity_context.get("next_intended_stage"):
+            console.print(f"  Next Intended Stage: {continuity_context.get('next_intended_stage')}")
+        if continuity_context.get("stop_reason"):
+            console.print(f"  [yellow]Stop Reason: {continuity_context.get('stop_reason')}[/yellow]")
 
     if dry_run:
         console.print("[yellow]Dry run - not saving[/yellow]")
