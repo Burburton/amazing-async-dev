@@ -211,6 +211,7 @@ def create(
     
     execution_pack = {
         "execution_id": execution_id,
+        "project_id": product_id,
         "feature_id": runstate["feature_id"],
         "task_id": planning_context.get("task", runstate["active_task"]),
         "goal": f"Execute: {planning_context.get('task', runstate['active_task'])}",
