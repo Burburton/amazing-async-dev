@@ -5,6 +5,7 @@ Feature 016: Integrated decision template matching for consistent decision struc
 Feature 019a: Integrated workflow_feedback section for workflow/system issues.
 Feature 019c: Integrated promotions section for promoted feedback.
 Feature 033: Enriched with doctor assessment, recovery guidance, and feedback handoff signals.
+Feature 037: Integrated continuation decision and checkpoint semantics.
 """
 
 from datetime import datetime
@@ -14,6 +15,7 @@ from typing import Any
 from runtime.decision_templates import enhance_decision_with_template
 from runtime.workflow_feedback_store import create_workflow_feedback_for_review
 from runtime.feedback_promotion_store import create_promotions_for_review
+from runtime.continuation_evaluator import evaluate_continuation, get_continuation_summary
 
 
 def build_daily_review_pack(
@@ -52,6 +54,10 @@ def build_daily_review_pack(
 
     if promotions:
         review_pack["promotions"] = create_promotions_for_review(promotions)
+
+    continuation_decision = _build_continuation_decision(execution_result, runstate)
+    if continuation_decision:
+        review_pack["continuation_decision"] = continuation_decision
 
     optional_fields = {
         "risk_summary": _build_risk_summary(execution_result),
@@ -539,3 +545,26 @@ def _build_doctor_assessment(project_path: Path) -> dict[str, Any] | None:
         }
     
     return assessment
+
+
+def _build_continuation_decision(
+    execution_result: dict[str, Any],
+    runstate: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Build continuation decision section from evaluation.
+    
+    Feature 037: Continuation semantics integration.
+    """
+    decision = evaluate_continuation(runstate, execution_result)
+    
+    return {
+        "state": decision.state.value,
+        "checkpoint_type": decision.checkpoint_type.value if decision.checkpoint_type else None,
+        "continuation_allowed": decision.continuation_allowed,
+        "next_stage": decision.next_stage.value if decision.next_stage else None,
+        "reason": decision.reason,
+        "escalation_required": decision.escalation_required,
+        "stop_condition": decision.stop_condition.to_dict() if decision.stop_condition else None,
+        "candidate_actions": decision.candidate_next_actions,
+        "summary": get_continuation_summary(decision),
+    }
