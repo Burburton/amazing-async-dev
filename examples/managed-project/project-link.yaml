@@ -1,0 +1,19 @@
+# Example: Managed External Product (amazing-visual-map)
+# Feature 039: Artifact Ownership & Storage Boundary Governance
+
+product_id: "amazing-visual-map"
+repo_name: "amazing-visual-map"
+repo_url: "https://github.com/Burburton/amazing-visual-map"
+ownership_mode: "managed_external"
+
+# Optional fields
+repo_local_path: "../amazing-visual-map"
+product_artifact_root: "projects/amazing-visual-map"
+orchestration_artifact_root: "projects/amazing-visual-map"
+current_phase: "phase-3-experience-refinement"
+last_execution_id: "exec-20260414-001"
+status: "active"
+sync_notes: "Product specs in product repo. Execution packs/results in async-dev."
+
+created_at: "2026-04-01T10:00:00Z"
+updated_at: "2026-04-15T12:30:00Z"
