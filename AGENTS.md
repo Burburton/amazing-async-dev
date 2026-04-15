@@ -240,3 +240,69 @@ For browser verification, ExecutionResult MUST include:
 
 > **For interactive frontend work, environment setup is not verification.**
 > **Server startup is a prerequisite step, not a validation result.**
+
+---
+
+## 10. Governance Boundary Rules (Feature 039)
+
+### 10.1 Repository Mode Classification
+Before execution, determine `ownership_mode` from project-link.yaml:
+- `self_hosted`: Product and orchestrator in same repo (Mode A)
+- `managed_external`: Product in separate repo (Mode B)
+
+If project-link.yaml missing, assume `self_hosted`.
+
+### 10.2 Product Truth Rule (MANDATORY)
+Product-owned artifacts MUST live in the product repo:
+- ProductBrief, FeatureSpec, feature completion reports
+- Dogfood reports, friction logs, phase summaries
+- Product memory artifacts, north-star documents
+
+For Mode B, these artifacts belong in the target product repository, NOT in async-dev.
+
+### 10.3 Orchestration Truth Rule (MANDATORY)
+Orchestration-owned artifacts MUST live in async-dev:
+- ExecutionPack, ExecutionResult, orchestration runstate
+- Verification records, continuation state
+- Project-link metadata, orchestration telemetry
+
+For Mode B, these artifacts belong in async-dev's `projects/{product_id}/`.
+
+### 10.4 projects/ Directory Meaning
+
+| Repository | projects/ Meaning |
+|------------|-------------------|
+| Product repo (Mode A/B) | Product-local canonical development memory |
+| async-dev (Mode A) | Same as product repo (coexistent) |
+| async-dev (Mode B) | Managed-project orchestration workspace |
+
+### 10.5 Decision Test (MANDATORY)
+Before creating/storing an artifact, apply this test:
+
+1. Does this describe the product? → Product repo
+2. Does this describe async-dev execution? → async-dev
+3. Would this matter if async-dev disappeared? → Product repo
+4. Would this matter if async-dev workflow changed but product unchanged? → async-dev
+
+### 10.6 Anti-Patterns (FORBIDDEN)
+
+| Anti-Pattern | Consequence |
+|--------------|-------------|
+| Product Repo Hollowing | **STOP** - Product must own its canonical docs |
+| Orchestrator Archive Overreach | **STOP** - async-dev is not product archive |
+| Mixed Ownership Without Boundary | **STOP** - Must classify ownership before storing |
+| Runtime State Confused with Product State | **STOP** - Orchestration runstate ≠ product history |
+
+### 10.7 Example: amazing-visual-map
+
+When orchestrating `amazing-visual-map` from async-dev:
+
+| In amazing-visual-map | In amazing-async-dev |
+|----------------------|----------------------|
+| ProductBrief | ExecutionPacks |
+| FeatureSpecs | ExecutionResults |
+| Friction logs | Orchestration runstate |
+| Dogfood reports | Project-link.yaml |
+| Phase reports | Continuation state |
+
+This ensures `amazing-visual-map` remains self-contained while async-dev orchestrates.
