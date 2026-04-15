@@ -280,6 +280,45 @@ Use `*_count` or singular nouns: `passed`, `failed`
 
 ---
 
+## Governance Terms (Feature 039)
+
+### Repository Modes
+
+| Term | Definition |
+|------|------------|
+| self_hosted | Mode A - Product and orchestrator in same repository |
+| managed_external | Mode B - Product in separate repository, async-dev orchestrates |
+| ownership_mode | Field indicating which mode applies |
+
+### Ownership Concepts
+
+| Term | Definition |
+|------|------------|
+| product truth | Artifacts describing the product itself (ProductBrief, FeatureSpec, etc.) |
+| orchestration truth | Artifacts describing async-dev execution behavior (ExecutionPack, ExecutionResult, etc.) |
+| product repo | Repository containing product-owned canonical documents |
+| orchestration repo | async-dev repository containing execution metadata |
+
+### Boundary Artifacts
+
+| Term | Usage |
+|------|-------|
+| ProjectLink | Object representing managed product linkage |
+| project-link | File name suffix |
+| project-link.yaml | Linkage metadata file |
+| product_artifact_root | Root path for product-owned artifacts |
+| orchestration_artifact_root | Root path for orchestration artifacts |
+
+### Governance Anti-Patterns
+
+| Term | Definition |
+|------|------------|
+| product repo hollowing | Product lacks its own canonical documents |
+| orchestrator archive overreach | async-dev becomes primary archive for another product |
+| mixed ownership without boundary | Same artifact class stored unpredictably across repos |
+
+---
+
 ## Consistency Check
 
 Before creating or editing any artifact, verify:
@@ -288,3 +327,4 @@ Before creating or editing any artifact, verify:
 - [ ] IDs follow patterns
 - [ ] Field names follow conventions
 - [ ] Avoids deprecated terms
+- [ ] For Mode B, follows ownership boundary rules
