@@ -4,6 +4,9 @@ Primary execution mode for amazing-async-dev:
 - Outputs ExecutionPack in YAML and Markdown formats
 - Provides instructions for triggering external tools
 - Awaits external execution and result consumption
+
+Feature 038: Enhanced with Interactive Frontend Verification Gate.
+When verification_type requires browser verification, outputs mandatory Playwright invocation instructions.
 """
 
 import yaml
@@ -11,6 +14,14 @@ from pathlib import Path
 from typing import Any
 
 from runtime.engines.base import ExecutionEngine
+
+
+# Feature 038: Verification types that require browser-level verification
+BROWSER_VERIFICATION_TYPES = [
+    "frontend_interactive",
+    "frontend_visual_behavior",
+    "mixed_app_workflow",
+]
 
 
 class ExternalToolEngine(ExecutionEngine):
@@ -82,6 +93,9 @@ class ExternalToolEngine(ExecutionEngine):
 
         Format designed for easy reading by OpenCode/Claude Code etc.
         """
+        verification_type = pack.get("verification_type", "backend_only")
+        requires_browser = verification_type in BROWSER_VERIFICATION_TYPES
+
         lines = [
             f"# ExecutionPack: {pack.get('execution_id', 'unknown')}",
             "",
@@ -119,6 +133,9 @@ class ExternalToolEngine(ExecutionEngine):
         for d in pack.get("deliverables", []):
             lines.append(f"- **{d.get('item', 'unknown')}** → `{d.get('path', 'path')}`")
 
+        if requires_browser:
+            lines.extend(self._build_browser_verification_section(pack, verification_type))
+
         lines.extend([
             "",
             "## Verification Steps",
@@ -149,12 +166,32 @@ class ExternalToolEngine(ExecutionEngine):
             "- Run all verification_steps",
             "- Stop at any stop_condition",
             "- Leave evidence of work",
+        ])
+
+        if requires_browser:
+            lines.extend([
+                "- Invoke `/playwright` skill after server is ready (FR-9)",
+                "- Run at least one browser scenario",
+                "- Capture `browser_verification` evidence in ExecutionResult",
+            ])
+
+        lines.extend([
             "",
             "### MUST NOT",
             "- Expand scope without approval",
             "- Make architectural decisions alone",
             "- Skip verification steps",
             "- Proceed when blocked",
+        ])
+
+        if requires_browser:
+            lines.extend([
+                "- Stop at \"server started\" without browser run",
+                "- Claim `success` without `browser_verification.executed: true`",
+                "- Skip browser verification without valid exception reason",
+            ])
+
+        lines.extend([
             "",
             "---",
             "",
@@ -173,6 +210,18 @@ class ExternalToolEngine(ExecutionEngine):
             "verification_result:",
             "  passed: N",
             "  failed: M",
+        ])
+
+        if requires_browser:
+            lines.extend([
+                "browser_verification:",
+                "  executed: true|false",
+                "  passed: N",
+                "  failed: M",
+                "  exception_reason: (if not executed)",
+            ])
+
+        lines.extend([
             "issues_found:",
             "  - ...",
             "blocked_reasons:",
@@ -185,6 +234,49 @@ class ExternalToolEngine(ExecutionEngine):
 
         with open(path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
+
+    def _build_browser_verification_section(self, pack: dict[str, Any], verification_type: str) -> list[str]:
+        """Build browser verification section for Markdown output."""
+        return [
+            "",
+            "---",
+            "",
+            "## Browser Verification (MANDATORY)",
+            "",
+            f"**Verification Type: `{verification_type}`**",
+            "",
+            "**This task requires browser-level verification.**",
+            "",
+            "### Verification Stages",
+            "1. Build/setup → Complete build steps",
+            "2. Server start → Start local dev/preview server",
+            "3. Server ready → Poll for health/readiness",
+            "4. Browser verification → Execute Playwright scenarios",
+            "5. Evidence capture → Record results, screenshots",
+            "6. Completion → Only after stages 4-5 succeed",
+            "",
+            "### MUST",
+            "- Invoke `/playwright` skill after server is ready",
+            "- Run at least one browser scenario",
+            "- Capture `browser_verification` evidence in ExecutionResult",
+            "",
+            "### MUST NOT",
+            "- Stop at \"server started\" without browser run",
+            "- Claim `success` without `browser_verification.executed: true`",
+            "- Skip browser verification without valid exception reason",
+            "",
+            "### Valid Exception Reasons",
+            "If browser verification cannot run, MUST record one of these in `browser_verification.exception_reason`:",
+            "- `playwright_unavailable`: Playwright tooling not available",
+            "- `environment_blocked`: Environment constraints prevent execution",
+            "- `browser_install_failed`: Browser installation failed",
+            "- `ci_container_limitation`: CI/container cannot run browser",
+            "- `missing_credentials`: Required credentials not available",
+            "- `deterministic_blocker`: Known blocker prevents meaningful verification",
+            "- `reclassified_noninteractive`: Feature reclassified as non-interactive",
+            "",
+            "**If browser verification cannot run, you MUST still record evidence in browser_verification field.**",
+        ]
 
     def _build_instructions(self, pack: dict[str, Any], md_path: Path) -> str:
         """Build human-readable execution instructions."""
