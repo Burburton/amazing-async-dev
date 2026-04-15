@@ -15,6 +15,7 @@ required:
   - stop_conditions
 
 optional:
+  - verification_type
   - allowed_tools
   - notes
   - priority
@@ -116,6 +117,19 @@ fields:
       - "Decision needed for scope expansion"
       - "Error that cannot be resolved autonomously"
     required: true
+
+  verification_type:
+    type: enum
+    description: Classification of verification requirements (Feature 038)
+    values:
+      - backend_only
+      - frontend_noninteractive
+      - frontend_interactive
+      - frontend_visual_behavior
+      - mixed_app_workflow
+    default: backend_only
+    example: "frontend_interactive"
+    required: false
 
   allowed_tools:
     type: array
@@ -372,6 +386,13 @@ json_schema:
       type: array
       items:
         type: string
+    verification_type:
+      enum:
+        - backend_only
+        - frontend_noninteractive
+        - frontend_interactive
+        - frontend_visual_behavior
+        - mixed_app_workflow
     allowed_tools:
       type: array
       items:

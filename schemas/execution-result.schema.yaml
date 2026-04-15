@@ -14,6 +14,7 @@ required:
   - recommended_next_step
 
 optional:
+  - browser_verification
   - issues_resolved
   - metrics
   - notes
@@ -164,6 +165,59 @@ fields:
       next_stage: "execution_pack_generation"
       reason: "Checkpoint reached. No stop conditions apply."
     required: false
+
+  browser_verification:
+    type: object
+    description: Browser-level verification evidence (Feature 038)
+    required: false
+    properties:
+      executed:
+        type: boolean
+        description: Whether browser verification was actually executed
+      passed:
+        type: integer
+        description: Number of scenarios that passed
+      failed:
+        type: integer
+        description: Number of scenarios that failed
+      skipped:
+        type: integer
+        description: Number of scenarios skipped
+      exception_reason:
+        type: enum
+        description: Structured reason if browser verification could not run
+        values:
+          - playwright_unavailable
+          - environment_blocked
+          - browser_install_failed
+          - ci_container_limitation
+          - missing_credentials
+          - deterministic_blocker
+          - reclassified_noninteractive
+      scenarios_run:
+        type: array
+        description: List of scenarios that were executed
+        items_type: string
+      screenshots:
+        type: array
+        description: Paths to screenshot artifacts
+        items_type: string
+      duration:
+        type: string
+        description: Time spent on browser verification
+    example:
+      executed: true
+      passed: 5
+      failed: 0
+      skipped: 1
+      scenarios_run:
+        - "Navigate to home page"
+        - "Click login button"
+        - "Submit form"
+      screenshots:
+        - "screenshots/home.png"
+        - "screenshots/login.png"
+      duration: "2m30s"
 
 lifecycle:
   created_by: run-day workflow
@@ -346,3 +400,33 @@ json_schema:
         type: string
     duration:
       type: string
+    browser_verification:
+      type: object
+      properties:
+        executed:
+          type: boolean
+        passed:
+          type: integer
+        failed:
+          type: integer
+        skipped:
+          type: integer
+        exception_reason:
+          enum:
+            - playwright_unavailable
+            - environment_blocked
+            - browser_install_failed
+            - ci_container_limitation
+            - missing_credentials
+            - deterministic_blocker
+            - reclassified_noninteractive
+        scenarios_run:
+          type: array
+          items:
+            type: string
+        screenshots:
+          type: array
+          items:
+            type: string
+        duration:
+          type: string
