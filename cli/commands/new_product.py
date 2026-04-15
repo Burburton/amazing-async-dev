@@ -1,4 +1,7 @@
-"""New-product command - Create a new product with ProductBrief."""
+"""New-product command - Create a new product with ProductBrief.
+
+Feature 039: Added --ownership-mode and --repo-url for managed external products.
+"""
 
 import typer
 from rich.console import Console
@@ -17,6 +20,12 @@ def create(
     target_user: str = typer.Option("", help="Target user description"),
     path: str = typer.Option("projects", help="Root directory for projects"),
     starter_pack: str = typer.Option("", help="Path to starter-pack.yaml from advisor"),
+    ownership_mode: str = typer.Option(
+        "self_hosted",
+        help="Repository ownership mode: self_hosted (Mode A) or managed_external (Mode B)"
+    ),
+    repo_url: str = typer.Option("", help="Remote repository URL (for managed_external mode)"),
+    repo_name: str = typer.Option("", help="Repository name (defaults to product_id)"),
 ):
     """Create new product with ProductBrief.
 
@@ -24,11 +33,13 @@ def create(
     - projects/{product_id}/ directory
     - product-brief.yaml with provided info
     - runstate.md with initial planning phase
+    - project-link.yaml (for managed_external mode)
 
     Examples:
         asyncdev new-product create --product-id my-app --name "My App"
         asyncdev new-product create --product-id demo-001 --name "Demo" --problem "Test"
         asyncdev new-product create --product-id ai-tool --name "AI Tool" --starter-pack starter-pack.yaml
+        asyncdev new-product create --product-id visual-map --name "Visual Map" --ownership-mode managed_external --repo-url https://github.com/user/visual-map
     """
     from pathlib import Path
     from runtime.adapters.filesystem_adapter import FilesystemAdapter
@@ -39,12 +50,27 @@ def create(
     root = Path(path)
     product_dir = root / product_id
 
+    if ownership_mode not in ["self_hosted", "managed_external"]:
+        console.print(f"[red]Invalid ownership_mode: {ownership_mode}[/red]")
+        console.print("Valid options: self_hosted, managed_external")
+        raise typer.Exit(1)
+
+    if ownership_mode == "managed_external" and not repo_url:
+        console.print("[yellow]managed_external mode requires --repo-url[/yellow]")
+        console.print("Example: --repo-url https://github.com/user/product-repo")
+
     if product_dir.exists():
         console.print(f"[red]Product already exists: {product_dir}[/red]")
         console.print("Use different --product-id or delete existing")
         raise typer.Exit(1)
 
     console.print(Panel(f"Create Product: {name}", border_style="green"))
+
+    if ownership_mode == "managed_external":
+        console.print(f"[blue]Ownership mode:[/blue] managed_external (Mode B)")
+        console.print(f"[blue]Product repo:[/blue] {repo_url}")
+    else:
+        console.print(f"[blue]Ownership mode:[/blue] self_hosted (Mode A)")
 
     consumption = None
     if starter_pack:
@@ -116,6 +142,27 @@ def create(
         f.write(markdown_content)
 
     console.print(f"[green]Created:[/green] {runstate_path}")
+
+    # Create project-link.yaml for managed_external mode
+    if ownership_mode == "managed_external":
+        project_link = {
+            "product_id": product_id,
+            "repo_name": repo_name or product_id,
+            "repo_url": repo_url,
+            "ownership_mode": "managed_external",
+            "status": "active",
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+        }
+        
+        link_path = product_dir / "project-link.yaml"
+        with open(link_path, "w", encoding="utf-8") as f:
+            yaml.dump(project_link, f, default_flow_style=False, sort_keys=False)
+        
+        console.print(f"[green]Created:[/green] {link_path}")
+        console.print("\n[blue]Governance note:[/blue]")
+        console.print("[dim]Product truth should live in the product repo.[/dim]")
+        console.print("[dim]Orchestration truth stays in async-dev.[/dim]")
 
     if consumption and consumption.success:
         console.print("\n[blue]Starter pack applied:[/blue]")

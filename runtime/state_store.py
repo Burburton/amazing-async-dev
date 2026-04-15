@@ -203,3 +203,50 @@ def update_runstate_from_result(
     runstate["updated_at"] = datetime.now().isoformat()
 
     return runstate
+
+
+def load_project_link(project_path: Path) -> dict[str, Any] | None:
+    """Load project-link.yaml from project directory."""
+    link_path = project_path / "project-link.yaml"
+    if not link_path.exists():
+        return None
+    
+    with open(link_path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def get_ownership_mode(project_path: Path) -> str:
+    """Get ownership mode from project-link.yaml.
+
+    Returns:
+        "self_hosted" if no project-link or explicit self_hosted
+        "managed_external" if project-link specifies managed_external
+    """
+    project_link = load_project_link(project_path)
+    if project_link:
+        return project_link.get("ownership_mode", "self_hosted")
+    return "self_hosted"
+
+
+def is_managed_external(project_path: Path) -> bool:
+    """Check if project is in managed external mode."""
+    return get_ownership_mode(project_path) == "managed_external"
+
+
+def get_product_repo_path(project_path: Path) -> Path | None:
+    """Get local path to product repo for managed_external mode.
+
+    Returns None for self_hosted mode (product is same repo).
+    """
+    project_link = load_project_link(project_path)
+    if not project_link:
+        return None
+    
+    if project_link.get("ownership_mode") != "managed_external":
+        return None
+    
+    local_path = project_link.get("repo_local_path")
+    if local_path:
+        return Path(local_path)
+    
+    return None

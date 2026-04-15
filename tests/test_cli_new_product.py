@@ -102,6 +102,131 @@ class TestNewProductCreate:
         assert runstate["current_phase"] == "planning"
 
 
+class TestNewProductGovernance:
+    """Tests for --ownership-mode and --repo-url parameters (Feature 039)."""
+
+    def test_default_is_self_hosted(self, temp_dir):
+        """Default ownership mode should be self_hosted."""
+        result = runner.invoke(app, [
+            "create",
+            "--product-id", "test-product",
+            "--name", "Test Product",
+            "--path", str(temp_dir),
+        ])
+
+        assert result.exit_code == 0
+        assert "self_hosted" in result.output
+
+    def test_no_project_link_for_self_hosted(self, temp_dir):
+        """self_hosted mode should not create project-link.yaml."""
+        result = runner.invoke(app, [
+            "create",
+            "--product-id", "test-product",
+            "--name", "Test Product",
+            "--path", str(temp_dir),
+        ])
+
+        link_path = temp_dir / "test-product" / "project-link.yaml"
+        assert not link_path.exists()
+
+    def test_managed_external_creates_project_link(self, temp_dir):
+        """managed_external mode should create project-link.yaml."""
+        result = runner.invoke(app, [
+            "create",
+            "--product-id", "visual-map",
+            "--name", "Visual Map",
+            "--ownership-mode", "managed_external",
+            "--repo-url", "https://github.com/user/amazing-visual-map",
+            "--path", str(temp_dir),
+        ])
+
+        assert result.exit_code == 0
+        link_path = temp_dir / "visual-map" / "project-link.yaml"
+        assert link_path.exists()
+
+        with open(link_path) as f:
+            link = yaml.safe_load(f)
+
+        assert link["ownership_mode"] == "managed_external"
+        assert link["repo_url"] == "https://github.com/user/amazing-visual-map"
+
+    def test_managed_external_shows_governance_note(self, temp_dir):
+        """managed_external mode should show governance guidance."""
+        result = runner.invoke(app, [
+            "create",
+            "--product-id", "visual-map",
+            "--name", "Visual Map",
+            "--ownership-mode", "managed_external",
+            "--repo-url", "https://github.com/user/visual-map",
+            "--path", str(temp_dir),
+        ])
+
+        assert result.exit_code == 0
+        assert "Governance note" in result.output
+        assert "Product truth" in result.output
+
+    def test_managed_external_without_repo_url_warns(self, temp_dir):
+        """managed_external without --repo-url should show warning."""
+        result = runner.invoke(app, [
+            "create",
+            "--product-id", "visual-map",
+            "--name", "Visual Map",
+            "--ownership-mode", "managed_external",
+            "--path", str(temp_dir),
+        ])
+
+        assert result.exit_code == 0
+        assert "requires --repo-url" in result.output
+
+    def test_invalid_ownership_mode_fails(self, temp_dir):
+        """Invalid ownership_mode should fail."""
+        result = runner.invoke(app, [
+            "create",
+            "--product-id", "test-product",
+            "--name", "Test",
+            "--ownership-mode", "invalid_mode",
+            "--path", str(temp_dir),
+        ])
+
+        assert result.exit_code == 1
+        assert "Invalid ownership_mode" in result.output
+
+    def test_repo_name_defaults_to_product_id(self, temp_dir):
+        """--repo-name should default to product_id if not provided."""
+        result = runner.invoke(app, [
+            "create",
+            "--product-id", "visual-map",
+            "--name", "Visual Map",
+            "--ownership-mode", "managed_external",
+            "--repo-url", "https://github.com/user/visual-map",
+            "--path", str(temp_dir),
+        ])
+
+        link_path = temp_dir / "visual-map" / "project-link.yaml"
+        with open(link_path) as f:
+            link = yaml.safe_load(f)
+
+        assert link["repo_name"] == "visual-map"
+
+    def test_repo_name_can_be_customized(self, temp_dir):
+        """--repo-name can be set to different value."""
+        result = runner.invoke(app, [
+            "create",
+            "--product-id", "visual-map",
+            "--name", "Visual Map",
+            "--ownership-mode", "managed_external",
+            "--repo-url", "https://github.com/user/amazing-visual-map",
+            "--repo-name", "amazing-visual-map",
+            "--path", str(temp_dir),
+        ])
+
+        link_path = temp_dir / "visual-map" / "project-link.yaml"
+        with open(link_path) as f:
+            link = yaml.safe_load(f)
+
+        assert link["repo_name"] == "amazing-visual-map"
+
+
 class TestNewProductList:
     """Tests for new-product list command."""
 
