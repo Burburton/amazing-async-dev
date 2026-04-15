@@ -184,3 +184,59 @@ duration: "[estimated_duration]"
 | Not updating RunState | **Execution incomplete** |
 | No evidence left | **Execution unverifiable** |
 | Missing DailyReviewPack | **Execution incomplete** |
+
+---
+
+## 9. Interactive Frontend Verification Gate (Feature 038)
+
+### 9.1 Classification Rule
+When executing a feature/task, determine `verification_type`:
+- `backend_only`: No browser verification required
+- `frontend_noninteractive`: Browser verification optional
+- `frontend_interactive`: Browser verification mandatory
+- `frontend_visual_behavior`: Browser verification mandatory
+- `mixed_app_workflow`: Browser verification mandatory for frontend portion
+
+### 9.2 Completion Gate (FR-7)
+A frontend-interactive task MUST NOT be marked `status: success` unless:
+1. `browser_verification.executed: true` and results recorded
+2. OR valid `browser_verification.exception_reason` recorded with explanation
+
+### 9.3 Playwright Invocation Policy (FR-9)
+When `verification_type` requires browser verification:
+- MUST invoke `/playwright` skill after server startup
+- MUST NOT stop at "server ready" without browser run
+- MUST capture evidence (scenarios, screenshots)
+
+### 9.4 Orchestration Continuation (FR-10)
+After server startup for frontend verification:
+- MUST continue to browser verification stage
+- MUST handle long-running server processes
+- MUST poll for server readiness before Playwright launch
+
+### 9.5 Exception Handling
+If browser verification cannot run, MUST record structured exception:
+
+| Exception Reason | When to Use |
+|------------------|-------------|
+| `playwright_unavailable` | Playwright tooling not available in environment |
+| `environment_blocked` | Environment constraints prevent execution |
+| `browser_install_failed` | Browser installation failed |
+| `ci_container_limitation` | CI/container environment cannot run browser |
+| `missing_credentials` | Required credentials not available for test path |
+| `deterministic_blocker` | Known blocker prevents meaningful verification |
+| `reclassified_noninteractive` | Feature reclassified as non-interactive |
+
+### 9.6 Evidence Requirements
+For browser verification, ExecutionResult MUST include:
+- `browser_verification.executed`: boolean
+- `browser_verification.passed`: count of passed scenarios
+- `browser_verification.failed`: count of failed scenarios
+- `browser_verification.scenarios_run`: list of executed scenarios
+- `browser_verification.screenshots`: paths to screenshot artifacts (optional)
+- `browser_verification.duration`: time spent
+
+### 9.7 Core Principle
+
+> **For interactive frontend work, environment setup is not verification.**
+> **Server startup is a prerequisite step, not a validation result.**
