@@ -106,6 +106,34 @@ Example: Continue with RunState and ExecutionPack schemas
 
 ## Optional Fields
 
+### browser_verification
+Browser-level verification evidence (Feature 038).
+
+```
+Required when verification_type is frontend_interactive, frontend_visual_behavior, or mixed_app_workflow.
+Example:
+  executed: true
+  passed: 5
+  failed: 0
+  skipped: 1
+  exception_reason: null (or valid reason if not executed)
+  scenarios_run:
+    - Navigate to home page
+    - Click login button
+  screenshots:
+    - screenshots/home.png
+  duration: 2m30s
+```
+
+Valid exception_reason values:
+- playwright_unavailable
+- environment_blocked
+- browser_install_failed
+- ci_container_limitation
+- missing_credentials
+- deterministic_blocker
+- reclassified_noninteractive
+
 ### metrics
 Execution metrics.
 
@@ -171,6 +199,17 @@ decisions_required:
 recommended_next_step: "[NEXT_ACTION]"
 
 # Optional
+browser_verification:
+  executed: [true|false]
+  passed: [COUNT]
+  failed: [COUNT]
+  skipped: [COUNT]
+  exception_reason: "[playwright_unavailable|environment_blocked|...]"
+  scenarios_run:
+    - "[SCENARIO_1]"
+  screenshots:
+    - "[SCREENSHOT_PATH]"
+  duration: "[DURATION]"
 metrics:
   files_read: [COUNT]
   files_written: [COUNT]

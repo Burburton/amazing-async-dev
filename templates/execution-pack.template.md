@@ -114,6 +114,19 @@ Example:
 
 ## Optional Fields
 
+### verification_type
+Classification of verification requirements (Feature 038).
+
+```
+Values: backend_only, frontend_noninteractive, frontend_interactive, frontend_visual_behavior, mixed_app_workflow
+Default: backend_only
+```
+
+When `frontend_interactive`, `frontend_visual_behavior`, or `mixed_app_workflow`:
+- Browser-level verification is mandatory
+- Playwright skill must be invoked after server startup
+- Evidence must be captured in ExecutionResult.browser_verification
+
 ### allowed_tools
 Tools AI may use.
 
@@ -168,6 +181,7 @@ stop_conditions:
   - "[CONDITION_2]"
 
 # Optional
+verification_type: "[backend_only|frontend_noninteractive|frontend_interactive|frontend_visual_behavior|mixed_app_workflow]"
 allowed_tools:
   - "[TOOL_1]"
   - "[TOOL_2]"
