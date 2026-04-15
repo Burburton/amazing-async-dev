@@ -621,6 +621,124 @@ info = store.get_recovery_info("001-auth")
 
 ---
 
+## Repository Modes (Feature 039)
+
+Feature 039 introduced explicit governance boundaries for artifact ownership.
+
+### Mode A: Self-Hosted Product Mode
+
+The product being developed is the current repository itself.
+
+**Examples:**
+- `amazing-async-dev` developing `amazing-async-dev`
+- `amazing-visual-map` developing itself in its own repo
+
+**Characteristics:**
+- Product repo == Working repo
+- All artifacts may coexist in `projects/{product_id}/`
+- No ownership boundary needed
+
+### Mode B: Managed External Product Mode
+
+`amazing-async-dev` orchestrates development of a separate real repository.
+
+**Examples:**
+- `amazing-async-dev` drives work on `amazing-visual-map`
+- `amazing-async-dev` drives work on another app/tool/site repo
+
+**Characteristics:**
+- Product repo != Orchestration repo
+- Artifact ownership must be split clearly
+- Project-link.yaml defines the boundary
+
+### Ownership Boundary
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     OWNERSHIP BOUNDARY (Mode B)                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   PRODUCT REPO (Product Truth)         ASYNC-DEV (Orchestration)   │
+│   ─────────────────────────            ────────────────────────     │
+│   • ProductBrief                       • ExecutionPack              │
+│   • FeatureSpec                        • ExecutionResult            │
+│   • Feature completion reports         • Orchestration runstate     │
+│   • Dogfood reports                    • Verification records       │
+│   • Friction logs                      • Continuation state         │
+│   • Phase summaries                    • Project-link.yaml          │
+│   • Product memory                     • Orchestration telemetry    │
+│   • North-star documents                                             │
+│                                                                      │
+│   Purpose: Product self-description   Purpose: How work was done   │
+│   Survives async-dev removal          Survives product unchanged   │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Core Principle
+
+> **Product truth should live with the product. Orchestration truth should live with the orchestrator.**
+
+### Decision Test
+
+Before creating/storing an artifact:
+
+1. **Does this describe the product?** → Product repo
+2. **Does this describe async-dev execution?** → async-dev
+3. **Would this matter if async-dev disappeared?** → Product repo
+4. **Would this matter if async-dev workflow changed but product unchanged?** → async-dev
+
+### Project-Link Metadata
+
+For Mode B, async-dev maintains a linkage record:
+
+```yaml
+product_id: "amazing-visual-map"
+repo_url: "https://github.com/Burburton/amazing-visual-map"
+ownership_mode: "managed_external"
+repo_local_path: "../amazing-visual-map"
+```
+
+This enables:
+- Product repo owns its canonical documents
+- async-dev owns orchestration metadata
+- Clear boundary prevents archive overreach
+
+### Anti-Patterns (FORBIDDEN)
+
+| Anti-Pattern | Problem |
+|--------------|---------|
+| Product Repo Hollowing | Product lacks its own canonical docs |
+| Orchestrator Archive Overreach | async-dev becomes product archive |
+| Mixed Ownership Without Boundary | Same artifact class stored unpredictably |
+
+---
+
+## Storage Locations (Extended)
+
+### Mode A: Self-Hosted
+| Object | Location Pattern |
+|--------|------------------|
+| ProductBrief | `projects/{product_id}/product-brief.md` |
+| FeatureSpec | `projects/{product_id}/features/{feature_id}/feature-spec.md` |
+| RunState | `projects/{product_id}/runstate.md` |
+| ExecutionPack | `projects/{product_id}/execution-packs/{execution_id}.md` |
+| ExecutionResult | `projects/{product_id}/execution-results/{execution_id}.md` |
+| DailyReviewPack | `projects/{product_id}/reviews/{date}-review.md` |
+
+### Mode B: Managed External
+| Object | Product Repo | async-dev |
+|--------|--------------|-----------|
+| ProductBrief | `projects/{product_id}/product-brief.md` | — |
+| FeatureSpec | `projects/{product_id}/features/{feature_id}/feature-spec.md` | — |
+| Dogfood/Friction | `projects/{product_id}/dogfood/`, `friction/` | — |
+| ExecutionPack | — | `projects/{product_id}/execution-packs/` |
+| ExecutionResult | — | `projects/{product_id}/execution-results/` |
+| RunState | — | `projects/{product_id}/runstate.md` |
+| ProjectLink | — | `projects/{product_id}/project-link.yaml` |
+
+---
+
 ## Next Steps
 
 After understanding this architecture:
@@ -628,3 +746,4 @@ After understanding this architecture:
 2. Read templates/ for usage patterns
 3. Read examples/ for concrete instances
 4. Try a day loop with demo product
+5. For managed external products, read docs/infra/039-artifact-ownership-storage-boundary.md
