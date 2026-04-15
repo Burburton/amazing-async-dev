@@ -1,0 +1,215 @@
+schema_type: project-link
+version: "1.0"
+description: Linkage metadata for managed external product repos (Feature 039)
+
+required:
+  - product_id
+  - repo_name
+  - repo_url
+  - ownership_mode
+
+optional:
+  - repo_local_path
+  - product_artifact_root
+  - orchestration_artifact_root
+  - current_phase
+  - last_execution_id
+  - last_checkpoint
+  - status
+  - sync_notes
+  - created_at
+  - updated_at
+
+fields:
+  product_id:
+    type: string
+    description: Unique identifier for the managed product
+    pattern: "^[a-z0-9-]+$"
+    example: "amazing-visual-map"
+    required: true
+
+  repo_name:
+    type: string
+    description: Repository name
+    example: "amazing-visual-map"
+    required: true
+
+  repo_url:
+    type: string
+    description: Remote repository URL
+    example: "https://github.com/Burburton/amazing-visual-map"
+    required: true
+
+  ownership_mode:
+    type: enum
+    description: Repository ownership mode determining artifact storage boundary
+    values:
+      - self_hosted
+      - managed_external
+    example: "managed_external"
+    required: true
+    default: "self_hosted"
+
+  repo_local_path:
+    type: string
+    description: Local filesystem path to product repo relative to async-dev (if available)
+    example: "../amazing-visual-map"
+    required: false
+
+  product_artifact_root:
+    type: string
+    description: Root path for product-owned artifacts within the product repo
+    example: "projects/amazing-visual-map"
+    required: false
+    default: "projects/{product_id}"
+
+  orchestration_artifact_root:
+    type: string
+    description: Root path for orchestration artifacts within async-dev
+    example: "projects/amazing-visual-map"
+    required: false
+    default: "projects/{product_id}"
+
+  current_phase:
+    type: string
+    description: Current development phase in the product repo
+    example: "phase-3-experience-refinement"
+    required: false
+
+  last_execution_id:
+    type: string
+    description: Most recent execution ID run for this product
+    pattern: "^exec-[0-9]{8}-[0-9]{3}$"
+    example: "exec-20260414-001"
+    required: false
+
+  last_checkpoint:
+    type: string
+    description: Last checkpoint event for this product
+    example: "iteration_completed"
+    required: false
+
+  status:
+    type: enum
+    description: Managed project status
+    values:
+      - active
+      - paused
+      - completed
+      - archived
+    example: "active"
+    required: false
+    default: "active"
+
+  sync_notes:
+    type: string
+    description: Notes about artifact sync state or migration status
+    example: "Product specs migrated to product repo. Orchestration artifacts remain in async-dev."
+    required: false
+
+  created_at:
+    type: datetime
+    description: When this project-link was created
+    example: "2026-04-15T10:00:00Z"
+    required: false
+
+  updated_at:
+    type: datetime
+    description: When this project-link was last updated
+    example: "2026-04-15T12:30:00Z"
+    required: false
+
+ownership_rules:
+  self_hosted:
+    description: Mode A - Product and orchestrator in same repository
+    product_artifacts_location: "projects/{product_id}/"
+    orchestration_artifacts_location: "projects/{product_id}/"
+    note: "All artifacts may coexist in same repo since product repo == working repo"
+
+  managed_external:
+    description: Mode B - Product in separate repository, async-dev orchestrates
+    product_artifacts_location: "Product repo: projects/{product_id}/"
+    orchestration_artifacts_location: "async-dev: projects/{product_id}/"
+    product_owns:
+      - "ProductBrief"
+      - "FeatureSpec"
+      - "Feature completion reports"
+      - "Dogfood reports"
+      - "Friction logs"
+      - "Phase summaries"
+      - "Product memory artifacts"
+      - "North-star documents"
+    orchestration_owns:
+      - "ExecutionPack"
+      - "ExecutionResult"
+      - "Orchestration runstate"
+      - "Verification records"
+      - "Continuation state"
+      - "Project-link metadata"
+      - "Orchestration telemetry"
+
+lifecycle:
+  created_by: new-product workflow or manual
+  update_frequency: low
+  update_triggers:
+    - "Execution completed"
+    - "Phase change"
+    - "Status change"
+    - "Migration progress"
+
+validation:
+  - product_id must match pattern
+  - repo_url must be valid URL format
+  - ownership_mode must be valid enum
+  - If managed_external, product_artifact_root and orchestration_artifact_root should be documented
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - product_id
+    - repo_name
+    - repo_url
+    - ownership_mode
+  properties:
+    product_id:
+      type: string
+      pattern: "^[a-z0-9-]+$"
+    repo_name:
+      type: string
+    repo_url:
+      type: string
+      format: uri
+    ownership_mode:
+      enum:
+        - self_hosted
+        - managed_external
+      default: self_hosted
+    repo_local_path:
+      type: string
+    product_artifact_root:
+      type: string
+    orchestration_artifact_root:
+      type: string
+    current_phase:
+      type: string
+    last_execution_id:
+      type: string
+      pattern: "^exec-[0-9]{8}-[0-9]{3}$"
+    last_checkpoint:
+      type: string
+    status:
+      enum:
+        - active
+        - paused
+        - completed
+        - archived
+      default: active
+    sync_notes:
+      type: string
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
