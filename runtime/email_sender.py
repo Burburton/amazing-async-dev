@@ -199,6 +199,96 @@ class EmailSender:
         ])
         
         return "\n".join(lines)
+    
+    def send_status_report(
+        self,
+        report: dict[str, Any],
+    ) -> tuple[bool, str | None]:
+        """Send status report email.
+        
+        Args:
+            report: Status report dict
+            
+        Returns:
+            (success, mock_path_if_mock_mode)
+        """
+        if self.config.delivery_mode == "mock_file":
+            return self._send_status_mock(report)
+        elif self.config.delivery_mode == "console":
+            return self._send_status_console(report)
+        else:
+            return self._send_status_smtp(report)
+    
+    def _send_status_mock(self, report: dict[str, Any]) -> tuple[bool, str]:
+        report_id = report.get("report_id", "unknown")
+        mock_path = self.config.mock_outbox_path / f"{report_id}.md"
+        
+        email_content = self._build_status_email_content(report)
+        
+        with open(mock_path, "w") as f:
+            f.write(email_content)
+        
+        return True, str(mock_path)
+    
+    def _send_status_console(self, report: dict[str, Any]) -> tuple[bool, None]:
+        email_content = self._build_status_email_content(report)
+        print("\n" + "="*60)
+        print("STATUS REPORT EMAIL (console mode)")
+        print("="*60)
+        print(email_content)
+        print("="*60 + "\n")
+        return True, None
+    
+    def _send_status_smtp(self, report: dict[str, Any]) -> tuple[bool, None]:
+        if not self.config.is_smtp_configured():
+            return False, None
+        
+        to_address = self.config.to_address
+        
+        subject = self._build_status_subject(report)
+        body = self._build_status_body(report)
+        
+        msg = MIMEMultipart()
+        msg["From"] = self.config.from_address
+        msg["To"] = to_address
+        msg["Subject"] = subject
+        
+        msg.attach(MIMEText(body, "plain"))
+        
+        try:
+            with smtplib.SMTP(self.config.smtp_host, self.config.smtp_port, timeout=30) as server:
+                if self.config.smtp_use_tls:
+                    server.starttls()
+                server.login(self.config.smtp_username, self.config.smtp_password)
+                server.sendmail(self.config.from_address, [to_address], msg.as_string())
+            return True, None
+        except Exception:
+            return False, None
+    
+    def _build_status_email_content(self, report: dict[str, Any]) -> str:
+        subject = self._build_status_subject(report)
+        body = self._build_status_body(report)
+        return f"Subject: {subject}\n\n{body}"
+    
+    def _build_status_subject(self, report: dict[str, Any]) -> str:
+        report_type = report.get("report_type", "progress")
+        project_id = report.get("project_id", "")
+        report_id = report.get("report_id", "")
+        
+        type_labels = {
+            "progress": "Progress",
+            "milestone": "Milestone",
+            "blocker": "BLOCKER",
+            "dogfood": "Dogfood",
+        }
+        
+        type_label = type_labels.get(report_type, "Status")
+        
+        return f"{self.config.subject_prefix} {type_label}: {project_id} [{report_id}]"
+    
+    def _build_status_body(self, report: dict[str, Any]) -> str:
+        from runtime.status_report_builder import format_report_for_email
+        return format_report_for_email(report)
 
 
 def create_email_config(runtime_path: Path) -> EmailConfig:
@@ -223,3 +313,21 @@ def send_decision_email(
     config = create_email_config(runtime_path)
     sender = EmailSender(config)
     return sender.send_decision_request(request)
+
+
+def send_status_report_email(
+    report: dict[str, Any],
+    runtime_path: Path,
+) -> tuple[bool, str | None]:
+    """Send status report email using configured mode (Feature 044).
+    
+    Args:
+        report: Status report dict
+        runtime_path: Runtime path for config
+        
+    Returns:
+        (success, mock_path_if_mock)
+    """
+    config = create_email_config(runtime_path)
+    sender = EmailSender(config)
+    return sender.send_status_report(report)

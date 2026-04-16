@@ -2,6 +2,7 @@
 
 Feature 034: Enriched with prior-night decision pack alignment.
 Feature 037: Integrated continuation semantics for checkpoint-based progression.
+Feature 043: Integrated email decision reconciliation and sync.
 """
 
 from datetime import datetime
@@ -30,6 +31,11 @@ from runtime.continuation_evaluator import (
     should_auto_proceed_to_next_stage,
 )
 from runtime.continuation_types import ExecutionState
+from runtime.decision_sync import (
+    reconcile_decision_sources,
+    get_decision_status_summary,
+    apply_email_resolution_to_runstate,
+)
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import get_relative_path
 
@@ -193,6 +199,30 @@ def continue_loop(
     if review_pack:
         context = _extract_continuation_context(review_pack)
         _display_prior_context(context)
+
+    unified_decisions = reconcile_decision_sources(project_path)
+    
+    if unified_decisions.get("has_discrepancies"):
+        console.print("\n[bold yellow]Decision Discrepancies Detected[/bold yellow]")
+        for disc in unified_decisions.get("discrepancies", []):
+            console.print(f"  [yellow]• {disc.get('message', disc.get('type', 'Unknown'))}[/yellow]")
+    
+    if unified_decisions.get("pending_email_decisions"):
+        console.print("\n[bold cyan]Email Decisions Pending[/bold cyan]")
+        for req in unified_decisions["pending_email_decisions"]:
+            req_id = req.get("decision_request_id", "")
+            question = req.get("question", "")
+            console.print(f"  [cyan]• {req_id}: {question[:50]}[/cyan]")
+    
+    if unified_decisions.get("email_decision_resolved"):
+        console.print("\n[bold green]Email Decision Resolved[/bold green]")
+        console.print(f"  [green]• Request: {unified_decisions.get('resolved_request_id', 'unknown')}[/green]")
+        console.print(f"  [green]• Reply: {unified_decisions.get('resolved_reply', {}).get('reply_value', '')}[/green]")
+        
+        updated_runstate = apply_email_resolution_to_runstate(project_path)
+        if updated_runstate:
+            runstate = updated_runstate
+            console.print("[cyan]Applied email resolution to RunState[/cyan]")
 
     feature_id = runstate.get("feature_id", "")
     product_id = runstate.get("project_id", "")

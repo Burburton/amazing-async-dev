@@ -27,6 +27,9 @@ optional:
   - continuation_allowed
   - next_intended_stage
   - continuation_candidate_actions
+  - decision_request_pending
+  - decision_request_sent_at
+  - last_decision_resolution
 
 fields:
   project_id:
@@ -212,6 +215,42 @@ fields:
       - "Enter dogfood stage"
     required: false
 
+  decision_request_pending:
+    type: string
+    description: ID of active decision request awaiting email reply (Feature 043)
+    example: "dr-20260416-001"
+    required: false
+
+  decision_request_sent_at:
+    type: datetime
+    description: When decision request email was sent (Feature 043)
+    example: "2026-04-16T10:30:00"
+    required: false
+
+  last_decision_resolution:
+    type: object
+    description: Last resolved decision from email reply (Feature 043)
+    properties:
+      request_id:
+        type: string
+        example: "dr-20260416-001"
+      reply_command:
+        type: string
+        example: "DECISION A"
+      reply_type:
+        type: string
+        example: "DECISION"
+      selected_option:
+        type: string
+        example: "A"
+      resolved_at:
+        type: datetime
+        example: "2026-04-16T14:00:00"
+      applied_action:
+        type: string
+        example: "select_option"
+    required: false
+
 lifecycle:
   created_by: plan-day workflow
   update_frequency: high
@@ -365,3 +404,24 @@ json_schema:
             type: string
           requires_confirmation:
             type: boolean
+    decision_request_pending:
+      type: string
+    decision_request_sent_at:
+      type: string
+      format: date-time
+    last_decision_resolution:
+      type: object
+      properties:
+        request_id:
+          type: string
+        reply_command:
+          type: string
+        reply_type:
+          type: string
+        selected_option:
+          type: string
+        resolved_at:
+          type: string
+          format: date-time
+        applied_action:
+          type: string

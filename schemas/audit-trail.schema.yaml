@@ -1,0 +1,291 @@
+schema_type: audit-trail
+version: "1.0"
+description: End-to-end audit trail for decision/reporting loop (Feature 047)
+
+required:
+  - audit_id
+  - chain_type
+  - project_id
+  - created_at
+
+optional:
+  - outbound_request_id
+  - outbound_report_id
+  - outbound_sent_at
+  - outbound_channel
+  - outbound_artifact_path
+  - inbound_reply_id
+  - inbound_received_at
+  - inbound_reply_raw
+  - inbound_parsed_command
+  - inbound_parsed_argument
+  - inbound_validation_status
+  - decision_applied_at
+  - decision_applied_action
+  - decision_runstate_before
+  - decision_runstate_after
+  - decision_continuation_phase
+  - missing_links_detected
+  - missing_links_details
+
+fields:
+  audit_id:
+    type: string
+    description: Unique audit trail identifier
+    pattern: "audit-YYYYMMDD-###"
+    example: "audit-20260416-001"
+    required: true
+
+  chain_type:
+    type: enum
+    description: Type of audit chain
+    values:
+      - decision_request_chain
+      - status_report_chain
+    example: "decision_request_chain"
+    required: true
+
+  project_id:
+    type: string
+    description: Project context
+    example: "amazing-async-dev"
+    required: true
+
+  created_at:
+    type: datetime
+    description: When audit record was created
+    example: "2026-04-16T10:30:00"
+    required: true
+
+  outbound_request_id:
+    type: string
+    description: Decision request ID sent (for decision chains)
+    example: "dr-20260416-001"
+    required: false
+
+  outbound_report_id:
+    type: string
+    description: Status report ID sent (for report chains)
+    example: "sr-20260416-001"
+    required: false
+
+  outbound_sent_at:
+    type: datetime
+    description: When outbound message was sent
+    example: "2026-04-16T10:30:00"
+    required: false
+
+  outbound_channel:
+    type: enum
+    description: Delivery channel used
+    values:
+      - email
+      - mock_file
+      - console
+    example: "mock_file"
+    required: false
+
+  outbound_artifact_path:
+    type: string
+    description: Path to outbound artifact (email mock file)
+    example: ".runtime/email-outbox/dr-001.md"
+    required: false
+
+  inbound_reply_id:
+    type: string
+    description: Reply identifier
+    example: "reply-20260416-001"
+    required: false
+
+  inbound_received_at:
+    type: datetime
+    description: When reply was received
+    example: "2026-04-16T14:00:00"
+    required: false
+
+  inbound_reply_raw:
+    type: string
+    description: Raw reply text
+    example: "DECISION A"
+    required: false
+
+  inbound_parsed_command:
+    type: string
+    description: Parsed reply command
+    example: "DECISION"
+    required: false
+
+  inbound_parsed_argument:
+    type: string
+    description: Parsed reply argument
+    example: "A"
+    required: false
+
+  inbound_validation_status:
+    type: enum
+    description: Reply validation result
+    values:
+      - valid
+      - invalid_syntax
+      - invalid_option
+      - duplicate
+      - expired
+    example: "valid"
+    required: false
+
+  decision_applied_at:
+    type: datetime
+    description: When decision was applied to RunState
+    example: "2026-04-16T14:05:00"
+    required: false
+
+  decision_applied_action:
+    type: string
+    description: Action taken from decision
+    example: "select_option"
+    required: false
+
+  decision_runstate_before:
+    type: object
+    description: RunState snapshot before decision applied
+    properties:
+      phase:
+        type: string
+      decisions_needed_count:
+        type: integer
+    required: false
+
+  decision_runstate_after:
+    type: object
+    description: RunState snapshot after decision applied
+    properties:
+      phase:
+        type: string
+      decisions_needed_count:
+        type: integer
+    required: false
+
+  decision_continuation_phase:
+    type: string
+    description: Phase set for continuation after decision
+    example: "planning"
+    required: false
+
+  missing_links_detected:
+    type: boolean
+    description: Whether missing links were found in chain
+    example: false
+    required: false
+
+  missing_links_details:
+    type: array
+    description: Details of missing links detected
+    items_type: object
+    example:
+      - stage: "inbound_reply"
+        expected: "Should have reply after sent request"
+        actual: "No reply recorded"
+    required: false
+
+chain_stages:
+  decision_request_chain:
+    stages:
+      - outbound_request_sent
+      - inbound_reply_received
+      - inbound_parsed
+      - decision_applied
+      - execution_continued
+
+  status_report_chain:
+    stages:
+      - outbound_report_sent
+      - informational_only
+
+linkage_rules:
+  decision_request_chain:
+    outbound_request_id: required
+    inbound_reply_id: required if reply received
+    decision_applied_at: required if resolved
+
+  status_report_chain:
+    outbound_report_id: required
+    inbound_reply_id: optional (reports may not need reply)
+
+missing_link_detection:
+  checks:
+    - stage_missing: "Stage in expected sequence not recorded"
+    - timestamp_gap: "Unusual time gap between stages (>24h)"
+    - orphaned_request: "Request sent but no reply recorded"
+    - orphaned_reply: "Reply received but no request found"
+    - unapplied_decision: "Decision parsed but not applied"
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - audit_id
+    - chain_type
+    - project_id
+    - created_at
+  properties:
+    audit_id:
+      type: string
+      pattern: "^audit-[0-9]{8}-[0-9]{3}$"
+    chain_type:
+      enum:
+        - decision_request_chain
+        - status_report_chain
+    project_id:
+      type: string
+    created_at:
+      type: string
+      format: date-time
+    outbound_request_id:
+      type: string
+    outbound_report_id:
+      type: string
+    outbound_sent_at:
+      type: string
+      format: date-time
+    outbound_channel:
+      enum:
+        - email
+        - mock_file
+        - console
+    outbound_artifact_path:
+      type: string
+    inbound_reply_id:
+      type: string
+    inbound_received_at:
+      type: string
+      format: date-time
+    inbound_reply_raw:
+      type: string
+    inbound_parsed_command:
+      type: string
+    inbound_parsed_argument:
+      type: string
+    inbound_validation_status:
+      enum:
+        - valid
+        - invalid_syntax
+        - invalid_option
+        - duplicate
+        - expired
+    decision_applied_at:
+      type: string
+      format: date-time
+    decision_applied_action:
+      type: string
+    decision_runstate_before:
+      type: object
+    decision_runstate_after:
+      type: object
+    decision_continuation_phase:
+      type: string
+    missing_links_detected:
+      type: boolean
+    missing_links_details:
+      type: array
+      items:
+        type: object

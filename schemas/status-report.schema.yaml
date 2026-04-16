@@ -1,0 +1,233 @@
+schema_type: status-report
+version: "1.0"
+description: High-signal status report format for email delivery (Feature 044)
+
+required:
+  - report_id
+  - report_type
+  - project_id
+  - feature_id
+  - summary
+  - what_changed
+  - current_state
+  - reply_required
+
+optional:
+  - risks_blockers
+  - next_step
+  - evidence_links
+  - metrics
+  - created_at
+  - recommendation_type
+  - recommendation_why
+  - continuation_status
+
+fields:
+  report_id:
+    type: string
+    description: Unique report identifier
+    example: "sr-20260416-001"
+    required: true
+    pattern: "sr-YYYYMMDD-###"
+
+  report_type:
+    type: enum
+    description: Type of status report
+    values:
+      - progress
+      - milestone
+      - blocker
+      - dogfood
+    example: "progress"
+    required: true
+
+  project_id:
+    type: string
+    description: Project identifier
+    example: "amazing-async-dev"
+    required: true
+
+  feature_id:
+    type: string
+    description: Feature identifier
+    example: "044"
+    required: true
+
+  summary:
+    type: string
+    description: One-line summary (max 50 chars ideal)
+    example: "Progress: 3 items completed, working on tests"
+    required: true
+    max_length: 100
+
+  what_changed:
+    type: array
+    description: List of changes made (max 5 items)
+    items_type: string
+    example:
+      - "Created status_report_builder.py"
+      - "Added send_status_report to email_sender"
+    required: true
+    max_items: 5
+
+  current_state:
+    type: string
+    description: Current execution state
+    example: "Executing: test_status_report.py"
+    required: true
+
+  risks_blockers:
+    type: array
+    description: Current risks or blockers
+    items_type: string
+    example:
+      - "API timeout issue"
+      - "Missing dependency"
+    required: false
+
+  next_step:
+    type: string
+    description: Recommended next step
+    example: "Continue with CLI integration"
+    required: false
+    default: "Continue execution"
+
+  reply_required:
+    type: boolean
+    description: Whether reply is needed
+    example: false
+    required: true
+
+  evidence_links:
+    type: array
+    description: Links to evidence artifacts
+    items_type: string
+    example:
+      - "tests/test_status_report.py"
+      - ".runtime/email-outbox/sr-001.md"
+    required: false
+
+  metrics:
+    type: object
+    description: Optional metrics
+    example:
+      tests_passed: 15
+      files_created: 2
+    required: false
+
+  created_at:
+    type: datetime
+    description: When report was created
+    example: "2026-04-16T10:30:00"
+    required: false
+
+  recommendation_type:
+    type: enum
+    description: Type of recommendation (Feature 045)
+    values:
+      - recommendation
+      - required_decision
+      - optional_future_work
+    example: "recommendation"
+    required: false
+
+  recommendation_why:
+    type: string
+    description: Brief explanation of why this is recommended (Feature 045)
+    example: "Natural progression from completed work"
+    required: false
+    max_length: 80
+
+  continuation_status:
+    type: enum
+    description: Whether system can continue autonomously (Feature 045)
+    values:
+      - autonomous_possible
+      - needs_input
+      - blocked
+    example: "autonomous_possible"
+    required: false
+
+report_types:
+  progress:
+    description: Regular progress update
+    reply_default: false
+    max_items: 3
+    
+  milestone:
+    description: Milestone closure notification
+    reply_default: false
+    max_items: 5
+    
+  blocker:
+    description: Blocker notification requiring attention
+    reply_default: true
+    max_items: 2
+    
+  dogfood:
+    description: Dogfood test results
+    reply_default: false
+    max_items: 5
+
+formatting_rules:
+  one_screen_target: true
+  summary_max_chars: 50
+  what_changed_max_items: 5
+  risks_max_items: 2
+  no_log_dump: true
+  evidence_links_optional: true
+  reply_explicit: true
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - report_id
+    - report_type
+    - project_id
+    - feature_id
+    - summary
+    - what_changed
+    - current_state
+    - reply_required
+  properties:
+    report_id:
+      type: string
+      pattern: "^sr-[0-9]{8}-[0-9]{3}$"
+    report_type:
+      enum:
+        - progress
+        - milestone
+        - blocker
+        - dogfood
+    project_id:
+      type: string
+    feature_id:
+      type: string
+    summary:
+      type: string
+      maxLength: 100
+    what_changed:
+      type: array
+      maxItems: 5
+      items:
+        type: string
+    current_state:
+      type: string
+    risks_blockers:
+      type: array
+      items:
+        type: string
+    next_step:
+      type: string
+    reply_required:
+      type: boolean
+    evidence_links:
+      type: array
+      items:
+        type: string
+    metrics:
+      type: object
+    created_at:
+      type: string
+      format: date-time

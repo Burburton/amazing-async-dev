@@ -22,6 +22,9 @@ from runtime.reply_parser import (
     ValidationStatus,
     ReplyCommand,
 )
+from runtime.decision_sync import sync_decision_to_runstate, sync_reply_to_runstate
+from runtime.reply_action_mapper import map_reply_to_action
+from runtime.state_store import StateStore
 
 app = typer.Typer(help="Async decision channel (Feature 021)")
 console = Console()
@@ -95,10 +98,21 @@ def create(
                 mock_path=mock_path,
             )
             console.print(f"[green]Email sent (mock): {mock_path}[/green]")
+            
+            state_store = StateStore(project_path)
+            runstate = state_store.load_runstate() or {}
+            runstate = sync_decision_to_runstate(request, runstate)
+            state_store.save_runstate(runstate)
+            console.print("[cyan]Synced to RunState.decisions_needed[/cyan]")
         else:
             console.print("[red]Failed to send[/red]")
     
     if not send:
+        state_store = StateStore(project_path)
+        runstate = state_store.load_runstate() or {}
+        runstate = sync_decision_to_runstate(request, runstate)
+        state_store.save_runstate(runstate)
+        console.print("[cyan]Synced to RunState.decisions_needed[/cyan]")
         console.print("[yellow]Created but not sent. Use --send to send.[/yellow]")
 
 
@@ -287,6 +301,13 @@ def reply(
         reply_raw_text=command,
     )
     
+    action = map_reply_to_action(parsed, request)
+    
+    state_store = StateStore(project_path)
+    runstate = state_store.load_runstate() or {}
+    runstate = sync_reply_to_runstate(request_id, reply_record, runstate, action)
+    state_store.save_runstate(runstate)
+    
     console.print(Panel(
         f"Request: {request_id}\n"
         f"Reply: {command}\n"
@@ -296,10 +317,12 @@ def reply(
     ))
     
     console.print(f"\n[green]Decision resolved: {command}[/green]")
+    console.print(f"[cyan]Action: {action['runstate_action']}[/cyan]")
+    console.print(f"[cyan]Next: {action['next_recommended']}[/cyan]")
     
     next_action = request.get("recommended_next_action_after_reply")
     if next_action:
-        console.print(f"[cyan]Next action: {next_action}[/cyan]")
+        console.print(f"[dim]After reply: {next_action}[/dim]")
 
 
 @app.command()
@@ -384,3 +407,75 @@ def stats(
         table.add_row(status, str(count))
     
     console.print(table)
+
+
+@app.command()
+def status_report(
+    project: str = typer.Option(..., help="Product ID"),
+    feature: str = typer.Option("", help="Feature ID"),
+    type: str = typer.Option("progress", help="Report type (progress/milestone/blocker/dogfood)"),
+    summary: str = typer.Option("", help="One-line summary"),
+    changes: str = typer.Option("", help="Changes (comma-separated)"),
+    state: str = typer.Option("active", help="Current state"),
+    risks: str = typer.Option("", help="Risks/blockers (comma-separated)"),
+    next: str = typer.Option("", help="Next step"),
+    reply: bool = typer.Option(False, help="Whether reply is required"),
+    send: bool = typer.Option(True, help="Send after creating"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Create and send a high-signal status report (Feature 044).
+    
+    Example:
+        asyncdev email-decision status-report --project my-app --feature 001 \
+            --type progress --summary "Progress: 3 items done" \
+            --changes "item1,item2,item3" --state "testing"
+    """
+    from runtime.status_report_builder import build_status_report, format_report_for_email
+    from runtime.email_sender import create_email_config, EmailSender
+    
+    project_path = path / project
+    
+    what_changed = [c.strip() for c in changes.split(",")] if changes else []
+    risks_blockers = [r.strip() for r in risks.split(",")] if risks else None
+    
+    if type not in ["progress", "milestone", "blocker", "dogfood"]:
+        type = "progress"
+    
+    if not summary:
+        summary = f"{type.capitalize()} update for {project}/{feature}"
+    
+    report = build_status_report(
+        report_type=type,
+        project_id=project,
+        feature_id=feature,
+        summary=summary,
+        what_changed=what_changed,
+        current_state=state,
+        risks_blockers=risks_blockers,
+        next_step=next if next else None,
+        reply_required=reply,
+    )
+    
+    console.print(Panel(
+        f"Report ID: {report['report_id']}\n"
+        f"Type: {type}\n"
+        f"Summary: {summary[:40]}...\n"
+        f"Changes: {len(what_changed)} items\n"
+        f"Reply required: {reply}",
+        title="Status Report Created",
+        border_style="green"
+    ))
+    
+    if send:
+        config = create_email_config(project_path)
+        sender = EmailSender(config)
+        success, mock_path = sender.send_status_report(report)
+        
+        if success:
+            console.print(f"[green]Report sent (mock): {mock_path}[/green]")
+        else:
+            console.print("[red]Failed to send[/red]")
+    
+    if not send:
+        console.print("\n[bold]Report Preview:[/bold]")
+        console.print(format_report_for_email(report))
