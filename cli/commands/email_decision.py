@@ -479,3 +479,84 @@ def status_report(
     if not send:
         console.print("\n[bold]Report Preview:[/bold]")
         console.print(format_report_for_email(report))
+
+
+@app.command()
+def escalation_check(
+    project: str = typer.Option(..., help="Product ID"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+    trigger: str = typer.Option(None, help="Trigger type to check"),
+):
+    """Check if email should be sent based on escalation policy (Feature 048).
+    
+    Example:
+        asyncdev email-decision escalation-check --project my-app
+        asyncdev email-decision escalation-check --project my-app --trigger escalation_blocker
+    """
+    from runtime.email_escalation_policy import (
+        EmailTriggerType,
+        should_send_email,
+        get_appropriate_triggers_for_runstate,
+        format_escalation_summary,
+        classify_email_type,
+        get_email_urgency,
+    )
+    from runtime.state_store import StateStore
+    
+    project_path = path / project
+    store = StateStore(project_path)
+    runstate = store.load_runstate()
+    
+    if not runstate:
+        console.print("[red]No RunState found[/red]")
+        raise typer.Exit(1)
+    
+    triggers = get_appropriate_triggers_for_runstate(runstate)
+    
+    if trigger:
+        try:
+            trigger_type = EmailTriggerType(trigger)
+            triggers = [trigger_type]
+        except ValueError:
+            console.print(f"[red]Invalid trigger: {trigger}[/red]")
+            console.print(f"[yellow]Valid triggers: {[t.value for t in EmailTriggerType]}[/yellow]")
+            raise typer.Exit(1)
+    
+    if not triggers:
+        console.print("[green]No escalation triggers detected[/green]")
+        console.print("[dim]RunState has no blockers, decisions, or risky actions[/dim]")
+        return
+    
+    console.print(f"[cyan]Found {len(triggers)} potential triggers[/cyan]")
+    
+    table = Table(title="Escalation Policy Check")
+    table.add_column("Trigger", style="cyan")
+    table.add_column("Should Send", style="green")
+    table.add_column("Urgency", style="yellow")
+    table.add_column("Email Type", style="magenta")
+    table.add_column("Reason", style="white")
+    
+    for trigger_type in triggers:
+        should, reason, explanation = should_send_email(runstate, trigger_type)
+        urgency = get_email_urgency(trigger_type)
+        email_type, email_desc = classify_email_type(trigger_type)
+        
+        table.add_row(
+            trigger_type.value,
+            str(should),
+            urgency.value,
+            email_type,
+            explanation[:50] if explanation else "",
+        )
+    
+    console.print(table)
+    
+    console.print("\n[bold]Policy Mode:[/bold] " + runstate.get("policy_mode", "balanced"))
+    
+    blockers = runstate.get("blocked_items", [])
+    decisions = runstate.get("decisions_needed", [])
+    risky = runstate.get("pending_risky_actions", [])
+    
+    console.print(f"[bold]Blocked Items:[/bold] {len(blockers)}")
+    console.print(f"[bold]Decisions Needed:[/bold] {len(decisions)}")
+    console.print(f"[bold]Risky Actions:[/bold] {len(risky)}")
