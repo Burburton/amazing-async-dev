@@ -560,3 +560,171 @@ def escalation_check(
     console.print(f"[bold]Blocked Items:[/bold] {len(blockers)}")
     console.print(f"[bold]Decisions Needed:[/bold] {len(decisions)}")
     console.print(f"[bold]Risky Actions:[/bold] {len(risky)}")
+
+
+@app.command()
+def failures(
+    project: str = typer.Option(..., help="Product ID"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+    unresolved: bool = typer.Option(False, help="Show only unresolved failures"),
+    request_id: str = typer.Option(None, help="Filter by request ID"),
+):
+    """List email channel failure records (Feature 049).
+    
+    Example:
+        asyncdev email-decision failures --project my-app
+        asyncdev email-decision failures --project my-app --unresolved
+        asyncdev email-decision failures --project my-app --request-id dr-001
+    """
+    from runtime.email_failure_handler import FailureRecordStore
+    
+    project_path = path / project
+    store = FailureRecordStore(project_path)
+    
+    failures = store.list_failures(
+        request_id=request_id,
+        unresolved_only=unresolved,
+    )
+    
+    if not failures:
+        console.print("[green]No failure records found[/green]")
+        return
+    
+    table = Table(title="Email Channel Failures")
+    table.add_column("Failure ID", style="cyan")
+    table.add_column("Request", style="blue")
+    table.add_column("Type", style="yellow")
+    table.add_column("Resolved", style="green")
+    table.add_column("Occurred", style="magenta")
+    
+    for failure in failures:
+        table.add_row(
+            failure.get("failure_id", ""),
+            failure.get("request_id", ""),
+            failure.get("failure_type", ""),
+            str(failure.get("resolved", False)),
+            failure.get("occurred_at", "")[:19],
+        )
+    
+    console.print(table)
+    
+    unresolved_count = len([f for f in failures if not f.get("resolved")])
+    console.print(f"\n[bold]Total:[/bold] {len(failures)} failures, {unresolved_count} unresolved")
+
+
+@app.command()
+def resolve_failure(
+    project: str = typer.Option(..., help="Product ID"),
+    failure_id: str = typer.Option(..., "--id", help="Failure ID"),
+    action: str = typer.Option("pause_for_human", help="Recovery action"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Resolve a failure record (Feature 049).
+    
+    Example:
+        asyncdev email-decision resolve-failure --project my-app --id fail-001 --action retry_send
+    """
+    from runtime.email_failure_handler import FailureRecordStore, RecoveryAction
+    
+    project_path = path / project
+    store = FailureRecordStore(project_path)
+    
+    try:
+        recovery = RecoveryAction(action)
+    except ValueError:
+        console.print(f"[red]Invalid action: {action}[/red]")
+        console.print(f"[yellow]Valid actions: {[a.value for a in RecoveryAction]}[/yellow]")
+        raise typer.Exit(1)
+    
+    resolved = store.resolve_failure(failure_id, recovery)
+    
+    if not resolved:
+        console.print(f"[red]Failure not found: {failure_id}[/red]")
+        raise typer.Exit(1)
+    
+    console.print(Panel(
+        f"Failure ID: {failure_id}\n"
+        f"Action: {action}\n"
+        f"Resolved At: {resolved.get('resolved_at', '')}",
+        title="Failure Resolved",
+        border_style="green"
+    ))
+
+
+@app.command()
+def check_timeout(
+    project: str = typer.Option(..., help="Product ID"),
+    request_id: str = typer.Option(None, "--id", help="Check specific request"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Check for timeout conditions on pending requests (Feature 049).
+    
+    Example:
+        asyncdev email-decision check-timeout --project my-app
+        asyncdev email-decision check-timeout --project my-app --id dr-001
+    """
+    from runtime.email_failure_handler import (
+        handle_timeout,
+        get_timeout_policy,
+        FailureRecordStore,
+    )
+    from runtime.decision_request_store import DecisionRequestStore, DecisionRequestStatus
+    
+    project_path = path / project
+    req_store = DecisionRequestStore(project_path)
+    fail_store = FailureRecordStore(project_path)
+    
+    pending = req_store.list_requests(status=DecisionRequestStatus.SENT)
+    
+    if request_id:
+        pending = [r for r in pending if r.get("decision_request_id") == request_id]
+    
+    if not pending:
+        console.print("[green]No pending requests to check[/green]")
+        return
+    
+    console.print(f"[cyan]Checking {len(pending)} pending requests[/cyan]")
+    
+    table = Table(title="Timeout Check")
+    table.add_column("Request ID", style="cyan")
+    table.add_column("Sent At", style="blue")
+    table.add_column("Hours Elapsed", style="yellow")
+    table.add_column("Policy", style="magenta")
+    table.add_column("Needs Timeout", style="green")
+    
+    timeout_count = 0
+    
+    for req in pending:
+        sent_at = req.get("sent_at")
+        if sent_at:
+            sent_dt = datetime.fromisoformat(sent_at)
+            hours_elapsed = (datetime.now() - sent_dt).total_seconds() / 3600
+            
+            category = req.get("pause_reason_category", "technical")
+            policy_mode = req.get("policy_mode", "balanced")
+            timeout_behavior = get_timeout_policy(policy_mode, category)
+            
+            needs_timeout = hours_elapsed >= 48
+            
+            if needs_timeout:
+                timeout_count += 1
+                fail_store.record_failure(
+                    req.get("decision_request_id"),
+                    "timeout_no_reply",
+                    {"hours_elapsed": hours_elapsed},
+                )
+            
+            table.add_row(
+                req.get("decision_request_id", ""),
+                sent_at[:19],
+                f"{hours_elapsed:.1f}",
+                timeout_behavior.value,
+                str(needs_timeout),
+            )
+    
+    console.print(table)
+    
+    if timeout_count > 0:
+        console.print(f"\n[yellow]{timeout_count} requests need timeout handling[/yellow]")
+    else:
+        console.print(f"\n[green]All requests within timeout threshold[/green]")
