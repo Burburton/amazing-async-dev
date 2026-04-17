@@ -214,6 +214,20 @@ class TestResendProvider:
         assert isinstance(result, tuple)
         assert len(result) == 2
 
+    def test_test_connection_with_custom_recipient(self):
+        os.environ["RESEND_API_KEY"] = "re_test"
+        os.environ["RESEND_FROM_EMAIL"] = "sender@test.com"
+        
+        provider = ResendProvider(ResendConfig())
+        
+        success, explanation = provider.test_connection(to="custom@test.com")
+        
+        assert isinstance(success, bool)
+        assert isinstance(explanation, str)
+        
+        os.environ.pop("RESEND_API_KEY", None)
+        os.environ.pop("RESEND_FROM_EMAIL", None)
+
 
 class TestResendWebhookHandler:
     def test_handle_event_returns_dict(self):

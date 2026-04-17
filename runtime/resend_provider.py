@@ -212,9 +212,12 @@ class ResendProvider:
         except Exception as e:
             return False, None, {"error": str(e)}
     
-    def test_connection(self) -> tuple[bool, str]:
+    def test_connection(self, to: str | None = None) -> tuple[bool, str]:
         """Test Resend API connection.
         
+        Args:
+            to: Optional recipient email (default: RESEND_TEST_ADDRESS)
+            
         Returns:
             (success, explanation)
         """
@@ -224,14 +227,16 @@ class ResendProvider:
         if not self.config.from_email:
             return False, "No from_email configured"
         
+        recipient = to or RESEND_TEST_ADDRESS
+        
         success, message_id, response = self.send_email(
-            to=RESEND_TEST_ADDRESS,
+            to=recipient,
             subject="Test connection from async-dev",
             text="This is a test email to verify Resend integration.",
         )
         
         if success:
-            return True, f"Test email sent successfully. Message ID: {message_id}"
+            return True, f"Test email sent successfully to {recipient}. Message ID: {message_id}"
         else:
             return False, f"Failed: {response.get('error', 'Unknown error')}"
 
