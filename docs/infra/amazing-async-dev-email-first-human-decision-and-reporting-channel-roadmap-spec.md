@@ -445,6 +445,30 @@ Extend the channel once the baseline email system is real, trustworthy, and usef
 
 ---
 
+## Feature 053 — Resend Email Provider Integration
+### Objective
+Integrate Resend as the real email transport/provider for the existing Email-First Human Decision & Reporting Channel.
+
+### Scope
+- integrate Resend for outbound email sending
+- support decision requests, status reports, and blocker emails
+- persist provider-specific message metadata
+- define inbound handling path for replies/events
+- connect inbound email flow to existing decision/reply pipeline
+- integrate provider failures with existing robustness/failure-handling logic
+- define configuration, secrets, and environment expectations
+- support safe testing modes (mock/sandbox/dry-run)
+
+### Acceptance criteria
+- outbound emails sent via Resend API
+- message ID persisted in decision request record
+- webhook handler receives and parses inbound replies
+- reply linked to original decision request
+- integration with existing reply pipeline (Feature 043)
+- API errors handled via Feature 049 failure handling
+
+---
+
 ## Feature 050 — new-product / project-link Email Channel Integration
 ### Objective
 Integrate email contact and decision-channel setup into project bootstrap flows.
@@ -504,14 +528,16 @@ Recommended sequence for `async-dev` / `opencode`:
 7. **047** — audit trail
 8. **048** — escalation integration
 9. **049** — robustness
-10. **046** — best-practice reporting iteration pack
-11. **050** — bootstrap integration
-12. **051** — digest modes
-13. **052** — adapter readiness
+10. **053** — Resend email provider integration (production transport)
+11. **046** — best-practice reporting iteration pack
+12. **050** — bootstrap integration
+13. **051** — digest modes
+14. **052** — adapter readiness
 
 Notes:
 - `046` can start earlier as research, but its outputs are more valuable once real examples from 040-045 exist.
 - `047-049` should not be neglected just because the transport works.
+- `053` provides real email transport via Resend API, critical for production use.
 
 ---
 
