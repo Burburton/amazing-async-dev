@@ -15,10 +15,15 @@ from runtime.resend_provider import (
     create_resend_config,
     is_resend_configured,
     format_resend_setup_instructions,
+    save_resend_config,
+    load_resend_config,
+    interactive_resend_setup,
+    apply_resend_config_from_file,
     RESEND_API_URL,
     RESEND_SEND_ENDPOINT,
     RESEND_TEST_ADDRESS,
     RESEND_TEST_ADDRESSES,
+    RESEND_CONFIG_FILE,
 )
 
 
@@ -411,3 +416,190 @@ class TestEmailSenderIntegration:
         sender = EmailSender(EmailConfig())
         
         assert hasattr(sender, "_send_resend")
+
+
+class TestConfigFileFunctions:
+    def test_save_resend_config_creates_file(self, temp_dir):
+        config_path = temp_dir / "resend-config.json"
+        
+        result = save_resend_config(
+            api_key="re_test123",
+            from_email="test@example.com",
+            config_path=config_path,
+        )
+        
+        assert result["status"] == "success"
+        assert config_path.exists()
+        
+        with open(config_path) as f:
+            data = json.load(f)
+        
+        assert data["api_key"] == "re_test123"
+        assert data["from_email"] == "test@example.com"
+
+    def test_save_resend_config_with_sandbox(self, temp_dir):
+        config_path = temp_dir / "resend-config.json"
+        
+        result = save_resend_config(
+            api_key="re_test",
+            from_email="test@example.com",
+            sandbox_mode=True,
+            config_path=config_path,
+        )
+        
+        with open(config_path) as f:
+            data = json.load(f)
+        
+        assert data["sandbox_mode"] == True
+
+    def test_save_resend_config_creates_runtime_dir(self, temp_dir):
+        config_path = temp_dir / ".runtime" / "resend-config.json"
+        
+        result = save_resend_config(
+            api_key="re_test",
+            from_email="test@example.com",
+            config_path=config_path,
+        )
+        
+        assert config_path.parent.exists()
+        assert config_path.exists()
+
+    def test_load_resend_config_returns_dict(self, temp_dir):
+        config_path = temp_dir / "resend-config.json"
+        
+        save_resend_config(
+            api_key="re_test",
+            from_email="test@example.com",
+            config_path=config_path,
+        )
+        
+        config = load_resend_config(config_path)
+        
+        assert config is not None
+        assert config["api_key"] == "re_test"
+        assert config["from_email"] == "test@example.com"
+
+    def test_load_resend_config_returns_none_if_not_exists(self, temp_dir):
+        config_path = temp_dir / "nonexistent.json"
+        
+        config = load_resend_config(config_path)
+        
+        assert config is None
+
+    def test_apply_resend_config_from_file_sets_env(self, temp_dir):
+        config_path = temp_dir / "resend-config.json"
+        
+        save_resend_config(
+            api_key="re_apply_test",
+            from_email="apply@example.com",
+            sandbox_mode=True,
+            config_path=config_path,
+        )
+        
+        os.environ.pop("RESEND_API_KEY", None)
+        os.environ.pop("RESEND_FROM_EMAIL", None)
+        os.environ.pop("RESEND_SANDBOX_MODE", None)
+        
+        result = apply_resend_config_from_file(config_path)
+        
+        assert result == True
+        assert os.environ.get("RESEND_API_KEY") == "re_apply_test"
+        assert os.environ.get("RESEND_FROM_EMAIL") == "apply@example.com"
+        assert os.environ.get("RESEND_SANDBOX_MODE") == "true"
+        
+        os.environ.pop("RESEND_API_KEY", None)
+        os.environ.pop("RESEND_FROM_EMAIL", None)
+        os.environ.pop("RESEND_SANDBOX_MODE", None)
+
+    def test_apply_resend_config_returns_false_if_not_exists(self, temp_dir):
+        config_path = temp_dir / "nonexistent.json"
+        
+        result = apply_resend_config_from_file(config_path)
+        
+        assert result == False
+
+    def test_interactive_setup_with_both_params(self, temp_dir):
+        config_path = temp_dir / "resend-config.json"
+        
+        result = interactive_resend_setup(
+            api_key="re_interactive_test",
+            from_email="interactive@example.com",
+            open_browser=False,
+            config_path=config_path,
+        )
+        
+        assert result["status"] == "success"
+        assert config_path.exists()
+
+    def test_interactive_setup_detects_existing_config(self, temp_dir):
+        config_path = temp_dir / "resend-config.json"
+        
+        save_resend_config(
+            api_key="re_existing",
+            from_email="existing@example.com",
+            config_path=config_path,
+        )
+        
+        result = interactive_resend_setup(
+            api_key="re_new",
+            from_email="new@example.com",
+            open_browser=False,
+            config_path=config_path,
+        )
+        
+        assert result["status"] == "already_configured"
+
+    def test_interactive_setup_validates_api_key_format(self, temp_dir):
+        config_path = temp_dir / "resend-config.json"
+        
+        result = interactive_resend_setup(
+            api_key="invalid_key",
+            from_email="test@example.com",
+            open_browser=False,
+            config_path=config_path,
+        )
+        
+        assert result["status"] == "error"
+        assert "re_" in result["error"]
+
+    def test_interactive_setup_validates_email_format(self, temp_dir):
+        config_path = temp_dir / "resend-config.json"
+        
+        result = interactive_resend_setup(
+            api_key="re_valid",
+            from_email="invalid-email",
+            open_browser=False,
+            config_path=config_path,
+        )
+        
+        assert result["status"] == "error"
+        assert "email" in result["error"].lower()
+
+    def test_config_file_constant_path(self):
+        assert RESEND_CONFIG_FILE == Path(".runtime/resend-config.json")
+
+    def test_full_workflow_save_load_apply(self, temp_dir):
+        config_path = temp_dir / "resend-config.json"
+        
+        save_resend_config(
+            api_key="re_workflow_test",
+            from_email="workflow@example.com",
+            webhook_secret="whsec_test",
+            sandbox_mode=False,
+            config_path=config_path,
+        )
+        
+        loaded = load_resend_config(config_path)
+        assert loaded["api_key"] == "re_workflow_test"
+        
+        os.environ.pop("RESEND_API_KEY", None)
+        os.environ.pop("RESEND_FROM_EMAIL", None)
+        
+        apply_resend_config_from_file(config_path)
+        
+        config = ResendConfig()
+        assert config.api_key == "re_workflow_test"
+        assert config.from_email == "workflow@example.com"
+        
+        os.environ.pop("RESEND_API_KEY", None)
+        os.environ.pop("RESEND_FROM_EMAIL", None)

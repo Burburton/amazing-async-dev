@@ -5,6 +5,7 @@ Provides outbound email sending via Resend API and inbound webhook handling.
 
 import json
 import os
+import webbrowser
 import urllib.request
 import urllib.parse
 from datetime import datetime
@@ -15,6 +16,7 @@ from typing import Any
 RESEND_API_URL = "https://api.resend.com"
 RESEND_SEND_ENDPOINT = "/emails"
 RESEND_RATE_LIMIT_PER_SECOND = 5
+RESEND_CONFIG_FILE = Path(".runtime/resend-config.json")
 
 
 RESEND_TEST_ADDRESS = "delivered@resend.dev"
@@ -501,3 +503,211 @@ export RESEND_SANDBOX_MODE=true
 
 All emails will go to delivered@resend.dev
 """
+
+
+def save_resend_config(
+    api_key: str,
+    from_email: str,
+    webhook_secret: str | None = None,
+    sandbox_mode: bool = False,
+    config_path: Path | None = None,
+) -> dict[str, Any]:
+    """Save Resend configuration to file.
+    
+    Args:
+        api_key: Resend API key
+        from_email: Verified sender email
+        webhook_secret: Webhook signing secret (optional)
+        sandbox_mode: Enable sandbox mode
+        config_path: Path to config file (default: .runtime/resend-config.json)
+        
+    Returns:
+        Result dict with status and path
+    """
+    path = config_path or RESEND_CONFIG_FILE
+    
+    # Ensure .runtime directory exists
+    path.parent.mkdir(parents=True, exist_ok=True)
+    
+    config_data = {
+        "api_key": api_key,
+        "from_email": from_email,
+        "webhook_secret": webhook_secret or "",
+        "sandbox_mode": sandbox_mode,
+        "created_at": datetime.now().isoformat(),
+    }
+    
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(config_data, f, indent=2)
+    
+    return {
+        "status": "success",
+        "path": str(path),
+        "config": config_data,
+    }
+
+
+def load_resend_config(config_path: Path | None = None) -> dict[str, Any] | None:
+    """Load Resend configuration from file.
+    
+    Args:
+        config_path: Path to config file (default: .runtime/resend-config.json)
+        
+    Returns:
+        Config dict or None if not found
+    """
+    path = config_path or RESEND_CONFIG_FILE
+    
+    if not path.exists():
+        return None
+    
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def interactive_resend_setup(
+    api_key: str | None = None,
+    from_email: str | None = None,
+    sandbox_mode: bool | None = None,
+    open_browser: bool = True,
+    config_path: Path | None = None,
+) -> dict[str, Any]:
+    """Interactive Resend configuration setup.
+    
+    Args:
+        api_key: Resend API key (optional, will prompt if not provided)
+        from_email: Verified sender email (optional, will prompt if not provided)
+        sandbox_mode: Enable sandbox mode (optional, will prompt if api_key/from_email missing)
+        open_browser: Whether to open Resend dashboard in browser
+        config_path: Path to save config file
+        
+    Returns:
+        Result dict with status and details
+    """
+    path = config_path or RESEND_CONFIG_FILE
+    
+    # Check for existing config
+    existing_config = load_resend_config(path)
+    if existing_config:
+        return {
+            "status": "already_configured",
+            "path": str(path),
+            "config": existing_config,
+            "message": f"Config already exists at {path}. Use --force to overwrite.",
+        }
+    
+    # If both api_key and from_email provided, skip interactive prompts
+    skip_prompts = api_key and from_email
+    
+    # Open browser to get API key (only if not provided and user wants browser)
+    if open_browser and not api_key and not skip_prompts:
+        print("\nOpening Resend API Keys page in browser...")
+        print("1. Create a new API key")
+        print("2. Copy the key (starts with 're_')")
+        webbrowser.open("https://resend.com/api-keys")
+    
+    # Prompt for API key if not provided
+    if not api_key and not skip_prompts:
+        print("\nEnter your Resend API key (starts with 're_'):")
+        try:
+            api_key = input("API Key: ").strip()
+        except EOFError:
+            return {
+                "status": "error",
+                "error": "No input provided",
+            }
+    
+    # Validate API key format
+    if not api_key.startswith("re_"):
+        return {
+            "status": "error",
+            "error": "Invalid API key format. Should start with 're_'",
+        }
+    
+    # Open browser to verify domain (only if not provided and user wants browser)
+    if open_browser and not from_email and not skip_prompts:
+        print("\nOpening Resend Domains page in browser...")
+        print("1. Add your domain or use a verified one")
+        print("2. Use a verified email as sender")
+        webbrowser.open("https://resend.com/domains")
+    
+    # Prompt for from_email if not provided
+    if not from_email and not skip_prompts:
+        print("\nEnter your verified sender email:")
+        try:
+            from_email = input("From Email: ").strip()
+        except EOFError:
+            return {
+                "status": "error",
+                "error": "No email provided",
+            }
+    
+    # Validate email format
+    if "@" not in from_email:
+        return {
+            "status": "error",
+            "error": "Invalid email format",
+        }
+    
+    # Use provided sandbox_mode or prompt if interactive
+    final_sandbox_mode = sandbox_mode if sandbox_mode is not None else False
+    
+    if sandbox_mode is None and not skip_prompts:
+        print("\nEnable sandbox mode? (emails go to test address)")
+        try:
+            sandbox_input = input("Sandbox mode [y/N]: ").strip().lower()
+            final_sandbox_mode = sandbox_input == "y" or sandbox_input == "yes"
+        except EOFError:
+            pass
+    
+    # Save config
+    result = save_resend_config(
+        api_key=api_key,
+        from_email=from_email,
+        sandbox_mode=final_sandbox_mode,
+        config_path=path,
+    )
+    
+    if result["status"] == "success":
+        # Also set environment variables for immediate use
+        os.environ["RESEND_API_KEY"] = api_key
+        os.environ["RESEND_FROM_EMAIL"] = from_email
+        if final_sandbox_mode:
+            os.environ["RESEND_SANDBOX_MODE"] = "true"
+        
+        return {
+            "status": "success",
+            "path": str(path),
+            "api_key": api_key[:10] + "...",  # Partial for security
+            "from_email": from_email,
+            "sandbox_mode": final_sandbox_mode,
+            "message": "Configuration saved and environment variables set",
+        }
+    
+    return result
+
+
+def apply_resend_config_from_file(config_path: Path | None = None) -> bool:
+    """Apply Resend config from file to environment variables.
+    
+    Args:
+        config_path: Path to config file
+        
+    Returns:
+        True if config was applied, False otherwise
+    """
+    config = load_resend_config(config_path)
+    
+    if not config:
+        return False
+    
+    os.environ["RESEND_API_KEY"] = config.get("api_key", "")
+    os.environ["RESEND_FROM_EMAIL"] = config.get("from_email", "")
+    
+    if config.get("webhook_secret"):
+        os.environ["RESEND_WEBHOOK_SECRET"] = config["webhook_secret"]
+    
+    if config.get("sandbox_mode"):
+        os.environ["RESEND_SANDBOX_MODE"] = "true"
+    
+    return True
