@@ -28,6 +28,7 @@ console = Console()
 def setup(
     api_key: str = typer.Option(None, help="Resend API key"),
     from_email: str = typer.Option(None, help="Verified sender email"),
+    to_email: str = typer.Option(None, help="Your email for receiving decision emails"),
     sandbox: bool = typer.Option(False, help="Enable sandbox mode"),
     open_browser: bool = typer.Option(True, help="Open Resend dashboard in browser"),
     force: bool = typer.Option(False, help="Overwrite existing config"),
@@ -40,19 +41,19 @@ def setup(
     
     Example:
         asyncdev resend-auth setup
-        asyncdev resend-auth setup --api-key re_xxx --from-email noreply@domain.com
+        asyncdev resend-auth setup --api-key re_xxx --from-email noreply@domain.com --to-email your@email.com
         asyncdev resend-auth setup --no-open-browser
-        asyncdev resend-auth setup --force  # overwrite existing config
+        asyncdev resend-auth setup --force
     """
     path = config_path or RESEND_CONFIG_FILE
     
-    # Check existing config
     existing = load_resend_config(path)
     if existing and not force:
         console.print(Panel(
             f"Config exists at: {path}\n"
             f"API Key: {existing.get('api_key', '')[:10]}...\n"
             f"From Email: {existing.get('from_email')}\n"
+            f"To Email: {existing.get('to_address', 'not set')}\n"
             f"Sandbox: {existing.get('sandbox_mode', False)}",
             title="Existing Config Found",
             border_style="yellow"
@@ -60,19 +61,21 @@ def setup(
         console.print("\n[yellow]Use --force to overwrite[/yellow]")
         raise typer.Exit(0)
     
-    # If both provided, save directly without interactive prompts
     if api_key and from_email:
+        final_to_email = to_email or from_email
+        
         result = save_resend_config(
             api_key=api_key,
             from_email=from_email,
+            to_address=final_to_email,
             sandbox_mode=sandbox,
             config_path=path,
         )
         
         if result["status"] == "success":
-            # Apply to environment
             os.environ["RESEND_API_KEY"] = api_key
             os.environ["RESEND_FROM_EMAIL"] = from_email
+            os.environ["ASYNCDEV_TO_ADDRESS"] = final_to_email
             if sandbox:
                 os.environ["RESEND_SANDBOX_MODE"] = "true"
             
@@ -80,6 +83,7 @@ def setup(
                 f"Config saved: {path}\n"
                 f"API Key: {api_key[:10]}...\n"
                 f"From Email: {from_email}\n"
+                f"To Email: {final_to_email}\n"
                 f"Sandbox Mode: {sandbox}",
                 title="Resend Configuration Saved",
                 border_style="green"
@@ -93,10 +97,10 @@ def setup(
         
         return
     
-    # Interactive setup
     result = interactive_resend_setup(
         api_key=api_key,
         from_email=from_email,
+        to_address=to_email,
         open_browser=open_browser,
         config_path=path,
     )
@@ -106,6 +110,7 @@ def setup(
             f"Config saved: {result['path']}\n"
             f"API Key: {result['api_key']}\n"
             f"From Email: {result['from_email']}\n"
+            f"To Email: {result['to_address']}\n"
             f"Sandbox Mode: {result['sandbox_mode']}",
             title="Resend Configuration Complete",
             border_style="green"
