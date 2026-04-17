@@ -1,7 +1,7 @@
 # Feature 053 — Resend Email Provider Integration
 
 ## Status
-`planning`
+`complete`
 
 ## Objective
 Integrate Resend as the real email transport/provider for the existing Email-First Human Decision & Reporting Channel, so the system can actually send and receive email through a production-oriented service.
@@ -97,6 +97,9 @@ The current email decision/reporting channel logic is complete (Features 043-049
 8. ✅ Mock/sandbox mode available for testing
 9. ✅ Configuration via environment variables
 10. ✅ Tests pass for all functionality
+11. ✅ Interactive setup CLI with browser launch
+12. ✅ Config file persistence (.runtime/resend-config.json)
+13. ✅ Auto-load from config file on CLI commands
 
 ### Should Pass
 1. 📋 Rate limit handling with retry
@@ -135,7 +138,28 @@ RESEND_WEBHOOK_SECRET=whsec_xxx (optional)
 
 # Delivery mode
 ASYNCDEV_DELIVERY_MODE=resend
+
+# Config file (auto-created by interactive setup)
+.runtime/resend-config.json
 ```
+
+### Interactive Setup
+
+```bash
+# Interactive setup with browser launch
+asyncdev resend-auth setup
+
+# Direct setup (skip prompts)
+asyncdev resend-auth setup --api-key re_xxx --from-email noreply@domain.com
+
+# Check status (auto-loads from config file)
+asyncdev resend-auth status
+
+# Test connection
+asyncdev resend-auth test
+```
+
+The config file is saved to `.runtime/resend-config.json` and excluded from git via `.gitignore`.
 
 ---
 
