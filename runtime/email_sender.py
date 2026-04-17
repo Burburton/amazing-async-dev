@@ -1,6 +1,6 @@
 """Email sender for async decision channel (Feature 021).
 
-Supports SMTP and mock file delivery modes.
+Supports SMTP, mock file, and Gmail OAuth2 delivery modes.
 """
 
 import os
@@ -29,6 +29,9 @@ class EmailConfig:
         self.mock_outbox_path = Path(os.getenv("ASYNCDEV_MOCK_OUTBOX", ".runtime/email-outbox"))
         self.subject_prefix = os.getenv("ASYNCDEV_SUBJECT_PREFIX", "[async-dev]")
         
+        self.use_oauth2 = os.getenv("ASYNCDEV_USE_OAUTH2", "false").lower() == "true"
+        self.oauth2_token_path = Path(os.getenv("ASYNCDEV_OAUTH2_TOKEN_PATH", ".runtime/gmail-oauth2-token.json"))
+        
         if config_path and config_path.exists():
             self._load_config_file(config_path)
     
@@ -46,10 +49,26 @@ class EmailConfig:
         self.delivery_mode = config.get("delivery_mode", self.delivery_mode)
         self.mock_outbox_path = Path(config.get("mock_outbox_path", str(self.mock_outbox_path)))
         self.subject_prefix = config.get("email_subject_prefix", self.subject_prefix)
+        
+        if config.get("use_oauth2"):
+            self.use_oauth2 = True
+        if config.get("oauth2_token_path"):
+            self.oauth2_token_path = Path(config.get("oauth2_token_path"))
     
     def is_smtp_configured(self) -> bool:
         """Check if SMTP is properly configured."""
         return bool(self.smtp_host and self.smtp_username and self.smtp_password)
+    
+    def is_oauth2_configured(self) -> bool:
+        """Check if Gmail OAuth2 is configured."""
+        if self.use_oauth2:
+            from runtime.gmail_oauth2 import is_gmail_oauth2_configured
+            return is_gmail_oauth2_configured(self.oauth2_token_path)
+        return False
+    
+    def can_send_email(self) -> bool:
+        """Check if any email delivery method is available."""
+        return self.is_smtp_configured() or self.is_oauth2_configured()
 
 
 class EmailSender:
@@ -102,13 +121,20 @@ class EmailSender:
         return True, None
     
     def _send_smtp(self, request: dict[str, Any]) -> tuple[bool, None]:
-        """Real SMTP send."""
+        """Real SMTP send with OAuth2 or password auth."""
+        if self.config.use_oauth2:
+            return self._send_smtp_oauth2(request)
+        else:
+            return self._send_smtp_password(request)
+    
+    def _send_smtp_password(self, request: dict[str, Any]) -> tuple[bool, None]:
+        """SMTP send with username/password auth."""
         if not self.config.is_smtp_configured():
             return False, None
         
         to_address = self.config.to_address
         if not to_address:
-            request.get("email_to", "")
+            to_address = request.get("email_to", "")
         
         subject = self._build_subject(request)
         body = self._build_body(request)
@@ -126,6 +152,44 @@ class EmailSender:
                     server.starttls()
                 server.login(self.config.smtp_username, self.config.smtp_password)
                 server.sendmail(self.config.from_address, [to_address], msg.as_string())
+            return True, None
+        except Exception:
+            return False, None
+    
+    def _send_smtp_oauth2(self, request: dict[str, Any]) -> tuple[bool, None]:
+        """SMTP send with Gmail XOAUTH2."""
+        from runtime.gmail_oauth2 import GmailOAuth2Config
+        
+        oauth2_config = GmailOAuth2Config(self.config.oauth2_token_path)
+        
+        if not oauth2_config.is_configured():
+            return False, None
+        
+        auth_string = oauth2_config.get_auth_string()
+        email = oauth2_config.get_email()
+        
+        if not auth_string or not email:
+            return False, None
+        
+        to_address = self.config.to_address
+        if not to_address:
+            to_address = email
+        
+        subject = self._build_subject(request)
+        body = self._build_body(request)
+        
+        msg = MIMEMultipart()
+        msg["From"] = email
+        msg["To"] = to_address
+        msg["Subject"] = subject
+        
+        msg.attach(MIMEText(body, "plain"))
+        
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
+                server.starttls()
+                server.docmd("AUTH XOAUTH2 " + auth_string)
+                server.sendmail(email, [to_address], msg.as_string())
             return True, None
         except Exception:
             return False, None
@@ -240,6 +304,12 @@ class EmailSender:
         return True, None
     
     def _send_status_smtp(self, report: dict[str, Any]) -> tuple[bool, None]:
+        if self.config.use_oauth2:
+            return self._send_status_smtp_oauth2(report)
+        else:
+            return self._send_status_smtp_password(report)
+    
+    def _send_status_smtp_password(self, report: dict[str, Any]) -> tuple[bool, None]:
         if not self.config.is_smtp_configured():
             return False, None
         
@@ -261,6 +331,43 @@ class EmailSender:
                     server.starttls()
                 server.login(self.config.smtp_username, self.config.smtp_password)
                 server.sendmail(self.config.from_address, [to_address], msg.as_string())
+            return True, None
+        except Exception:
+            return False, None
+    
+    def _send_status_smtp_oauth2(self, report: dict[str, Any]) -> tuple[bool, None]:
+        from runtime.gmail_oauth2 import GmailOAuth2Config
+        
+        oauth2_config = GmailOAuth2Config(self.config.oauth2_token_path)
+        
+        if not oauth2_config.is_configured():
+            return False, None
+        
+        auth_string = oauth2_config.get_auth_string()
+        email = oauth2_config.get_email()
+        
+        if not auth_string or not email:
+            return False, None
+        
+        to_address = self.config.to_address
+        if not to_address:
+            to_address = email
+        
+        subject = self._build_status_subject(report)
+        body = self._build_status_body(report)
+        
+        msg = MIMEMultipart()
+        msg["From"] = email
+        msg["To"] = to_address
+        msg["Subject"] = subject
+        
+        msg.attach(MIMEText(body, "plain"))
+        
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
+                server.starttls()
+                server.docmd("AUTH XOAUTH2 " + auth_string)
+                server.sendmail(email, [to_address], msg.as_string())
             return True, None
         except Exception:
             return False, None

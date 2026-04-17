@@ -74,8 +74,21 @@ fields:
       - smtp
       - mock_file
       - console
+      - gmail_oauth2
     example: "mock_file"
     default: "mock_file"
+
+  use_oauth2:
+    type: boolean
+    description: Use Gmail OAuth2 instead of password auth
+    example: true
+    default: false
+
+  oauth2_token_path:
+    type: string
+    description: Path to Gmail OAuth2 token JSON file
+    example: ".runtime/gmail-oauth2-token.json"
+    default: ".runtime/gmail-oauth2-token.json"
 
   mock_outbox_path:
     type: string
