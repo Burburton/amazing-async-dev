@@ -32,11 +32,12 @@ class EmailConfig:
         self.use_oauth2 = os.getenv("ASYNCDEV_USE_OAUTH2", "false").lower() == "true"
         self.oauth2_token_path = Path(os.getenv("ASYNCDEV_OAUTH2_TOKEN_PATH", ".runtime/gmail-oauth2-token.json"))
         
+        self.use_resend = os.getenv("RESEND_API_KEY", "") != ""
+        
         if config_path and config_path.exists():
             self._load_config_file(config_path)
     
     def _load_config_file(self, config_path: Path) -> None:
-        """Load non-sensitive config from file."""
         import yaml
         with open(config_path) as f:
             config = yaml.safe_load(f) or {}
@@ -56,19 +57,20 @@ class EmailConfig:
             self.oauth2_token_path = Path(config.get("oauth2_token_path"))
     
     def is_smtp_configured(self) -> bool:
-        """Check if SMTP is properly configured."""
         return bool(self.smtp_host and self.smtp_username and self.smtp_password)
     
     def is_oauth2_configured(self) -> bool:
-        """Check if Gmail OAuth2 is configured."""
         if self.use_oauth2:
             from runtime.gmail_oauth2 import is_gmail_oauth2_configured
             return is_gmail_oauth2_configured(self.oauth2_token_path)
         return False
     
+    def is_resend_configured(self) -> bool:
+        from runtime.resend_provider import is_resend_configured
+        return is_resend_configured()
+    
     def can_send_email(self) -> bool:
-        """Check if any email delivery method is available."""
-        return self.is_smtp_configured() or self.is_oauth2_configured()
+        return self.is_smtp_configured() or self.is_oauth2_configured() or self.is_resend_configured()
 
 
 class EmailSender:
@@ -95,8 +97,23 @@ class EmailSender:
             return self._send_mock(request)
         elif self.config.delivery_mode == "console":
             return self._send_console(request)
+        elif self.config.delivery_mode == "resend":
+            return self._send_resend(request)
         else:
             return self._send_smtp(request)
+    
+    def _send_resend(self, request: dict[str, Any]) -> tuple[bool, str | None]:
+        """Send via Resend API."""
+        from runtime.resend_provider import ResendProvider, ResendConfig
+        
+        resend_config = ResendConfig()
+        if not resend_config.is_configured():
+            return False, None
+        
+        provider = ResendProvider(resend_config)
+        success, message_id, response = provider.send_decision_request(request)
+        
+        return success, message_id
     
     def _send_mock(self, request: dict[str, Any]) -> tuple[bool, str]:
         """Mock send - write to file."""
@@ -280,8 +297,22 @@ class EmailSender:
             return self._send_status_mock(report)
         elif self.config.delivery_mode == "console":
             return self._send_status_console(report)
+        elif self.config.delivery_mode == "resend":
+            return self._send_status_resend(report)
         else:
             return self._send_status_smtp(report)
+    
+    def _send_status_resend(self, report: dict[str, Any]) -> tuple[bool, str | None]:
+        from runtime.resend_provider import ResendProvider, ResendConfig
+        
+        resend_config = ResendConfig()
+        if not resend_config.is_configured():
+            return False, None
+        
+        provider = ResendProvider(resend_config)
+        success, message_id, response = provider.send_status_report(report)
+        
+        return success, message_id
     
     def _send_status_mock(self, report: dict[str, Any]) -> tuple[bool, str]:
         report_id = report.get("report_id", "unknown")
