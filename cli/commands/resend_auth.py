@@ -191,6 +191,11 @@ def status(
 
 @app.command()
 def test(
+    to: str = typer.Option(
+        None,
+        "--to",
+        help="Recipient email address (default: delivered@resend.dev)",
+    ),
     config_path: Path = typer.Option(
         None,
         help="Path to config file (default: .runtime/resend-config.json)",
@@ -200,6 +205,7 @@ def test(
     
     Example:
         asyncdev resend-auth test
+        asyncdev resend-auth test --to your@email.com
         asyncdev resend-auth test --config-path custom/path.json
     """
     path = config_path or RESEND_CONFIG_FILE
@@ -214,17 +220,26 @@ def test(
         console.print("[cyan]Run 'asyncdev resend-auth setup' first[/cyan]")
         raise typer.Exit(1)
     
-    console.print("[cyan]Sending test email via Resend...[/cyan]")
+    recipient = to or RESEND_TEST_ADDRESS
+    
+    if to:
+        console.print(f"[cyan]Sending test email to {to} via Resend...[/cyan]")
+    else:
+        console.print("[cyan]Sending test email to Resend test address...[/cyan]")
     
     provider = ResendProvider(config)
-    success, explanation = provider.test_connection()
+    success, explanation = provider.test_connection(to=to)
     
     if success:
         console.print(Panel(
-            f"{explanation}\n\nTest email sent to: {RESEND_TEST_ADDRESS}",
+            f"{explanation}",
             title="Resend Test Success",
             border_style="green"
         ))
+        
+        if not to:
+            console.print(f"[dim]Test address used: {RESEND_TEST_ADDRESS}[/dim]")
+            console.print("[dim]Use --to your@email.com to send a real test email[/dim]")
         
         if config.sandbox_mode:
             console.print("[yellow]Sandbox mode enabled - email went to test address[/yellow]")
