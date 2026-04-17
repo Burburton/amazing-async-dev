@@ -13,6 +13,11 @@ from runtime.resend_provider import (
     format_resend_setup_instructions,
     RESEND_TEST_ADDRESS,
     RESEND_TEST_ADDRESSES,
+    RESEND_CONFIG_FILE,
+    save_resend_config,
+    load_resend_config,
+    interactive_resend_setup,
+    apply_resend_config_from_file,
 )
 
 app = typer.Typer(help="Resend email provider configuration")
@@ -24,44 +29,106 @@ def setup(
     api_key: str = typer.Option(None, help="Resend API key"),
     from_email: str = typer.Option(None, help="Verified sender email"),
     sandbox: bool = typer.Option(False, help="Enable sandbox mode"),
+    open_browser: bool = typer.Option(True, help="Open Resend dashboard in browser"),
+    force: bool = typer.Option(False, help="Overwrite existing config"),
+    config_path: Path = typer.Option(
+        None,
+        help="Path to config file (default: .runtime/resend-config.json)",
+    ),
 ):
-    """Configure Resend email provider.
+    """Configure Resend email provider interactively.
     
     Example:
         asyncdev resend-auth setup
         asyncdev resend-auth setup --api-key re_xxx --from-email noreply@domain.com
+        asyncdev resend-auth setup --no-open-browser
+        asyncdev resend-auth setup --force  # overwrite existing config
     """
-    if api_key:
-        os.environ["RESEND_API_KEY"] = api_key
-    if from_email:
-        os.environ["RESEND_FROM_EMAIL"] = from_email
-    if sandbox:
-        os.environ["RESEND_SANDBOX_MODE"] = "true"
+    path = config_path or RESEND_CONFIG_FILE
     
-    config = ResendConfig()
-    
-    if config.is_configured():
+    # Check existing config
+    existing = load_resend_config(path)
+    if existing and not force:
         console.print(Panel(
-            f"API Key: {config.api_key[:10]}...\n"
-            f"From Email: {config.from_email}\n"
-            f"Sandbox Mode: {config.sandbox_mode}",
-            title="Resend Configuration",
+            f"Config exists at: {path}\n"
+            f"API Key: {existing.get('api_key', '')[:10]}...\n"
+            f"From Email: {existing.get('from_email')}\n"
+            f"Sandbox: {existing.get('sandbox_mode', False)}",
+            title="Existing Config Found",
+            border_style="yellow"
+        ))
+        console.print("\n[yellow]Use --force to overwrite[/yellow]")
+        raise typer.Exit(0)
+    
+    # If both provided, save directly without interactive prompts
+    if api_key and from_email:
+        result = save_resend_config(
+            api_key=api_key,
+            from_email=from_email,
+            sandbox_mode=sandbox,
+            config_path=path,
+        )
+        
+        if result["status"] == "success":
+            # Apply to environment
+            os.environ["RESEND_API_KEY"] = api_key
+            os.environ["RESEND_FROM_EMAIL"] = from_email
+            if sandbox:
+                os.environ["RESEND_SANDBOX_MODE"] = "true"
+            
+            console.print(Panel(
+                f"Config saved: {path}\n"
+                f"API Key: {api_key[:10]}...\n"
+                f"From Email: {from_email}\n"
+                f"Sandbox Mode: {sandbox}",
+                title="Resend Configuration Saved",
+                border_style="green"
+            ))
+            
+            console.print("\n[bold]Environment variables set[/bold]")
+            console.print("[cyan]Run 'asyncdev resend-auth test' to verify[/cyan]")
+        else:
+            console.print(f"[red]Failed: {result.get('error')}[/red]")
+            raise typer.Exit(1)
+        
+        return
+    
+    # Interactive setup
+    result = interactive_resend_setup(
+        api_key=api_key,
+        from_email=from_email,
+        open_browser=open_browser,
+        config_path=path,
+    )
+    
+    if result["status"] == "success":
+        console.print(Panel(
+            f"Config saved: {result['path']}\n"
+            f"API Key: {result['api_key']}\n"
+            f"From Email: {result['from_email']}\n"
+            f"Sandbox Mode: {result['sandbox_mode']}",
+            title="Resend Configuration Complete",
             border_style="green"
         ))
         
-        console.print("\n[bold]Configuration saved to environment variables[/bold]")
-        console.print("\n[cyan]To persist, add to your shell profile:[/cyan]")
-        console.print(f"  export RESEND_API_KEY={config.api_key}")
-        console.print(f"  export RESEND_FROM_EMAIL={config.from_email}")
-        if sandbox:
-            console.print(f"  export RESEND_SANDBOX_MODE=true")
-        console.print(f"  export ASYNCDEV_DELIVERY_MODE=resend")
+        console.print("\n[bold]Next steps:[/bold]")
+        console.print("  1. [cyan]export ASYNCDEV_DELIVERY_MODE=resend[/cyan]")
+        console.print("  2. [cyan]asyncdev resend-auth enable[/cyan]")
+        console.print("  3. [cyan]asyncdev resend-auth test[/cyan]")
+    elif result["status"] == "already_configured":
+        console.print(Panel(
+            f"Config exists at: {result['path']}\n"
+            f"Use --force to overwrite",
+            title="Config Already Exists",
+            border_style="yellow"
+        ))
     else:
-        console.print("[red]Missing required configuration[/red]")
-        console.print("\n[yellow]Required environment variables:[/yellow]")
-        console.print("  RESEND_API_KEY=re_xxxxxxxxxxxxx")
-        console.print("  RESEND_FROM_EMAIL=noreply@yourdomain.com")
-        console.print("\n[cyan]Run 'asyncdev resend-auth guide' for setup instructions[/cyan]")
+        console.print(Panel(
+            f"Error: {result.get('error', 'Unknown')}",
+            title="Setup Failed",
+            border_style="red"
+        ))
+        console.print("\n[cyan]Run 'asyncdev resend-auth guide' for help[/cyan]")
         raise typer.Exit(1)
 
 
@@ -77,15 +144,33 @@ def guide():
 
 
 @app.command()
-def status():
+def status(
+    config_path: Path = typer.Option(
+        None,
+        help="Path to config file (default: .runtime/resend-config.json)",
+    ),
+):
     """Check Resend configuration status.
     
     Example:
         asyncdev resend-auth status
+        asyncdev resend-auth status --config-path custom/path.json
     """
+    path = config_path or RESEND_CONFIG_FILE
+    
+    # Try to load from config file first
+    file_config = load_resend_config(path)
+    
+    # Apply file config to environment if exists
+    if file_config:
+        apply_resend_config_from_file(path)
+    
+    # Get current config (from env or file)
     config = ResendConfig()
     
     console.print(Panel(
+        f"Config File: {path}\n"
+        f"File Exists: {file_config is not None}\n"
         f"API Key: {config.api_key[:10] + '...' if config.api_key else 'NOT SET'}\n"
         f"From Email: {config.from_email or 'NOT SET'}\n"
         f"Webhook Secret: {'SET' if config.webhook_secret else 'NOT SET'}\n"
@@ -98,18 +183,30 @@ def status():
     if config.is_configured():
         console.print("[green]Ready to send emails[/green]")
         console.print(f"[cyan]Delivery mode: {os.getenv('ASYNCDEV_DELIVERY_MODE', 'mock_file')}[/cyan]")
+        console.print(f"[cyan]Config source: {path if file_config else 'environment'}[/cyan]")
     else:
         console.print("[red]Not configured[/red]")
         console.print("[cyan]Run 'asyncdev resend-auth setup' to configure[/cyan]")
 
 
 @app.command()
-def test():
+def test(
+    config_path: Path = typer.Option(
+        None,
+        help="Path to config file (default: .runtime/resend-config.json)",
+    ),
+):
     """Test Resend connection by sending a test email.
     
     Example:
         asyncdev resend-auth test
+        asyncdev resend-auth test --config-path custom/path.json
     """
+    path = config_path or RESEND_CONFIG_FILE
+    
+    if load_resend_config(path):
+        apply_resend_config_from_file(path)
+    
     config = ResendConfig()
     
     if not config.is_configured():
@@ -195,12 +292,23 @@ def webhook_info():
 
 
 @app.command()
-def enable():
+def enable(
+    config_path: Path = typer.Option(
+        None,
+        help="Path to config file (default: .runtime/resend-config.json)",
+    ),
+):
     """Enable Resend as the email delivery mode.
     
     Example:
         asyncdev resend-auth enable
+        asyncdev resend-auth enable --config-path custom/path.json
     """
+    path = config_path or RESEND_CONFIG_FILE
+    
+    if load_resend_config(path):
+        apply_resend_config_from_file(path)
+    
     config = ResendConfig()
     
     if not config.is_configured():
@@ -213,10 +321,11 @@ def enable():
     console.print(Panel(
         f"Delivery mode set to: resend\n"
         f"From Email: {config.from_email}\n"
-        f"Sandbox: {config.sandbox_mode}",
+        f"Sandbox: {config.sandbox_mode}\n"
+        f"Config source: {path if load_resend_config(path) else 'environment'}",
         title="Resend Enabled",
         border_style="green"
     ))
     
-    console.print("\n[cyan]To persist, add to your shell profile:[/cyan]")
+    console.print("\n[cyan]To persist delivery mode, add to your shell profile:[/cyan]")
     console.print("  export ASYNCDEV_DELIVERY_MODE=resend")
