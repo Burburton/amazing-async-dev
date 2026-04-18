@@ -1,8 +1,12 @@
 """Init command - Initialize amazing-async-dev project structure."""
 
+from pathlib import Path
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
+
+from runtime.gitignore_manager import GitignoreManager
 
 app = typer.Typer(help="Initialize project structure")
 console = Console()
@@ -13,17 +17,6 @@ def create(
     path: str = typer.Option("projects", help="Root directory for projects"),
     force: bool = typer.Option(False, help="Overwrite existing structure"),
 ):
-    """Initialize empty project structure.
-
-    Creates:
-    - projects/ root directory
-    - No demo content (ready for new-product)
-
-    Example:
-        asyncdev init create
-        asyncdev init create --path ./my-projects
-    """
-    from pathlib import Path
     from runtime.adapters.filesystem_adapter import FilesystemAdapter
 
     fs = FilesystemAdapter()
@@ -36,11 +29,17 @@ def create(
 
     console.print(Panel("Initialize Project Structure", border_style="green"))
 
-    # Create root
     fs.ensure_dir(root)
     console.print(f"[green]Created:[/green] {root}/")
 
-    # Create placeholder structure
+    gitignore_manager = GitignoreManager(root_path=Path.cwd())
+    result = gitignore_manager.ensure_safe(auto_fix=True)
+    
+    if result.missing_gitignore_entries:
+        console.print(f"\n[green]Added {len(result.missing_gitignore_entries)} gitignore entries[/green]")
+        for entry in result.missing_gitignore_entries:
+            console.print(f"  - {entry}")
+
     console.print("\n[cyan]Structure ready for:[/cyan]")
     console.print("  1. asyncdev new-product --product-id <id> --name <name>")
     console.print("  2. asyncdev new-feature --product-id <id> --feature-id <id>")

@@ -19,9 +19,25 @@ from runtime.resend_provider import (
     interactive_resend_setup,
     apply_resend_config_from_file,
 )
+from runtime.gitignore_manager import GitignoreManager
 
 app = typer.Typer(help="Resend email provider configuration")
 console = Console()
+
+
+def _ensure_gitignore_safe():
+    gitignore_manager = GitignoreManager()
+    result = gitignore_manager.ensure_safe(auto_fix=True)
+    
+    if result.missing_gitignore_entries:
+        console.print(f"[green]Added {len(result.missing_gitignore_entries)} gitignore entries[/green]")
+        for entry in result.missing_gitignore_entries:
+            console.print(f"  - {entry}")
+    
+    if result.tracked_sensitive_files:
+        console.print("[red]⚠ Some sensitive files are already tracked by git[/red]")
+        console.print("[yellow]Manual remediation required:[/yellow]")
+        console.print("  git rm --cached .runtime/resend-config.json")
 
 
 @app.command()
@@ -136,6 +152,8 @@ def setup(
         console.print("  1. [cyan]export ASYNCDEV_DELIVERY_MODE=resend[/cyan]")
         console.print("  2. [cyan]asyncdev resend-auth enable[/cyan]")
         console.print("  3. [cyan]asyncdev resend-auth test[/cyan]")
+        
+        _ensure_gitignore_safe()
     elif result["status"] == "already_configured":
         console.print(Panel(
             f"Config exists at: {result['path']}\n"
