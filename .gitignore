@@ -106,7 +106,10 @@ projects/
 .runtime/
 runtime/state.db
 
-# Playwright MCP logs
+screenshots/
+
+browser-verification-screenshots/
+
 .playwright-mcp/
 
 # Cloudflare workers (user-specific deployment)
