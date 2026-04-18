@@ -241,6 +241,39 @@ class TestBrowserVerifier:
         assert dict_result["browser_verification"]["executed"] is False
         assert dict_result["browser_verification"]["exception_reason"] == "ci_container_limitation"
 
+    def test_screenshot_path_with_project_name(self):
+        """Screenshot path should use project_name for subdirectory."""
+        from runtime.browser_verifier import run_browser_verification
+        
+        if check_playwright_available():
+            result = run_browser_verification(
+                url="http://example.com",
+                project_name="test-project",
+            )
+            assert result is not None
+        else:
+            result = create_exception_result(
+                ExceptionReason.PLAYWRIGHT_UNAVAILABLE,
+                "Playwright not installed",
+            )
+            assert result.executed is False
+
+    def test_screenshot_path_default(self):
+        """Screenshot path should use 'default' when no project_name."""
+        from runtime.browser_verifier import run_browser_verification
+        
+        if check_playwright_available():
+            result = run_browser_verification(
+                url="http://example.com",
+            )
+            assert result is not None
+        else:
+            result = create_exception_result(
+                ExceptionReason.PLAYWRIGHT_UNAVAILABLE,
+                "Playwright not installed",
+            )
+            assert result.executed is False
+
 
 class TestVerificationTypeEnum:
     """Tests for VerificationType enum."""

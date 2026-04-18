@@ -90,6 +90,7 @@ def check_playwright_available() -> bool:
 
 def run_browser_verification(
     url: str,
+    project_name: str | None = None,
     scenarios: list[str] | None = None,
     timeout: int = 60,
     screenshot_dir: Path | None = None,
@@ -98,9 +99,10 @@ def run_browser_verification(
     
     Args:
         url: URL to verify
+        project_name: Project name for screenshot subdirectory
         scenarios: List of scenarios to run (default: page_render, console_check, accessibility_snapshot)
         timeout: Timeout in seconds
-        screenshot_dir: Directory to save screenshots
+        screenshot_dir: Base directory for screenshots (defaults to screenshots/{project_name}/)
         
     Returns:
         BrowserVerificationResult with verification outcome
@@ -117,7 +119,14 @@ def run_browser_verification(
         )
     
     target_scenarios = scenarios or DEFAULT_SCENARIOS
-    screenshot_path = screenshot_dir or Path.cwd() / "browser-verification-screenshots"
+    
+    if screenshot_dir:
+        screenshot_path = screenshot_dir
+    elif project_name:
+        screenshot_path = Path.cwd() / "screenshots" / project_name
+    else:
+        screenshot_path = Path.cwd() / "screenshots" / "default"
+    
     screenshot_path.mkdir(parents=True, exist_ok=True)
     
     results: list[ScenarioResult] = []

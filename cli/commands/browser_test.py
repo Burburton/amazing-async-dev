@@ -101,13 +101,13 @@ def run_browser_test(
     console.print(f"  Scenarios: {target_scenarios or 'default'}")
     console.print(f"  Timeout: {timeout}s")
     
-    screenshot_dir = project_path / ".runtime" / "browser-screenshots"
+    project_name = project_path.name if project else "default"
     
     result = run_browser_verification(
         url=target_url,
+        project_name=project_name,
         scenarios=target_scenarios,
         timeout=timeout,
-        screenshot_dir=screenshot_dir,
     )
     
     _display_result(result)
