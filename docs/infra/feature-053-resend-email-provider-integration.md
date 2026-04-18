@@ -96,15 +96,26 @@ The current email decision/reporting channel logic is complete (Features 043-049
 7. ✅ API errors handled via Feature 049 failure handling
 8. ✅ Mock/sandbox mode available for testing
 9. ✅ Configuration via environment variables
-10. ✅ Tests pass for all functionality
+10. ✅ Tests pass for all functionality (48 tests)
 11. ✅ Interactive setup CLI with browser launch
 12. ✅ Config file persistence (.runtime/resend-config.json)
 13. ✅ Auto-load from config file on CLI commands
+14. ✅ **End-to-end decision loop verified** (2026-04-18)
+    - Sent decision request via Resend API
+    - Received reply via Cloudflare webhook
+    - Parsed DECISION A command
+    - Linked to original request via X-Decision-Request-Id header
+    - Updated decision request status to resolved
 
 ### Should Pass
-1. 📋 Rate limit handling with retry
-2. 📋 Delivered/opened event tracking (optional)
-3. 📋 Webhook signature verification
+1. ✅ Reply-To header for proper inbound routing
+2. ✅ Inbound address configuration (asyncdev-inbox@xxx.resend.app)
+3. ✅ Webhook URL configuration (Cloudflare Worker)
+4. ✅ check-inbox CLI command for polling pending decisions
+5. ✅ DeliveryChannel.RESEND enum
+6. 📋 Rate limit handling with retry
+7. 📋 Delivered/opened event tracking (optional)
+8. 📋 Webhook signature verification
 
 ---
 
