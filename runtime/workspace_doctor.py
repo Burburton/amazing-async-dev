@@ -46,6 +46,10 @@ class DoctorDiagnosis:
     feedback_draft_fields: dict[str, Any] = field(default_factory=dict)
     
     workspace_path: str = ""
+    
+    config_safety_status: str = "not_checked"
+    config_safety_issues: int = 0
+    tracked_sensitive_files: list[str] = field(default_factory=list)
 
 
 def diagnose_workspace(project_path: Path) -> DoctorDiagnosis:
@@ -79,6 +83,7 @@ def diagnose_workspace(project_path: Path) -> DoctorDiagnosis:
     _apply_rules(diagnosis, snapshot)
     _apply_recovery_playbooks(diagnosis, snapshot)
     _select_feedback_handoff(diagnosis, snapshot)
+    _check_config_safety(diagnosis)
     
     return diagnosis
 
@@ -390,6 +395,19 @@ def format_diagnosis_markdown(diagnosis: DoctorDiagnosis) -> str:
         for warning in diagnosis.warnings:
             lines.append(f"- {warning}")
     
+    if diagnosis.config_safety_status != "not_checked":
+        safety_status = "[OK] Safe" if diagnosis.config_safety_status == "safe" else "[WARN] Issues"
+        lines.extend([
+            "",
+            "## Config Safety",
+            f"- Status: {safety_status}",
+            f"- Issues: {diagnosis.config_safety_issues}",
+        ])
+        if diagnosis.tracked_sensitive_files:
+            lines.append("- Tracked sensitive files:")
+            for f in diagnosis.tracked_sensitive_files:
+                lines.append(f"  - {f}")
+    
     if diagnosis.likely_cause:
         lines.extend([
             "",
@@ -477,7 +495,30 @@ def format_diagnosis_yaml(diagnosis: DoctorDiagnosis) -> str:
         
         if diagnosis.feedback_draft_summary:
             data["feedback_draft_summary"] = diagnosis.feedback_draft_summary
-        if diagnosis.feedback_draft_fields:
-            data["feedback_draft_fields"] = diagnosis.feedback_draft_fields
+            if diagnosis.feedback_draft_fields:
+                data["feedback_draft_fields"] = diagnosis.feedback_draft_fields
+    
+    if diagnosis.config_safety_status != "not_checked":
+        data["config_safety_status"] = diagnosis.config_safety_status
+        data["config_safety_issues"] = diagnosis.config_safety_issues
+        if diagnosis.tracked_sensitive_files:
+            data["tracked_sensitive_files"] = diagnosis.tracked_sensitive_files
     
     return yaml.dump(data, default_flow_style=False, sort_keys=False)
+
+
+def _check_config_safety(diagnosis: DoctorDiagnosis) -> None:
+    from runtime.gitignore_manager import GitignoreManager
+    
+    manager = GitignoreManager()
+    summary = manager.get_safety_summary()
+    
+    diagnosis.config_safety_status = "safe" if summary["safe"] else "issues"
+    diagnosis.config_safety_issues = summary["sensitive_not_excluded"] + summary["tracked_sensitive"]
+    diagnosis.tracked_sensitive_files = summary["tracked_files"]
+    
+    if summary["tracked_sensitive"] > 0:
+        diagnosis.warnings.append(
+            f"Config Safety: {summary['tracked_sensitive']} sensitive files tracked by git"
+        )
+        diagnosis.warnings.append("Run: asyncdev config safety-fix")
