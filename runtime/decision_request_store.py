@@ -37,6 +37,7 @@ class DeliveryChannel(str, Enum):
     EMAIL = "email"
     MOCK_FILE = "mock_file"
     CONSOLE = "console"
+    RESEND = "resend"
 
 
 class DecisionRequestStore:

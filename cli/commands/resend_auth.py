@@ -29,6 +29,9 @@ def setup(
     api_key: str = typer.Option(None, help="Resend API key"),
     from_email: str = typer.Option(None, help="Verified sender email"),
     to_email: str = typer.Option(None, help="Your email for receiving decision emails"),
+    inbound_address: str = typer.Option(None, help="Resend inbound email address for replies"),
+    webhook_url: str = typer.Option(None, help="Cloudflare webhook endpoint URL"),
+    webhook_secret: str = typer.Option(None, help="Webhook signing secret"),
     sandbox: bool = typer.Option(False, help="Enable sandbox mode"),
     open_browser: bool = typer.Option(True, help="Open Resend dashboard in browser"),
     force: bool = typer.Option(False, help="Overwrite existing config"),
@@ -42,7 +45,7 @@ def setup(
     Example:
         asyncdev resend-auth setup
         asyncdev resend-auth setup --api-key re_xxx --from-email noreply@domain.com --to-email your@email.com
-        asyncdev resend-auth setup --no-open-browser
+        asyncdev resend-auth setup --inbound-address inbox@xxx.resend.app --webhook-url https://xxx.workers.dev
         asyncdev resend-auth setup --force
     """
     path = config_path or RESEND_CONFIG_FILE
@@ -54,6 +57,8 @@ def setup(
             f"API Key: {existing.get('api_key', '')[:10]}...\n"
             f"From Email: {existing.get('from_email')}\n"
             f"To Email: {existing.get('to_address', 'not set')}\n"
+            f"Inbound Address: {existing.get('inbound_address', 'not set')}\n"
+            f"Webhook URL: {existing.get('webhook_url', 'not set')}\n"
             f"Sandbox: {existing.get('sandbox_mode', False)}",
             title="Existing Config Found",
             border_style="yellow"
@@ -68,6 +73,9 @@ def setup(
             api_key=api_key,
             from_email=from_email,
             to_address=final_to_email,
+            inbound_address=inbound_address,
+            webhook_url=webhook_url,
+            webhook_secret=webhook_secret,
             sandbox_mode=sandbox,
             config_path=path,
         )
@@ -76,6 +84,12 @@ def setup(
             os.environ["RESEND_API_KEY"] = api_key
             os.environ["RESEND_FROM_EMAIL"] = from_email
             os.environ["ASYNCDEV_TO_ADDRESS"] = final_to_email
+            if inbound_address:
+                os.environ["RESEND_INBOUND_ADDRESS"] = inbound_address
+            if webhook_url:
+                os.environ["RESEND_WEBHOOK_URL"] = webhook_url
+            if webhook_secret:
+                os.environ["RESEND_WEBHOOK_SECRET"] = webhook_secret
             if sandbox:
                 os.environ["RESEND_SANDBOX_MODE"] = "true"
             
@@ -84,6 +98,8 @@ def setup(
                 f"API Key: {api_key[:10]}...\n"
                 f"From Email: {from_email}\n"
                 f"To Email: {final_to_email}\n"
+                f"Inbound Address: {inbound_address or 'not set'}\n"
+                f"Webhook URL: {webhook_url or 'not set'}\n"
                 f"Sandbox Mode: {sandbox}",
                 title="Resend Configuration Saved",
                 border_style="green"
@@ -178,9 +194,13 @@ def status(
         f"File Exists: {file_config is not None}\n"
         f"API Key: {config.api_key[:10] + '...' if config.api_key else 'NOT SET'}\n"
         f"From Email: {config.from_email or 'NOT SET'}\n"
+        f"To Email: {config.to_address or 'NOT SET'}\n"
+        f"Inbound Address: {config.inbound_address or 'NOT SET'}\n"
+        f"Webhook URL: {config.webhook_url or 'NOT SET'}\n"
         f"Webhook Secret: {'SET' if config.webhook_secret else 'NOT SET'}\n"
         f"Sandbox Mode: {config.sandbox_mode}\n"
-        f"Is Configured: {config.is_configured()}",
+        f"Is Configured: {config.is_configured()}\n"
+        f"Inbound Ready: {config.has_inbound_configured()}",
         title="Resend Status",
         border_style="blue"
     ))
@@ -189,6 +209,9 @@ def status(
         console.print("[green]Ready to send emails[/green]")
         console.print(f"[cyan]Delivery mode: {os.getenv('ASYNCDEV_DELIVERY_MODE', 'mock_file')}[/cyan]")
         console.print(f"[cyan]Config source: {path if file_config else 'environment'}[/cyan]")
+        if config.has_inbound_configured():
+            console.print("[green]Inbound email handling ready[/green]")
+            console.print(f"[cyan]Reply to: {config.inbound_address}[/cyan]")
     else:
         console.print("[red]Not configured[/red]")
         console.print("[cyan]Run 'asyncdev resend-auth setup' to configure[/cyan]")

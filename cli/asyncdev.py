@@ -11,7 +11,7 @@ from cli.commands import plan_day, run_day, review_night, resume_next_day
 from cli.commands import init, new_product, new_feature
 from cli.commands import complete_feature, archive_feature
 from cli.commands import sqlite_status, inspect_stop
-from cli.commands import backfill, archive, summary, feedback, policy, email_decision, snapshot, doctor, journal, gmail_auth, resend_auth
+from cli.commands import backfill, archive, summary, feedback, policy, email_decision, snapshot, doctor, journal, gmail_auth, resend_auth, check_inbox
 from cli.utils.output_formatter import print_next_step, print_phase_indicator
 from cli.utils.path_formatter import get_relative_path
 
@@ -60,6 +60,8 @@ app.add_typer(journal.app, name="journal", help="View async-dev loop artifact ti
 app.add_typer(gmail_auth.app, name="gmail-auth", help="Gmail OAuth2 authentication setup")
 
 app.add_typer(resend_auth.app, name="resend-auth", help="Resend email provider setup")
+
+app.add_typer(check_inbox.app, name="check-inbox", help="Check pending decisions from webhook")
 
 app.add_typer(sqlite_status.app, name="sqlite", help="SQLite state store queries")
 

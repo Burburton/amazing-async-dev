@@ -34,12 +34,23 @@ class ResendConfig:
     def __init__(self) -> None:
         self.api_key = os.getenv("RESEND_API_KEY", "")
         self.from_email = os.getenv("RESEND_FROM_EMAIL", "")
+        self.to_address = os.getenv("ASYNCDEV_TO_ADDRESS", "")
+        self.inbound_address = os.getenv("RESEND_INBOUND_ADDRESS", "")
+        self.webhook_url = os.getenv("RESEND_WEBHOOK_URL", "")
         self.webhook_secret = os.getenv("RESEND_WEBHOOK_SECRET", "")
         self.sandbox_mode = os.getenv("RESEND_SANDBOX_MODE", "false").lower() == "true"
     
     def is_configured(self) -> bool:
         """Check if Resend is properly configured."""
         return bool(self.api_key and self.from_email)
+    
+    def has_inbound_configured(self) -> bool:
+        """Check if inbound email handling is configured."""
+        return bool(self.inbound_address)
+    
+    def get_reply_to_address(self) -> str:
+        """Get reply-to address for outbound emails."""
+        return self.inbound_address or self.from_email
     
     def get_test_address(self) -> str:
         """Get test email address for sandbox mode."""
@@ -124,10 +135,13 @@ class ResendProvider:
         
         request_id = request.get("decision_request_id")
         
+        reply_to = self.config.get_reply_to_address()
+        
         return self.send_email(
             to=self.config.from_email if self.config.sandbox_mode else (config.to_address or self.config.from_email),
             subject=subject,
             text=body,
+            reply_to=reply_to,
             headers={"X-Decision-Request-Id": request_id} if request_id else None,
             request_id=request_id,
         )
@@ -514,6 +528,8 @@ def save_resend_config(
     api_key: str,
     from_email: str,
     to_address: str | None = None,
+    inbound_address: str | None = None,
+    webhook_url: str | None = None,
     webhook_secret: str | None = None,
     sandbox_mode: bool = False,
     config_path: Path | None = None,
@@ -523,10 +539,12 @@ def save_resend_config(
     Args:
         api_key: Resend API key
         from_email: Verified sender email
-        to_address: Your email for receiving decision emails (optional)
-        webhook_secret: Webhook signing secret (optional)
+        to_address: Your email for receiving decision emails
+        inbound_address: Resend inbound email address for replies
+        webhook_url: Cloudflare webhook endpoint URL
+        webhook_secret: Webhook signing secret
         sandbox_mode: Enable sandbox mode
-        config_path: Path to config file (default: .runtime/resend-config.json)
+        config_path: Path to config file
         
     Returns:
         Result dict with status and path
@@ -539,6 +557,8 @@ def save_resend_config(
         "api_key": api_key,
         "from_email": from_email,
         "to_address": to_address or from_email,
+        "inbound_address": inbound_address or "",
+        "webhook_url": webhook_url or "",
         "webhook_secret": webhook_secret or "",
         "sandbox_mode": sandbox_mode,
         "created_at": datetime.now().isoformat(),
@@ -706,6 +726,12 @@ def apply_resend_config_from_file(config_path: Path | None = None) -> bool:
     
     if config.get("to_address"):
         os.environ["ASYNCDEV_TO_ADDRESS"] = config["to_address"]
+    
+    if config.get("inbound_address"):
+        os.environ["RESEND_INBOUND_ADDRESS"] = config["inbound_address"]
+    
+    if config.get("webhook_url"):
+        os.environ["RESEND_WEBHOOK_URL"] = config["webhook_url"]
     
     if config.get("webhook_secret"):
         os.environ["RESEND_WEBHOOK_SECRET"] = config["webhook_secret"]

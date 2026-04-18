@@ -1,5 +1,6 @@
 """email-decision command - Async human decision channel (Feature 021)."""
 
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -15,6 +16,7 @@ from runtime.decision_request_store import (
     DeliveryChannel,
 )
 from runtime.email_sender import create_email_config, EmailSender
+from runtime.resend_provider import apply_resend_config_from_file
 from runtime.reply_parser import (
     parse_reply,
     validate_reply,
@@ -67,6 +69,14 @@ def create(
     except ValueError:
         dt = DecisionType.TECHNICAL
     
+    delivery_mode = os.getenv("ASYNCDEV_DELIVERY_MODE", "mock_file")
+    if delivery_mode == "resend":
+        delivery_channel = DeliveryChannel.RESEND
+    elif delivery_mode == "console":
+        delivery_channel = DeliveryChannel.CONSOLE
+    else:
+        delivery_channel = DeliveryChannel.MOCK_FILE
+    
     request = store.create_request(
         product_id=project,
         feature_id=feature,
@@ -76,7 +86,7 @@ def create(
         options=parsed_options,
         recommendation=recommendation,
         defer_impact=defer_impact if defer_impact else None,
-        delivery_channel=DeliveryChannel.MOCK_FILE,
+        delivery_channel=delivery_channel,
     )
     
     console.print(Panel(
@@ -88,6 +98,7 @@ def create(
     ))
     
     if send:
+        apply_resend_config_from_file()
         config = create_email_config(project_path)
         sender = EmailSender(config)
         success, mock_path = sender.send_decision_request(request)
@@ -97,7 +108,12 @@ def create(
                 request["decision_request_id"],
                 mock_path=mock_path,
             )
-            console.print(f"[green]Email sent (mock): {mock_path}[/green]")
+            if config.delivery_mode == "resend":
+                console.print(f"[green]Email sent via Resend: Message ID {mock_path}[/green]")
+            elif config.delivery_mode == "console":
+                console.print("[yellow]Email output above (console mode)[/yellow]")
+            else:
+                console.print(f"[green]Email sent (mock): {mock_path}[/green]")
             
             state_store = StateStore(project_path)
             runstate = state_store.load_runstate() or {}
@@ -236,6 +252,9 @@ def send(
         console.print(f"[yellow]Request already {request.get('status')}[/yellow]")
         return
     
+    apply_resend_config_from_file()
+    if os.getenv("RESEND_API_KEY") and os.getenv("RESEND_FROM_EMAIL"):
+        os.environ["ASYNCDEV_DELIVERY_MODE"] = "resend"
     config = create_email_config(project_path)
     sender = EmailSender(config)
     
@@ -243,10 +262,12 @@ def send(
     
     if success:
         store.mark_sent(request_id, mock_path=mock_path)
-        console.print(f"[green]Email sent (mock): {mock_path}[/green]")
-        
-        if config.delivery_mode == "console":
+        if config.delivery_mode == "resend":
+            console.print(f"[green]Email sent via Resend: Message ID {mock_path}[/green]")
+        elif config.delivery_mode == "console":
             console.print("[yellow]Email output above (console mode)[/yellow]")
+        else:
+            console.print(f"[green]Email sent (mock): {mock_path}[/green]")
     else:
         console.print("[red]Failed to send email[/red]")
         raise typer.Exit(1)

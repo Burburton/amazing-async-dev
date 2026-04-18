@@ -105,3 +105,12 @@ projects/*/runstate.md
 projects/
 .runtime/
 runtime/state.db
+
+# Playwright MCP logs
+.playwright-mcp/
+
+# Cloudflare workers (user-specific deployment)
+cloudflare/
+
+# Windows special files
+nul
