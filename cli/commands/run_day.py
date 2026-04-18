@@ -6,6 +6,7 @@ Modes:
 - mock: Testing and demonstration
 
 Feature 036: Enhanced with planning intent alignment and drift warnings.
+Feature 054: Auto email decision trigger integration.
 Hardening: Added --project parameter for canonical loop consistency.
 """
 
@@ -20,11 +21,25 @@ from runtime.state_store import StateStore
 from runtime.engines.factory import get_engine, get_available_modes
 from runtime.execution_event_types import ExecutionEventType
 from runtime.execution_logger import get_logger
+from runtime.auto_email_trigger import check_and_trigger, TriggerSource
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import get_relative_path
 
 app = typer.Typer(help="Run today's execution task")
 console = Console()
+
+
+def _auto_trigger_if_needed(project_path: Path, trigger_source: TriggerSource) -> None:
+    try:
+        result = check_and_trigger(project_path, trigger_source)
+        if result.triggered:
+            console.print(f"\n[green]Auto-triggered decision email: {result.request_id}[/green]")
+        elif result.skipped_reason:
+            console.print(f"\n[dim]Auto-trigger skipped: {result.skipped_reason}[/dim]")
+        elif result.error_message:
+            console.print(f"\n[yellow]Auto-trigger failed: {result.error_message}[/yellow]")
+    except Exception as e:
+        console.print(f"\n[yellow]Auto-trigger error: {e}[/yellow]")
 
 
 PLANNING_MODE_INTENT = {
@@ -485,6 +500,8 @@ def _run_mock_mode(
     previous_phase = runstate.get("current_phase", "executing")
     runstate["current_phase"] = "reviewing"
     store.save_runstate(runstate)
+    
+    _auto_trigger_if_needed(store.project_path, TriggerSource.RUN_DAY_AUTO)
 
     logger.log_transition(
         from_phase=previous_phase,
