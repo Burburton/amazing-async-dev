@@ -4,6 +4,9 @@ from rich.panel import Panel
 from datetime import datetime
 from pathlib import Path
 
+from runtime.project_link_loader import load_project_link, is_mode_b, get_product_repo_path
+from runtime.artifact_router import route_new_feature
+
 app = typer.Typer(help="Create new feature")
 console = Console()
 
@@ -16,17 +19,6 @@ def create(
     goal: str = typer.Option("", help="Feature goal"),
     path: str = typer.Option("projects", help="Root directory for projects"),
 ):
-    """Create new feature with FeatureSpec and RunState.
-
-    Creates:
-    - projects/{product_id}/features/{feature_id}/ directory
-    - feature-spec.yaml with provided info
-    - Updates runstate.md with new feature context
-
-    Example:
-        asyncdev new-feature create --product-id my-app --feature-id 001-auth --name "Auth"
-        asyncdev new-feature create --product-id demo --feature-id 001-core --name "Core" --goal "Build core"
-    """
     from pathlib import Path
     from runtime.adapters.filesystem_adapter import FilesystemAdapter
     from runtime.state_store import StateStore
@@ -41,20 +33,24 @@ def create(
         console.print("Run 'asyncdev new-product' first")
         raise typer.Exit(1)
 
-    feature_dir = product_dir / "features" / feature_id
+    console.print(Panel(f"Create Feature: {name}", border_style="green"))
+
+    context = load_project_link(product_dir)
+    
+    if context and context.ownership_mode.value == "managed_external":
+        spec_path, feature_dir = route_new_feature(product_dir, feature_id)
+        console.print(f"[cyan]Mode B: Routing FeatureSpec to product repo[/cyan]")
+    else:
+        feature_dir = product_dir / "docs" / "features" / feature_id
+        spec_path = feature_dir / "feature-spec.md"
 
     if feature_dir.exists():
         console.print(f"[red]Feature already exists: {feature_dir}[/red]")
         raise typer.Exit(1)
 
-    console.print(Panel(f"Create Feature: {name}", border_style="green"))
-
-    # Create feature directory
     fs.ensure_dir(feature_dir)
-
     console.print(f"[green]Created:[/green] {feature_dir}/")
 
-    # Create feature-spec.yaml
     feature_spec = {
         "feature_id": feature_id,
         "product_id": product_id,
@@ -72,13 +68,16 @@ def create(
         "created_at": datetime.now().isoformat(),
     }
 
-    spec_path = feature_dir / "feature-spec.yaml"
-    with open(spec_path, "w", encoding="utf-8") as f:
-        yaml.dump(feature_spec, f, default_flow_style=False, sort_keys=False)
+    spec_file = spec_path
+    if spec_file.suffix == ".md":
+        spec_content = f"# FeatureSpec - {name}\n\n```yaml\n{yaml.dump(feature_spec, default_flow_style=False, sort_keys=False)}```\n"
+        spec_file.write_text(spec_content, encoding="utf-8")
+    else:
+        with open(spec_file, "w", encoding="utf-8") as f:
+            yaml.dump(feature_spec, f, default_flow_style=False, sort_keys=False)
 
-    console.print(f"[green]Created:[/green] {spec_path}")
+    console.print(f"[green]Created:[/green] {spec_file}")
 
-    # Update runstate
     store = StateStore(product_dir)
     runstate = store.load_runstate() or {}
 
@@ -95,6 +94,7 @@ def create(
 
     console.print("\n[green]Feature created successfully![/green]")
     console.print(f"RunState phase: planning")
+    console.print(f"FeatureSpec: {spec_file}")
     console.print(f"Next: asyncdev plan-day to create ExecutionPack")
 
 
