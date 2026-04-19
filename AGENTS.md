@@ -241,6 +241,36 @@ For browser verification, ExecutionResult MUST include:
 > **For interactive frontend work, environment setup is not verification.**
 > **Server startup is a prerequisite step, not a validation result.**
 
+### 9.8 Verification Completion Enforcement (Feature 059)
+
+**MANDATORY**: After dev server startup for frontend verification, AI agent MUST:
+
+1. Continue to browser verification stage immediately
+2. NOT stop at "server ready" without running verification
+3. Complete verification within timeout (default: 120 seconds)
+4. If blocked, record exception_reason in ExecutionResult
+
+**Anti-Patterns (FORBIDDEN)**:
+- Starting dev server → stopping → claiming "ready"
+- Attempting manual Playwright → failing → not retrying with CLI
+- Leaving `verification_pending` state without completion
+
+**Timeout Behavior**:
+- If 120s elapsed without verification → auto-record timeout exception
+- `ExecutionResult.browser_verification.executed = false`
+- `exception_reason = "verification_timeout"`
+
+**Enforcement Hook**:
+- `runtime/verification_session.py` tracks session state
+- `runtime/verification_enforcer.py` checks timeout
+- System reminder sent if AI stops during `verification_pending`
+- ExecutionResult locked during `verification_pending` state
+
+**Session State Flow**:
+```
+pending → server_started → verification_in_progress → complete/timeout/exception
+```
+
 ---
 
 ## 10. Governance Boundary Rules (Feature 039)
