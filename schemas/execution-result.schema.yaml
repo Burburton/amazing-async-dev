@@ -15,6 +15,7 @@ required:
 
 optional:
   - browser_verification
+  - orchestration_terminal_state
   - issues_resolved
   - metrics
   - notes
@@ -164,6 +165,21 @@ fields:
       state: "continue"
       next_stage: "execution_pack_generation"
       reason: "Checkpoint reached. No stop conditions apply."
+    required: false
+
+  orchestration_terminal_state:
+    type: enum
+    description: Terminal state for browser verification orchestration (Feature 060)
+    values:
+      - not_required
+      - required_not_started
+      - in_progress
+      - success
+      - failure
+      - timeout
+      - exception_accepted
+      - skipped_by_policy
+    example: "success"
     required: false
 
   browser_verification:

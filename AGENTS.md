@@ -271,6 +271,62 @@ For browser verification, ExecutionResult MUST include:
 pending → server_started → verification_in_progress → complete/timeout/exception
 ```
 
+### 9.9 System-Owned Frontend Verification Orchestration (Feature 060)
+
+**CRITICAL**: Frontend verification is now **system-owned**, not agent-optional.
+
+The async-dev runtime now orchestrates frontend verification automatically:
+- `run_day` automatically invokes verification orchestrator for frontend tasks
+- `resume_next_day` triggers post-external verification for frontend tasks
+- Success progression blocked without valid `orchestration_terminal_state`
+
+#### Terminal States
+
+| Terminal State | Valid for Success? | Meaning |
+|-----------------|---------------------|---------|
+| `not_required` | ✅ Yes | Backend-only task, no verification needed |
+| `success` | ✅ Yes | Browser verification completed successfully |
+| `exception_accepted` | ✅ Yes | Valid exception recorded (playwright unavailable, etc.) |
+| `skipped_by_policy` | ✅ Yes | Explicitly skipped via policy rule |
+| `failure` | ❌ No | Verification failed (tests/scenarios failed) |
+| `timeout` | ❌ No | Verification timed out (120s exceeded) |
+| `required_not_started` | ❌ No | Verification required but never started |
+| `in_progress` | ❌ No | Verification still running |
+
+#### Integration Points
+
+1. **run_day live/mock mode**: Orchestrator invoked after engine execution
+2. **resume_next_day**: Post-external verification triggered for frontend tasks
+3. **Success gate**: `orchestration_terminal_state` checked before marking success
+
+#### ExecutionResult Requirements
+
+For frontend tasks, ExecutionResult MUST now include:
+```yaml
+orchestration_terminal_state: "success|failure|timeout|exception_accepted|..."
+browser_verification:
+  executed: true|false
+  passed: N
+  failed: M
+  exception_reason: (if not executed)
+```
+
+#### Architecture
+
+```
+Feature 056 = capability layer (browser_verifier, dev_server_manager)
+Feature 059 = enforcement primitives (verification_session, verification_enforcer)
+Feature 060 = orchestration integration (browser_verification_orchestrator)
+```
+
+The orchestrator (`runtime/browser_verification_orchestrator.py`) is the integration layer that:
+- Determines verification requirement
+- Starts dev server
+- Runs browser verification
+- Captures structured results
+- Applies timeout policies
+- Returns terminal state
+
 ---
 
 ## 10. Governance Boundary Rules (Feature 039)
