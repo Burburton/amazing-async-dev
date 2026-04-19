@@ -6,6 +6,7 @@ Primary execution mode for amazing-async-dev:
 - Awaits external execution and result consumption
 
 Feature 038: Enhanced with Interactive Frontend Verification Gate.
+Feature 060: Post-external verification now system-owned via resume-next-day.
 When verification_type requires browser verification, outputs mandatory Playwright invocation instructions.
 """
 

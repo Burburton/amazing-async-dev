@@ -117,3 +117,9 @@ cloudflare/
 
 # Windows special files
 nul
+
+# Added by asyncdev config safety
+.credentials/
+*-config.json
+.secrets/
+*token*
