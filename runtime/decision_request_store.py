@@ -206,6 +206,18 @@ class DecisionRequestStore:
         self.save_request(request)
         return request
     
+    def mark_resolved(
+        self,
+        request_id: str,
+        resolution: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Mark request as resolved with resolution value."""
+        return self.update_request_status(
+            request_id,
+            DecisionRequestStatus.RESOLVED,
+            resolution=resolution,
+        )
+    
     def check_expired(self) -> list[dict[str, Any]]:
         """Check for expired requests and update their status."""
         now = datetime.now()
