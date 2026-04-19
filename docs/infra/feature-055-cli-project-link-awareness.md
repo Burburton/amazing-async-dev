@@ -1,7 +1,7 @@
 # Feature 055 — CLI Project-Link Awareness & Artifact Routing
 
 ## Status
-`planning`
+`complete`
 
 ## Objective
 Make all async-dev CLI commands aware of `project-link.yaml` and automatically route artifacts to the correct repository based on `ownership_mode`. This enables seamless Mode B (managed_external) product development without manual path management.

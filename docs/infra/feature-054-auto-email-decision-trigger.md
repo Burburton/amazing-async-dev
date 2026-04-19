@@ -1,7 +1,7 @@
 # Feature 054 — Auto Email Decision Trigger
 
 ## Status
-`planning`
+`complete`
 
 ## Objective
 Automatically trigger email decision requests when `decisions_needed` becomes non-empty, eliminating the need for manual `email-decision create --send` calls. This enables true low-interruption canonical loop execution where AI can pause for human decisions without manual intervention.

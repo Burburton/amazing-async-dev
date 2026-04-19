@@ -26,6 +26,19 @@ def create(
     ),
     repo_url: str = typer.Option("", help="Remote repository URL (for managed_external mode)"),
     repo_name: str = typer.Option("", help="Repository name (defaults to product_id)"),
+    enable_email: bool = typer.Option(
+        False,
+        "--enable-email",
+        help="Enable email decision channel for this product"
+    ),
+    email_sender: str = typer.Option(
+        "",
+        help="Email sender address (e.g., noreply@yourdomain.com)"
+    ),
+    email_inbox: str = typer.Option(
+        "",
+        help="Email inbox for decision replies (e.g., decisions@yourdomain.com)"
+    ),
 ):
     """Create new product with ProductBrief.
 
@@ -34,12 +47,14 @@ def create(
     - product-brief.yaml with provided info
     - runstate.md with initial planning phase
     - project-link.yaml (for managed_external mode)
+    - Email channel config (if --enable-email)
 
     Examples:
         asyncdev new-product create --product-id my-app --name "My App"
         asyncdev new-product create --product-id demo-001 --name "Demo" --problem "Test"
         asyncdev new-product create --product-id ai-tool --name "AI Tool" --starter-pack starter-pack.yaml
         asyncdev new-product create --product-id visual-map --name "Visual Map" --ownership-mode managed_external --repo-url https://github.com/user/visual-map
+        asyncdev new-product create --product-id my-app --name "My App" --enable-email --email-sender noreply@example.com
     """
     from pathlib import Path
     from runtime.adapters.filesystem_adapter import FilesystemAdapter
@@ -143,26 +158,38 @@ def create(
 
     console.print(f"[green]Created:[/green] {runstate_path}")
 
-    # Create project-link.yaml for managed_external mode
+    # Create project-link.yaml
+    project_link_data = {
+        "product_id": product_id,
+        "ownership_mode": ownership_mode,
+        "status": "active",
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat(),
+    }
+    
     if ownership_mode == "managed_external":
-        project_link = {
-            "product_id": product_id,
-            "repo_name": repo_name or product_id,
-            "repo_url": repo_url,
-            "ownership_mode": "managed_external",
-            "status": "active",
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
+        project_link_data["repo_name"] = repo_name or product_id
+        project_link_data["repo_url"] = repo_url
+    
+    if enable_email:
+        project_link_data["email_channel"] = {
+            "enabled": True,
+            "sender": email_sender or "noreply@async-dev.local",
+            "decision_inbox": email_inbox or f"decisions-{product_id}@async-dev.local",
         }
-        
+        console.print(f"[blue]Email channel enabled:[/blue] {email_sender or 'noreply@async-dev.local'}")
+    
+    if ownership_mode == "managed_external" or enable_email:
         link_path = product_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
-            yaml.dump(project_link, f, default_flow_style=False, sort_keys=False)
+            yaml.dump(project_link_data, f, default_flow_style=False, sort_keys=False)
         
         console.print(f"[green]Created:[/green] {link_path}")
-        console.print("\n[blue]Governance note:[/blue]")
-        console.print("[dim]Product truth should live in the product repo.[/dim]")
-        console.print("[dim]Orchestration truth stays in async-dev.[/dim]")
+        
+        if ownership_mode == "managed_external":
+            console.print("\n[blue]Governance note:[/blue]")
+            console.print("[dim]Product truth should live in the product repo.[/dim]")
+            console.print("[dim]Orchestration truth stays in async-dev.[/dim]")
 
     if consumption and consumption.success:
         console.print("\n[blue]Starter pack applied:[/blue]")

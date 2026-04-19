@@ -1,7 +1,7 @@
 # Feature 057 — Config Safety Automation (Gitignore Auto-Check)
 
 ## Status
-`planning`
+`complete`
 
 ## Objective
 Automatically ensure sensitive configuration files are excluded from git, preventing accidental credential exposure. Integrate gitignore checks into async-dev initialization and provider setup workflows.

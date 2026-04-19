@@ -1,0 +1,189 @@
+schema_type: report-quality-rubric
+version: "1.0"
+description: Quality rubric for evaluating status reports against best-practice standards (Feature 046)
+
+# Based on research from McKinsey Pyramid Principle, HBR, AI Advisory Board, WhenNotesFly
+
+rubric_categories:
+  structure:
+    name: "Structure & Format"
+    max_points: 25
+    description: "BLUF compliance, one-screen constraint, format consistency"
+    criteria:
+      bluf_compliance:
+        name: "BLUF (Bottom Line Up Front)"
+        weight: 8
+        pass_condition: "Summary states decision/recommendation/ask in first line"
+        fail_condition: "Summary is vague or doesn't lead with conclusion"
+      one_screen_fit:
+        name: "One-Screen Constraint"
+        weight: 6
+        pass_condition: "≤400 words or ≤10 bullets, fits one screen"
+        fail_condition: "Requires scrolling or exceeds limits"
+      consistent_format:
+        name: "Format Consistency"
+        weight: 6
+        pass_condition: "Same structure across reports of same type"
+        fail_condition: "Inconsistent structure"
+      explicit_headers:
+        name: "Section Headers"
+        weight: 5
+        pass_condition: "Clear visual delimiters (What Changed, Next Step, etc)"
+        fail_condition: "Missing or unclear headers"
+
+  decision_readiness:
+    name: "Decision-Readiness"
+    max_points: 30
+    description: "Explicit ask, options, recommendation, deadline"
+    criteria:
+      explicit_ask:
+        name: "Explicit Ask"
+        weight: 10
+        pass_condition: "States what specifically needed from recipient"
+        fail_condition: "Ask is implied or missing"
+      options_provided:
+        name: "Options Provided"
+        weight: 8
+        pass_condition: "2-3 options with pros/cons (for blocker/decision_required)"
+        fail_condition: "Options missing or just listing without analysis"
+        applicability: ["blocker", "required_decision"]
+      recommendation_stated:
+        name: "Recommendation Stated"
+        weight: 7
+        pass_condition: "Clear recommendation, not just options"
+        fail_condition: "No recommendation or vague"
+      deadline_included:
+        name: "Decision Deadline"
+        weight: 5
+        pass_condition: "Includes 'Decision needed by [date]'"
+        fail_condition: "No deadline specified"
+        applicability: ["blocker", "required_decision"]
+
+  content_quality:
+    name: "Content Quality"
+    max_points: 25
+    description: "Outcomes over activities, quantification, blocker/risk separation"
+    criteria:
+      outcomes_not_activities:
+        name: "Outcomes Over Activities"
+        weight: 8
+        pass_condition: "Progress bullets describe outcomes/milestones"
+        fail_condition: "Progress bullets are activity logs"
+      quantified_claims:
+        name: "Quantified Claims"
+        weight: 7
+        pass_condition: "Numbers accompany qualitative statements"
+        fail_condition: "Qualitative only (significant, improved, faster)"
+        applicability: ["milestone", "blocker"]
+      blocker_risk_separated:
+        name: "Blocker/Risk Separation"
+        weight: 5
+        pass_condition: "Distinct sections for present blockers vs future risks"
+        fail_condition: "Blockers and risks mixed together"
+        applicability: ["blocker", "progress"]
+      no_hedging_language:
+        name: "Confident Framing"
+        weight: 5
+        pass_condition: "Active voice, no hedging (maybe, think, might)"
+        fail_condition: "Hedging language or passive voice"
+
+  signal_to_noise:
+    name: "Signal-to-Noise Ratio"
+    max_points: 20
+    description: "High signal, low noise, changed items only"
+    criteria:
+      changed_items_only:
+        name: "Changed Items Only"
+        weight: 8
+        pass_condition: "Reports what's new/different, not full retelling"
+        fail_condition: "Reports everything including unchanged items"
+      no_vanity_metrics:
+        name: "No Vanity Metrics"
+        weight: 6
+        pass_condition: "Metrics tied to decisions/outcomes"
+        fail_condition: "Metrics without context or actionable relevance"
+      truncation_applied:
+        name: "Truncation Applied"
+        weight: 6
+        pass_condition: "Links for details, not inline expansion"
+        fail_condition: "Everything inline, no references"
+
+quality_levels:
+  excellent:
+    min_score: 90
+    max_score: 100
+    description: "Fully compliant with best practices"
+  good:
+    min_score: 75
+    max_score: 89
+    description: "Mostly compliant, minor gaps"
+  acceptable:
+    min_score: 60
+    max_score: 74
+    description: "Meets minimum standards"
+  needs_improvement:
+    min_score: 40
+    max_score: 59
+    description: "Significant gaps, requires revision"
+  poor:
+    min_score: 0
+    max_score: 39
+    description: "Does not meet standards"
+
+anti_patterns:
+  building_up_to_recommendation:
+    description: "Summary doesn't lead with conclusion"
+    severity: high
+  over_including_methodology:
+    description: "Includes journey/analysis rather than outcome"
+    severity: medium
+  hedging_language:
+    description: "Uses maybe, think, might, could"
+    severity: medium
+  passive_voice:
+    description: "It was decided vs We decided"
+    severity: low
+  implicit_ask:
+    description: "Ask not explicitly stated"
+    severity: high
+  everything_is_fine:
+    description: "False confidence, hides problems"
+    severity: high
+  options_without_recommendation:
+    description: "Presents options but no recommendation"
+    severity: high
+  long_narrative_paragraphs:
+    description: "Large text blocks instead of bullets"
+    severity: medium
+  vanity_metrics:
+    description: "Metrics without actionable context"
+    severity: medium
+  blocker_risk_mixed:
+    description: "Blockers and risks not separated"
+    severity: medium
+
+future_improvements:
+  - id: "046-01"
+    description: "Add options structure with pros/cons format to status report"
+    priority: high
+    category: decision_readiness
+  - id: "046-02"
+    description: "Separate blockers (present) from risks (future) in report template"
+    priority: high
+    category: content_quality
+  - id: "046-03"
+    description: "Add decision_deadline field for required_decision type"
+    priority: high
+    category: decision_readiness
+  - id: "046-04"
+    description: "Strengthen quantification enforcement for milestone/blocker reports"
+    priority: medium
+    category: content_quality
+  - id: "046-05"
+    description: "Add SCQA framework support for complex decision requests"
+    priority: low
+    category: structure
+  - id: "046-06"
+    description: "Add executive summary template for multi-feature projects"
+    priority: low
+    category: structure
