@@ -3,6 +3,7 @@
 Feature 034: Enriched with prior-night decision pack alignment.
 Feature 037: Integrated continuation semantics for checkpoint-based progression.
 Feature 043: Integrated email decision reconciliation and sync.
+Feature 060: Post-external frontend verification orchestration (AC-003).
 """
 
 from datetime import datetime
@@ -36,11 +37,84 @@ from runtime.decision_sync import (
     get_decision_status_summary,
     apply_email_resolution_to_runstate,
 )
+from runtime.browser_verification_orchestrator import (
+    orchestrate_post_external,
+    OrchestrationTerminalState,
+)
+from runtime.verification_gate import requires_browser_verification
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import get_relative_path
 
 app = typer.Typer(help="Resume from human decisions, start next day loop")
 console = Console()
+
+
+def _run_post_external_verification(
+    project_path: Path,
+    product_id: str,
+    current_phase: str,
+) -> dict[str, Any] | None:
+    if current_phase != "reviewing":
+        return None
+    
+    store = StateStore(project_path)
+    packs = list(store.execution_packs_path.glob("exec-*.md"))
+    if not packs:
+        return None
+    
+    execution_id = packs[-1].stem
+    execution_pack = store.load_execution_pack(execution_id)
+    execution_result = store.load_execution_result(execution_id)
+    
+    if not execution_pack or not execution_result:
+        return None
+    
+    verification_type = execution_pack.get("verification_type", "backend_only")
+    if not requires_browser_verification(verification_type):
+        return None
+    
+    bv_field = execution_result.get("browser_verification", {})
+    if bv_field.get("executed", False):
+        return None
+    
+    if bv_field.get("exception_reason") in [
+        "playwright_unavailable",
+        "environment_blocked",
+        "browser_install_failed",
+        "ci_container_limitation",
+        "missing_credentials",
+        "deterministic_blocker",
+        "reclassified_noninteractive",
+    ]:
+        return None
+    
+    console.print(f"\n[bold cyan]Post-External Verification Required[/bold cyan]")
+    console.print(f"  Execution: {execution_id}")
+    console.print(f"  Verification Type: {verification_type}")
+    console.print(f"  [yellow]External tool did not complete browser verification[/yellow]")
+    
+    orchestration_result = orchestrate_post_external(
+        project_path=project_path,
+        project_id=product_id,
+        execution_pack=execution_pack,
+        execution_result=execution_result,
+    )
+    
+    console.print(f"  Terminal State: [green]{orchestration_result.terminal_state.value}[/green]")
+    
+    if orchestration_result.terminal_state == OrchestrationTerminalState.SUCCESS:
+        console.print("[green]Post-external verification completed[/green]")
+    elif orchestration_result.terminal_state == OrchestrationTerminalState.EXCEPTION_ACCEPTED:
+        console.print(f"[yellow]Verification skipped: {orchestration_result.exception_details}[/yellow]")
+    else:
+        console.print(f"[red]Verification failed[/red]")
+    
+    return {
+        "execution_id": execution_id,
+        "orchestration_result": orchestration_result,
+        "browser_verification": orchestration_result.to_dict()["browser_verification"],
+        "orchestration_terminal_state": orchestration_result.terminal_state.value,
+    }
 
 
 def _load_latest_review_pack(project_path: Path) -> dict[str, Any] | None:
@@ -227,6 +301,23 @@ def continue_loop(
     feature_id = runstate.get("feature_id", "")
     product_id = runstate.get("project_id", "")
     previous_phase = runstate.get("current_phase", "planning")
+    
+    post_external_result = _run_post_external_verification(
+        project_path,
+        product_id,
+        previous_phase,
+    )
+    
+    if post_external_result:
+        execution_id = post_external_result["execution_id"]
+        store = StateStore(project_path)
+        execution_result = store.load_execution_result(execution_id) or {}
+        
+        execution_result["browser_verification"] = post_external_result["browser_verification"]
+        execution_result["orchestration_terminal_state"] = post_external_result["orchestration_terminal_state"]
+        
+        store.save_execution_result(execution_result)
+        console.print("[cyan]Updated ExecutionResult with verification data[/cyan]")
 
     logger.log_event(
         ExecutionEventType.RESUME_NEXT_DAY_STARTED,

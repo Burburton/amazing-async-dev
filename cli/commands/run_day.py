@@ -7,6 +7,7 @@ Modes:
 
 Feature 036: Enhanced with planning intent alignment and drift warnings.
 Feature 054: Auto email decision trigger integration.
+Feature 060: System-owned frontend verification orchestration.
 Hardening: Added --project parameter for canonical loop consistency.
 """
 
@@ -22,6 +23,13 @@ from runtime.engines.factory import get_engine, get_available_modes
 from runtime.execution_event_types import ExecutionEventType
 from runtime.execution_logger import get_logger
 from runtime.auto_email_trigger import check_and_trigger, TriggerSource
+from runtime.browser_verification_orchestrator import (
+    BrowserVerificationOrchestrator,
+    OrchestrationResult,
+    OrchestrationTerminalState,
+    orchestrate_for_run_day,
+)
+from runtime.verification_gate import requires_browser_verification
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import get_relative_path
 
@@ -40,6 +48,50 @@ def _auto_trigger_if_needed(project_path: Path, trigger_source: TriggerSource) -
             console.print(f"\n[yellow]Auto-trigger failed: {result.error_message}[/yellow]")
     except Exception as e:
         console.print(f"\n[yellow]Auto-trigger error: {e}[/yellow]")
+
+
+def _run_frontend_verification(
+    project_path: Path,
+    execution_pack: dict[str, Any],
+    product_id: str,
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    verification_type = execution_pack.get("verification_type", "backend_only")
+    
+    if not requires_browser_verification(verification_type):
+        return result
+    
+    console.print(f"\n[cyan]Frontend verification required (type: {verification_type})[/cyan]")
+    
+    try:
+        orchestration_result = orchestrate_for_run_day(
+            project_path=project_path,
+            execution_pack=execution_pack,
+            project_id=product_id,
+        )
+        
+        result["orchestration_terminal_state"] = orchestration_result.terminal_state.value
+        result["browser_verification"] = orchestration_result.to_dict()["browser_verification"]
+        
+        if orchestration_result.terminal_state == OrchestrationTerminalState.SUCCESS:
+            console.print(f"[green]Frontend verification completed successfully[/green]")
+        elif orchestration_result.terminal_state == OrchestrationTerminalState.EXCEPTION_ACCEPTED:
+            console.print(f"[yellow]Frontend verification skipped: {orchestration_result.exception_details}[/yellow]")
+        else:
+            console.print(f"[red]Frontend verification failed: {orchestration_result.terminal_state.value}[/red]")
+            if result.get("status") == "success":
+                result["status"] = "partial"
+        
+    except Exception as e:
+        console.print(f"[red]Frontend verification orchestration error: {e}[/red]")
+        result["browser_verification"] = {
+            "executed": False,
+            "exception_reason": "environment_blocked",
+            "exception_details": str(e),
+        }
+        result["orchestration_terminal_state"] = OrchestrationTerminalState.EXCEPTION_ACCEPTED.value
+    
+    return result
 
 
 PLANNING_MODE_INTENT = {
@@ -358,6 +410,13 @@ def _run_live_mode(
     console.print(f"\n[cyan]Executing via API (model: {prep.get('model', 'unknown')})...[/cyan]")
 
     result = engine.run(execution_pack)
+    
+    result = _run_frontend_verification(
+        store.project_path,
+        execution_pack,
+        product_id,
+        result,
+    )
 
     logger.log_event(
         ExecutionEventType.EXECUTION_RESULT_COLLECTED,
@@ -479,6 +538,14 @@ def _run_mock_mode(
         }
 
     result = engine.run(test_pack)
+    
+    if execution_pack:
+        result = _run_frontend_verification(
+            store.project_path,
+            execution_pack,
+            product_id,
+            result,
+        )
 
     logger.log_event(
         ExecutionEventType.EXECUTION_RESULT_COLLECTED,
