@@ -4,6 +4,7 @@ Feature 034: Enriched with prior-night decision pack alignment.
 Feature 037: Integrated continuation semantics for checkpoint-based progression.
 Feature 043: Integrated email decision reconciliation and sync.
 Feature 060: Post-external frontend verification orchestration (AC-003).
+Feature 061: Fallback path for closeout recovery (primary path now in run-day external closeout).
 """
 
 from datetime import datetime
@@ -42,6 +43,12 @@ from runtime.browser_verification_orchestrator import (
     OrchestrationTerminalState,
 )
 from runtime.verification_gate import requires_browser_verification
+from runtime.external_execution_closeout import (
+    check_closeout_recovery_needed,
+    orchestrate_external_closeout,
+    CloseoutState,
+    CloseoutTerminalClassification,
+)
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import get_relative_path
 
@@ -54,6 +61,16 @@ def _run_post_external_verification(
     product_id: str,
     current_phase: str,
 ) -> dict[str, Any] | None:
+    """Fallback path for post-external verification (Feature 061 AC-006).
+    
+    This function is now the fallback recovery path, not the primary.
+    Primary path is in run-day external closeout (--trigger mode).
+    
+    Only runs if:
+    - current_phase is reviewing
+    - closeout recovery is needed (check_closeout_recovery_needed)
+    - verification is required and missing
+    """
     if current_phase != "reviewing":
         return None
     
@@ -69,51 +86,48 @@ def _run_post_external_verification(
     if not execution_pack or not execution_result:
         return None
     
-    verification_type = execution_pack.get("verification_type", "backend_only")
-    if not requires_browser_verification(verification_type):
+    closeout_state_str = execution_result.get("closeout_state", "")
+    
+    if closeout_state_str:
+        try:
+            closeout_state = CloseoutState(closeout_state_str)
+            if closeout_state.is_terminal() and closeout_state.is_success():
+                return None
+        except ValueError:
+            pass
+    
+    recovery_check = check_closeout_recovery_needed(project_path, execution_id)
+    
+    if not recovery_check.get("recovery_needed"):
         return None
     
-    bv_field = execution_result.get("browser_verification", {})
-    if bv_field.get("executed", False):
-        return None
-    
-    if bv_field.get("exception_reason") in [
-        "playwright_unavailable",
-        "environment_blocked",
-        "browser_install_failed",
-        "ci_container_limitation",
-        "missing_credentials",
-        "deterministic_blocker",
-        "reclassified_noninteractive",
-    ]:
-        return None
-    
-    console.print(f"\n[bold cyan]Post-External Verification Required[/bold cyan]")
+    console.print(f"\n[bold cyan]Closeout Recovery (Fallback Path)[/bold cyan]")
     console.print(f"  Execution: {execution_id}")
-    console.print(f"  Verification Type: {verification_type}")
-    console.print(f"  [yellow]External tool did not complete browser verification[/yellow]")
+    console.print(f"  Recovery Reason: {recovery_check.get('reason', 'unknown')}")
+    console.print(f"  [yellow]Primary closeout path did not complete[/yellow]")
     
-    orchestration_result = orchestrate_post_external(
+    closeout_result = orchestrate_external_closeout(
         project_path=project_path,
-        project_id=product_id,
+        execution_id=execution_id,
         execution_pack=execution_pack,
-        execution_result=execution_result,
+        project_id=product_id,
     )
     
-    console.print(f"  Terminal State: [green]{orchestration_result.terminal_state.value}[/green]")
+    console.print(f"  Closeout State: [green]{closeout_result.closeout_state.value}[/green]")
     
-    if orchestration_result.terminal_state == OrchestrationTerminalState.SUCCESS:
-        console.print("[green]Post-external verification completed[/green]")
-    elif orchestration_result.terminal_state == OrchestrationTerminalState.EXCEPTION_ACCEPTED:
-        console.print(f"[yellow]Verification skipped: {orchestration_result.exception_details}[/yellow]")
+    if closeout_result.closeout_state == CloseoutState.CLOSEOUT_COMPLETED_SUCCESS:
+        console.print("[green]Closeout recovery completed[/green]")
+    elif closeout_result.closeout_state == CloseoutState.CLOSEOUT_RECOVERY_REQUIRED:
+        console.print(f"[yellow]Closeout still requires recovery: {closeout_result.recovery_reason}[/yellow]")
     else:
-        console.print(f"[red]Verification failed[/red]")
+        console.print(f"[red]Closeout failed[/red]")
     
     return {
         "execution_id": execution_id,
-        "orchestration_result": orchestration_result,
-        "browser_verification": orchestration_result.to_dict()["browser_verification"],
-        "orchestration_terminal_state": orchestration_result.terminal_state.value,
+        "closeout_result": closeout_result,
+        "browser_verification": closeout_result.to_dict(),
+        "closeout_state": closeout_result.closeout_state.value,
+        "closeout_terminal_state": closeout_result.terminal_classification.value if closeout_result.terminal_classification else None,
     }
 
 

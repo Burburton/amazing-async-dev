@@ -327,6 +327,100 @@ The orchestrator (`runtime/browser_verification_orchestrator.py`) is the integra
 - Applies timeout policies
 - Returns terminal state
 
+### 9.10 External Execution Closeout Orchestration (Feature 061)
+
+**CRITICAL**: External execution closeout is now **system-owned**, not fire-and-forget.
+
+When running `run-day --mode external --trigger`, the system:
+- Triggers external tool execution
+- Enters a closeout phase (polls for result readiness)
+- Detects missing frontend verification
+- Invokes Feature 060 post-external verification when needed
+- Classifies final closeout state
+- Persists closeout results in ExecutionResult
+
+#### Primary vs Fallback Path
+
+| Path | When | Behavior |
+|------|------|----------|
+| **Primary** | `run-day --trigger` | Closeout in same lifecycle, verification run immediately |
+| **Fallback** | `resume-next-day` | Recovery for interrupted/incomplete closeout |
+
+**Key Change**: `resume-next-day` is now the fallback recovery path, not the primary completion mechanism.
+
+#### Closeout States
+
+| State | Meaning |
+|-------|---------|
+| `external_execution_triggered` | External tool invoked |
+| `external_execution_pending` | Polling for result |
+| `external_execution_result_detected` | ExecutionResult file found |
+| `post_external_verification_required` | Frontend verification needed but missing |
+| `post_external_verification_running` | Feature 060 verification executing |
+| `post_external_verification_completed` | Verification finished |
+| `external_execution_stalled` | No progress detected |
+| `closeout_timeout` | Polling exceeded 120s timeout |
+| `closeout_completed_success` | All closeout steps successful |
+| `closeout_completed_failure` | Closeout failed |
+| `closeout_recovery_required` | Fallback recovery needed |
+
+#### Terminal Classifications
+
+| Classification | Valid for Success? | Meaning |
+|----------------|---------------------|---------|
+| `success` | ✅ Yes | Closeout completed, verification valid |
+| `failure` | ❌ No | Closeout failed |
+| `verification_failure` | ❌ No | Frontend verification failed |
+| `closeout_timeout` | ❌ No | Polling timeout |
+| `stalled` | ❌ No | External execution stalled |
+| `recovery_required` | ❌ No | Fallback recovery needed |
+
+#### ExecutionResult Requirements
+
+For external execution closeout, ExecutionResult MUST include:
+```yaml
+closeout_state: "closeout_completed_success|closeout_timeout|..."
+closeout_terminal_state: "success|failure|recovery_required|..."
+closeout_result:
+  execution_result_detected: true|false
+  verification_required: true|false
+  verification_completed: true|false
+  poll_attempts: N
+  elapsed_seconds: M
+  recovery_required: true|false
+  recovery_reason: (if recovery required)
+```
+
+#### Architecture
+
+```
+Feature 056 = capability layer (browser_verifier, dev_server_manager)
+Feature 059 = enforcement primitives (verification_session, verification_enforcer)
+Feature 060 = frontend verification orchestration (browser_verification_orchestrator)
+Feature 061 = external closeout lifecycle (external_execution_closeout)
+```
+
+The closeout orchestrator (`runtime/external_execution_closeout.py`) is responsible for:
+- Polling for ExecutionResult readiness (10s intervals, max 120s)
+- Detecting missing frontend verification
+- Invoking Feature 060 orchestration when needed
+- Classifying terminal closeout state
+- Persisting closeout state to ExecutionResult
+
+#### Anti-Patterns (FORBIDDEN)
+
+| Anti-Pattern | Consequence |
+|--------------|-------------|
+| External mode as pure fire-and-forget | **STOP** - Closeout must run |
+| resume-next-day as only verification recovery | **STOP** - Primary path moved forward |
+| Re-implementing browser verification in closeout | **STOP** - Use Feature 060 orchestration |
+| Freeform logs as closeout truth | **STOP** - Structured state required |
+
+#### Integration Points
+
+1. **run_day external --trigger**: Primary closeout path (polls for result, runs verification)
+2. **resume_next_day**: Fallback recovery path (checks closeout_state, completes if needed)
+
 ---
 
 ## 10. Governance Boundary Rules (Feature 039)

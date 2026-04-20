@@ -16,6 +16,9 @@ required:
 optional:
   - browser_verification
   - orchestration_terminal_state
+  - closeout_state
+  - closeout_terminal_state
+  - closeout_result
   - issues_resolved
   - metrics
   - notes
@@ -181,6 +184,101 @@ fields:
       - skipped_by_policy
     example: "success"
     required: false
+
+  closeout_state:
+    type: enum
+    description: Closeout lifecycle state for external execution (Feature 061)
+    values:
+      - external_execution_triggered
+      - external_execution_pending
+      - external_execution_result_detected
+      - post_external_verification_required
+      - post_external_verification_running
+      - post_external_verification_completed
+      - external_execution_stalled
+      - closeout_timeout
+      - closeout_completed_success
+      - closeout_completed_failure
+      - closeout_recovery_required
+    example: "closeout_completed_success"
+    required: false
+
+  closeout_terminal_state:
+    type: enum
+    description: Terminal classification for external closeout outcome (Feature 061)
+    values:
+      - success
+      - failure
+      - verification_failure
+      - closeout_timeout
+      - stalled
+      - recovery_required
+    example: "success"
+    required: false
+
+  closeout_result:
+    type: object
+    description: Full closeout orchestration result details (Feature 061)
+    required: false
+    properties:
+      closeout_state:
+        type: string
+        description: Current closeout state
+      closeout_terminal_state:
+        type: string
+        description: Terminal classification if closeout complete
+      execution_result_detected:
+        type: boolean
+        description: Whether execution result was detected during closeout
+      execution_result_valid:
+        type: boolean
+        description: Whether execution result was valid
+      verification_required:
+        type: boolean
+        description: Whether frontend verification was required
+      verification_completed:
+        type: boolean
+        description: Whether frontend verification completed
+      verification_terminal_state:
+        type: string
+        description: Verification orchestration terminal state
+      poll_attempts:
+        type: integer
+        description: Number of polling attempts
+      elapsed_seconds:
+        type: number
+        description: Total closeout elapsed time
+      timeout_seconds:
+        type: integer
+        description: Configured timeout
+      started_at:
+        type: string
+        description: Closeout start timestamp
+      finished_at:
+        type: string
+        description: Closeout finish timestamp
+      recovery_required:
+        type: boolean
+        description: Whether fallback recovery is needed
+      recovery_reason:
+        type: string
+        description: Reason for recovery if required
+      stall_detected:
+        type: boolean
+        description: Whether stall was detected
+      closeout_error:
+        type: string
+        description: Error message if closeout failed
+    example:
+      closeout_state: "closeout_completed_success"
+      closeout_terminal_state: "success"
+      execution_result_detected: true
+      execution_result_valid: true
+      verification_required: true
+      verification_completed: true
+      poll_attempts: 3
+      elapsed_seconds: 45.2
+      timeout_seconds: 120
 
   browser_verification:
     type: object
@@ -445,4 +543,70 @@ json_schema:
           items:
             type: string
         duration:
+          type: string
+    orchestration_terminal_state:
+      enum:
+        - not_required
+        - required_not_started
+        - in_progress
+        - success
+        - failure
+        - timeout
+        - exception_accepted
+        - skipped_by_policy
+    closeout_state:
+      enum:
+        - external_execution_triggered
+        - external_execution_pending
+        - external_execution_result_detected
+        - post_external_verification_required
+        - post_external_verification_running
+        - post_external_verification_completed
+        - external_execution_stalled
+        - closeout_timeout
+        - closeout_completed_success
+        - closeout_completed_failure
+        - closeout_recovery_required
+    closeout_terminal_state:
+      enum:
+        - success
+        - failure
+        - verification_failure
+        - closeout_timeout
+        - stalled
+        - recovery_required
+    closeout_result:
+      type: object
+      properties:
+        closeout_state:
+          type: string
+        closeout_terminal_state:
+          type: string
+        execution_result_detected:
+          type: boolean
+        execution_result_valid:
+          type: boolean
+        verification_required:
+          type: boolean
+        verification_completed:
+          type: boolean
+        verification_terminal_state:
+          type: string
+        poll_attempts:
+          type: integer
+        elapsed_seconds:
+          type: number
+        timeout_seconds:
+          type: integer
+        started_at:
+          type: string
+        finished_at:
+          type: string
+        recovery_required:
+          type: boolean
+        recovery_reason:
+          type: string
+        stall_detected:
+          type: boolean
+        closeout_error:
           type: string

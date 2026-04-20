@@ -8,6 +8,7 @@ Modes:
 Feature 036: Enhanced with planning intent alignment and drift warnings.
 Feature 054: Auto email decision trigger integration.
 Feature 060: System-owned frontend verification orchestration.
+Feature 061: External execution closeout orchestration (primary path).
 Hardening: Added --project parameter for canonical loop consistency.
 """
 
@@ -30,6 +31,12 @@ from runtime.browser_verification_orchestrator import (
     orchestrate_for_run_day,
 )
 from runtime.verification_gate import requires_browser_verification
+from runtime.external_execution_closeout import (
+    orchestrate_external_closeout,
+    CloseoutState,
+    CloseoutTerminalClassification,
+    CloseoutResult,
+)
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import get_relative_path
 
@@ -350,6 +357,28 @@ def _run_external_mode(
             event_data={"execution_id": execution_id, "triggered": True},
         )
 
+        if not dry_run:
+            console.print("\n[bold cyan]Entering External Closeout Phase (Feature 061)[/bold cyan]")
+            console.print(f"  Waiting for execution result (timeout: 120s)...")
+            
+            closeout_result = orchestrate_external_closeout(
+                project_path=store.project_path,
+                execution_id=execution_id,
+                execution_pack=execution_pack,
+                project_id=product_id,
+            )
+            
+            _handle_closeout_result(
+                closeout_result,
+                execution_id,
+                feature_id,
+                product_id,
+                logger,
+                store,
+                root,
+            )
+            return
+
     if dry_run:
         console.print("[yellow]Dry run - external mode does not modify state[/yellow]")
         logger.close()
@@ -362,6 +391,153 @@ def _run_external_mode(
         root=root,
         hints=["After execution, run resume-next-day to continue"],
     )
+
+
+def _handle_closeout_result(
+    closeout_result: CloseoutResult,
+    execution_id: str,
+    feature_id: str,
+    product_id: str,
+    logger,
+    store: StateStore,
+    root: Path,
+) -> None:
+    """Handle closeout result and update state (Feature 061 AC-002)."""
+    console.print(f"\n[bold]Closeout Status:[/bold] {closeout_result.closeout_state.value}")
+    console.print(f"  Poll Attempts: {closeout_result.poll_attempts}")
+    console.print(f"  Elapsed: {closeout_result.elapsed_seconds:.1f}s")
+    
+    if closeout_result.execution_result_detected:
+        console.print(f"  Result Detected: [green]Yes[/green]")
+    else:
+        console.print(f"  Result Detected: [red]No[/red]")
+    
+    if closeout_result.verification_required:
+        console.print(f"  Verification Required: [yellow]Yes[/yellow]")
+        console.print(f"  Verification Completed: {closeout_result.verification_completed}")
+        console.print(f"  Verification Terminal: {closeout_result.verification_terminal_state or 'N/A'}")
+    
+    terminal_classification = closeout_result.terminal_classification
+    if terminal_classification:
+        if terminal_classification == CloseoutTerminalClassification.SUCCESS:
+            console.print(f"\n  [bold green]Terminal Classification: {terminal_classification.value}[/bold green]")
+        elif terminal_classification == CloseoutTerminalClassification.RECOVERY_REQUIRED:
+            console.print(f"\n  [bold yellow]Terminal Classification: {terminal_classification.value}[/bold yellow]")
+            if closeout_result.recovery_reason:
+                console.print(f"  [yellow]Reason: {closeout_result.recovery_reason}[/yellow]")
+        else:
+            console.print(f"\n  [bold red]Terminal Classification: {terminal_classification.value}[/bold red]")
+    
+    logger.log_event(
+        ExecutionEventType.EXTERNAL_EXECUTION_CLOSEOUT,
+        feature_id=feature_id,
+        product_id=product_id,
+        event_data={
+            "execution_id": execution_id,
+            "closeout_state": closeout_result.closeout_state.value,
+            "terminal_classification": terminal_classification.value if terminal_classification else None,
+            "poll_attempts": closeout_result.poll_attempts,
+            "elapsed_seconds": closeout_result.elapsed_seconds,
+        },
+    )
+    
+    execution_result = store.load_execution_result(execution_id) or {}
+    execution_result["closeout_state"] = closeout_result.closeout_state.value
+    execution_result["closeout_terminal_state"] = terminal_classification.value if terminal_classification else None
+    execution_result["closeout_result"] = closeout_result.to_dict()
+    
+    if closeout_result.execution_result_detected and closeout_result.execution_result_valid:
+        if terminal_classification == CloseoutTerminalClassification.SUCCESS:
+            execution_result["status"] = "success"
+        elif terminal_classification == CloseoutTerminalClassification.RECOVERY_REQUIRED:
+            execution_result["status"] = "partial"
+        else:
+            execution_result["status"] = "failed"
+    else:
+        execution_result["status"] = "failed"
+        execution_result["blocked_reasons"] = [{
+            "reason": closeout_result.recovery_reason or "External execution did not produce valid result",
+            "impact": "Closeout incomplete",
+        }]
+    
+    store.save_execution_result(execution_result)
+    
+    runstate = store.load_runstate() or {}
+    previous_phase = runstate.get("current_phase", "executing")
+    
+    if terminal_classification == CloseoutTerminalClassification.SUCCESS:
+        runstate["current_phase"] = "reviewing"
+        runstate["last_action"] = f"External closeout completed: {execution_id}"
+        runstate["next_recommended_action"] = "Generate DailyReviewPack"
+    elif terminal_classification == CloseoutTerminalClassification.RECOVERY_REQUIRED:
+        runstate["current_phase"] = "reviewing"
+        runstate["last_action"] = f"External closeout recovery needed: {execution_id}"
+        runstate["next_recommended_action"] = "Run resume-next-day to recover closeout"
+        runstate["blocked_items"] = [{
+            "reason": closeout_result.recovery_reason or "Closeout incomplete",
+            "resolution": "Resume closeout via resume-next-day",
+        }]
+    else:
+        runstate["current_phase"] = "blocked"
+        runstate["last_action"] = f"External closeout failed: {execution_id}"
+        runstate["blocked_items"] = [{
+            "reason": f"Closeout terminal: {terminal_classification.value if terminal_classification else 'unknown'}",
+            "resolution": "Manual intervention required",
+        }]
+    
+    store.save_runstate(runstate)
+    
+    logger.log_transition(
+        from_phase=previous_phase,
+        to_phase=runstate["current_phase"],
+        feature_id=feature_id,
+        product_id=product_id,
+        reason=f"External closeout: {closeout_result.closeout_state.value}",
+    )
+    logger.close()
+    
+    result_path = store.execution_results_path / f"{execution_id}.md"
+    
+    if terminal_classification == CloseoutTerminalClassification.SUCCESS:
+        print_success_panel(
+            message=f"External closeout completed successfully",
+            title="Closeout Complete",
+            paths=[
+                {"label": "ExecutionResult", "path": str(result_path)},
+                {"label": "RunState", "path": str(store.project_path / "runstate.md")},
+            ],
+            root=root,
+        )
+        print_next_step(
+            action="Generate DailyReviewPack for human review",
+            command="asyncdev review-night generate",
+            artifact_path=result_path,
+            root=root,
+        )
+    elif terminal_classification == CloseoutTerminalClassification.RECOVERY_REQUIRED:
+        print_success_panel(
+            message=f"External closeout recovery needed",
+            title="Closeout Partial",
+            paths=[
+                {"label": "ExecutionResult", "path": str(result_path)},
+            ],
+            root=root,
+        )
+        print_next_step(
+            action="Run resume-next-day to complete closeout",
+            command="asyncdev resume-next-day continue-loop",
+            artifact_path=result_path,
+            root=root,
+            hints=["Closeout interrupted or verification incomplete"],
+        )
+    else:
+        console.print(f"\n[red]External closeout failed. Check ExecutionResult for details.[/red]")
+        print_next_step(
+            action="Review failure and decide next action",
+            command="asyncdev resume-next-day status",
+            artifact_path=result_path,
+            root=root,
+        )
 
 
 def _run_live_mode(

@@ -23,6 +23,7 @@ class ExecutionEventType(str, Enum):
     # External execution mode
     EXTERNAL_EXECUTION_TRIGGERED = "external-execution-triggered"
     EXTERNAL_EXECUTION_AWAITING = "external-execution-awaiting"
+    EXTERNAL_EXECUTION_CLOSEOUT = "external-execution-closeout"
     
     # State transitions
     BLOCKED_ENTERED = "blocked-entered"
