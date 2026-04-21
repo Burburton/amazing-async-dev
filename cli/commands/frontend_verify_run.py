@@ -19,6 +19,7 @@ from rich.table import Table
 
 from runtime.frontend_verification_recipe import execute_frontend_verification_recipe
 from runtime.frontend_recipe_state import FrontendRecipeStage
+from runtime.project_link_loader import get_product_repo_path, is_mode_b
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import get_relative_path
 
@@ -52,11 +53,19 @@ def execute(
     root = Path.cwd() if path == Path("projects") else path
     
     if project:
-        project_path = path / project
-        if not project_path.exists():
+        # Resolve orchestration workspace path first
+        orchestration_path = path / project
+        if not orchestration_path.exists():
             console.print(f"[red]Project not found: {project}[/red]")
-            console.print(f"[yellow]Path checked: {project_path}[/yellow]")
+            console.print(f"[yellow]Path checked: {orchestration_path}[/yellow]")
             raise typer.Exit(1)
+        
+        # For Mode B (managed_external), use product repo path from project-link.yaml
+        # For Mode A (self_hosted), use the orchestration path directly
+        project_path = get_product_repo_path(orchestration_path)
+        
+        if is_mode_b(orchestration_path):
+            console.print(f"[dim]Mode B: Using product repo at {project_path}[/dim]")
     else:
         project_path = Path.cwd()
     
