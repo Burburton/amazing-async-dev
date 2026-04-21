@@ -421,6 +421,101 @@ The closeout orchestrator (`runtime/external_execution_closeout.py`) is responsi
 1. **run_day external --trigger**: Primary closeout path (polls for result, runs verification)
 2. **resume_next_day**: Fallback recovery path (checks closeout_state, completes if needed)
 
+### 9.11 Controlled Frontend Verification Execution Recipe (Feature 062)
+
+**CRITICAL**: Frontend verification execution is now **controlled**, not ad hoc shell improvisation.
+
+External agents often start the frontend dev server and then stop without:
+- Running browser verification
+- Writing structured ExecutionResult
+- Reaching terminal execution outcome
+
+Feature 062 provides a **controlled execution recipe** that enforces a deterministic flow.
+
+#### Recipe Stages (Mandatory Sequence)
+
+| Stage | Action | Transition |
+|-------|--------|-------------|
+| INITIALIZING | Detect framework | → SERVER_STARTING |
+| SERVER_STARTING | Start dev server (controlled) | → READINESS_PROBING |
+| READINESS_PROBING | Probe readiness with timeout | → BROWSER_VERIFICATION |
+| BROWSER_VERIFICATION | Run Playwright verification | → RESULT_PERSISTING |
+| RESULT_PERSISTING | Write structured ExecutionResult | → COMPLETED_SUCCESS |
+
+**STOPPING AT "SERVER READY" IS FORBIDDEN.**
+
+#### Port Discovery Strategy
+
+| Strategy | Priority | Method |
+|----------|----------|--------|
+| stdout parsing | Primary | Parse dev server output for port (e.g., "Local: http://localhost:5173") |
+| port probe | Fallback | Probe known ports in PORT_RANGE if stdout parsing fails |
+
+#### Canonical Entry Point
+
+**CLI command (preferred):**
+```bash
+asyncdev frontend-verify-run --project <project_id>
+```
+
+This recipe guarantees:
+- Dev server startup is controlled (not foreground-blocking)
+- Port/URL discovery via stdout parsing + fallback probe
+- Readiness probe before browser verification
+- **MANDATORY** browser verification (not stopping at "server ready")
+- Structured execution result persisted automatically
+
+#### ExecutionPack Instruction
+
+When `verification_type` requires browser verification, ExecutionPack includes:
+```yaml
+frontend_verification_recipe:
+  use_recipe: true
+  invocation_command: "asyncdev frontend-verify-run --project {project_id}"
+  stages:
+    - SERVER_STARTING
+    - READINESS_PROBING
+    - BROWSER_VERIFICATION
+    - RESULT_PERSISTING
+  stop_at_ready_forbidden: true
+  result_required: true
+```
+
+External agents MUST follow this instruction instead of ad hoc shell commands.
+
+#### Architecture
+
+```
+Feature 056 = capability layer (browser_verifier, dev_server_manager)
+Feature 059 = enforcement primitives (verification_session, verification_enforcer)
+Feature 060 = frontend verification orchestration (browser_verification_orchestrator)
+Feature 061 = external closeout lifecycle (external_execution_closeout)
+Feature 062 = execution recipe (frontend_verification_recipe) ← upstream hardening
+```
+
+The recipe orchestrator (`runtime/frontend_verification_recipe.py`) ensures:
+- Controlled subprocess startup (not foreground-blocking)
+- Stdout capture for port detection
+- Bounded readiness probe
+- Mandatory browser verification invocation
+- Structured result persistence
+
+#### Anti-Patterns (FORBIDDEN)
+
+| Anti-Pattern | Consequence |
+|--------------|-------------|
+| Foreground-blocking `npm run dev` | **STOP** - Use controlled recipe |
+| Stopping at "server ready" | **STOP** - Must complete verification |
+| Guessing port manually | **STOP** - Use stdout parsing + probe |
+| Improvising shell commands | **STOP** - Use CLI recipe |
+| Skipping result persistence | **STOP** - Mandatory stage |
+
+#### Integration Points
+
+1. **asyncdev frontend-verify-run**: Canonical recipe entry point
+2. **external_tool_engine**: Injects recipe instruction into ExecutionPack
+3. **Features 060/061**: Receive structured upstream execution results
+
 ---
 
 ## 10. Governance Boundary Rules (Feature 039)

@@ -238,7 +238,11 @@ class ExternalToolEngine(ExecutionEngine):
 
     def _build_browser_verification_section(self, pack: dict[str, Any], verification_type: str) -> list[str]:
         """Build browser verification section for Markdown output."""
-        return [
+        recipe_instruction = pack.get("frontend_verification_recipe", {})
+        use_recipe = recipe_instruction.get("use_recipe", True)
+        project_id = pack.get("project_id", "")
+        
+        lines = [
             "",
             "---",
             "",
@@ -248,7 +252,45 @@ class ExternalToolEngine(ExecutionEngine):
             "",
             "**This task requires browser-level verification.**",
             "",
-            "### Verification Stages",
+        ]
+        
+        if use_recipe:
+            invocation_cmd = recipe_instruction.get(
+                "invocation_command",
+                f"asyncdev frontend-verify-run --project {project_id}"
+            )
+            
+            lines.extend([
+                "### PREFERRED METHOD: Controlled Recipe (Feature 062)",
+                "",
+                "**DO NOT improvise with ad hoc shell commands.**",
+                "",
+                "**Use the controlled frontend verification recipe instead:**",
+                "",
+                f"```bash",
+                f"{invocation_cmd}",
+                f"```",
+                "",
+                "This recipe guarantees:",
+                "- Dev server startup is controlled (not foreground-blocking)",
+                "- Port/URL discovery via stdout parsing + fallback probe",
+                "- Readiness probe before browser verification",
+                "- **MANDATORY** browser verification (not stopping at 'server ready')",
+                "- Structured execution result persisted automatically",
+                "",
+                "### Recipe Stages (must complete ALL)",
+                "1. SERVER_STARTING → Start dev server in controlled mode",
+                "2. READINESS_PROBING → Probe server with timeout",
+                "3. BROWSER_VERIFICATION → Run Playwright verification",
+                "4. RESULT_PERSISTING → Write structured ExecutionResult",
+                "5. COMPLETED_SUCCESS → Terminal outcome",
+                "",
+                "**STOPPING AT 'server ready' IS FORBIDDEN.**",
+                "",
+            ])
+        
+        lines.extend([
+            "### Verification Stages (if not using recipe)",
             "1. Build/setup → Complete build steps",
             "2. Server start → Start local dev/preview server",
             "3. Server ready → Poll for health/readiness",
@@ -265,6 +307,8 @@ class ExternalToolEngine(ExecutionEngine):
             "- Stop at \"server started\" without browser run",
             "- Claim `success` without `browser_verification.executed: true`",
             "- Skip browser verification without valid exception reason",
+            "- Use foreground-blocking `npm run dev` without backgrounding",
+            "- Guess port manually instead of probing",
             "",
             "### Valid Exception Reasons",
             "If browser verification cannot run, MUST record one of these in `browser_verification.exception_reason`:",
@@ -277,7 +321,9 @@ class ExternalToolEngine(ExecutionEngine):
             "- `reclassified_noninteractive`: Feature reclassified as non-interactive",
             "",
             "**If browser verification cannot run, you MUST still record evidence in browser_verification field.**",
-        ]
+        ])
+        
+        return lines
 
     def _build_instructions(self, pack: dict[str, Any], md_path: Path) -> str:
         """Build human-readable execution instructions."""

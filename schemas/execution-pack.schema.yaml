@@ -16,6 +16,7 @@ required:
 
 optional:
   - verification_type
+  - frontend_verification_recipe
   - allowed_tools
   - notes
   - priority
@@ -130,6 +131,47 @@ fields:
     default: backend_only
     example: "frontend_interactive"
     required: false
+
+  frontend_verification_recipe:
+    type: object
+    description: Controlled frontend verification instruction (Feature 062)
+    required: false
+    properties:
+      use_recipe:
+        type: boolean
+        description: Whether to use controlled recipe instead of ad hoc shell
+        default: true
+      invocation_command:
+        type: string
+        description: CLI command to invoke for frontend verification
+        default: "asyncdev frontend-verify-run --project {project_id}"
+      stages:
+        type: array
+        description: Recipe stages that must be completed
+        items_type: string
+        example:
+          - "SERVER_STARTING"
+          - "READINESS_PROBING"
+          - "BROWSER_VERIFICATION"
+          - "RESULT_PERSISTING"
+      stop_at_ready_forbidden:
+        type: boolean
+        description: Explicit prohibition against stopping at server ready
+        default: true
+      result_required:
+        type: boolean
+        description: Structured execution result is mandatory
+        default: true
+    example:
+      use_recipe: true
+      invocation_command: "asyncdev frontend-verify-run --project my-app"
+      stages:
+        - "SERVER_STARTING"
+        - "READINESS_PROBING"
+        - "BROWSER_VERIFICATION"
+        - "RESULT_PERSISTING"
+      stop_at_ready_forbidden: true
+      result_required: true
 
   allowed_tools:
     type: array
