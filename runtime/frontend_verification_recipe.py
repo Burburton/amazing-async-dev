@@ -17,7 +17,9 @@ Architecture (per Feature 062):
 """
 
 import re
+import threading
 import subprocess
+import sys
 import time
 import socket
 import urllib.request
@@ -47,25 +49,17 @@ from runtime.dev_server_manager import (
     PORT_RANGE,
 )
 from runtime.browser_verifier import run_browser_verification, BrowserVerificationStatus
+from runtime.shell_config import get_shell_config, ShellConfig, BASH_CLEAN_FLAGS, windows_path_to_bash_path
 
 
 def parse_port_from_stdout(stdout: str, framework: str) -> int | None:
-    """Parse port from dev server stdout output (Feature 062 section 7.3).
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    clean_stdout = ansi_escape.sub('', stdout)
     
-    Primary strategy: Parse stdout/stderr to detect actual port.
-    Supports common frameworks: Vite, Next.js, React, Nuxt, SvelteKit.
-    
-    Args:
-        stdout: Captured stdout/stderr from dev server
-        framework: Framework name for pattern selection
-        
-    Returns:
-        Detected port number or None
-    """
     patterns = PORT_PATTERNS.get(framework, PORT_PATTERNS["generic"])
     
     for pattern in patterns:
-        match = re.search(pattern, stdout, re.IGNORECASE)
+        match = re.search(pattern, clean_stdout, re.IGNORECASE)
         if match:
             try:
                 port = int(match.group(1))
@@ -153,6 +147,8 @@ class FrontendVerificationRecipe:
         self.server_start_timeout = server_start_timeout
         self.readiness_probe_timeout = readiness_probe_timeout
         self.browser_verification_timeout = browser_verification_timeout
+        
+        self._shell_config = ShellConfig(project_path / ".runtime" / "shell-config.yaml")
         
         self._start_time: datetime | None = None
         self._process: subprocess.Popen | None = None
@@ -299,50 +295,64 @@ class FrontendVerificationRecipe:
         return result
     
     def _start_dev_server(self, framework: DevServerFramework) -> ServerStartupInfo:
-        """Start dev server with controlled subprocess (Feature 062 section 6.2)."""
-        command = get_start_command(framework)
-        default_port = DEFAULT_PORTS.get(framework, 3000)
-        
-        # Add port flag for predictable port
-        if "--port" not in command:
-            command = command + ["--port", str(default_port)]
-        
         startup_start = datetime.now()
         stdout_capture = ""
         stderr_capture = ""
         
+        command = get_start_command(framework)
+        executable = self._shell_config.get_executable()
+        
+        if sys.platform == "win32" and executable:
+            bash_cwd = windows_path_to_bash_path(self.project_path)
+            command_str = " ".join(command)
+            bash_command = f"cd '{bash_cwd}' && {command_str}"
+            popen_args = [executable] + BASH_CLEAN_FLAGS + ["-c", bash_command]
+            popen_kwargs = {
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.STDOUT,
+                "text": True,
+            }
+        else:
+            popen_args = command
+            popen_kwargs = {
+                "cwd": self.project_path,
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.STDOUT,
+                "text": True,
+            }
+        
         try:
-            self._process = subprocess.Popen(
-                command,
-                cwd=self.project_path,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,  # Line buffered for faster capture
-            )
+            self._process = subprocess.Popen(popen_args, **popen_kwargs)
             
-            # Capture initial output for port detection (wait up to timeout)
+            output_buffer = []
+            detected_port = None
+            
+            def read_output():
+                while True:
+                    line = self._process.stdout.readline()
+                    if not line:
+                        break
+                    output_buffer.append(line)
+            
+            reader_thread = threading.Thread(target=read_output, daemon=True)
+            reader_thread.start()
+            
             poll_start = time.time()
             while time.time() - poll_start < self.server_start_timeout:
-                if self._process.stdout:
-                    line = self._process.stdout.readline()
-                    if line:
-                        stdout_capture += line
-                
-                if self._process.stderr:
-                    line = self._process.stderr.readline()
-                    if line:
-                        stderr_capture += line
-                
-                # Try to parse port from captured output
-                detected_port = parse_port_from_stdout(stdout_capture + stderr_capture, framework.value)
+                stdout_capture = "".join(output_buffer)
+                detected_port = parse_port_from_stdout(stdout_capture, framework.value)
                 if detected_port:
                     break
                 
-                time.sleep(0.5)
+                if self._process.poll() is not None:
+                    break
+                
+                time.sleep(0.2)
             
-            # Final port parsing
-            detected_port = parse_port_from_stdout(stdout_capture + stderr_capture, framework.value)
+            stdout_capture = "".join(output_buffer)
+            if not detected_port:
+                detected_port = parse_port_from_stdout(stdout_capture, framework.value)
+            
             detected_url = f"http://localhost:{detected_port}" if detected_port else None
             
             return ServerStartupInfo(

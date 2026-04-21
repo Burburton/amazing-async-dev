@@ -9,11 +9,14 @@ Manages dev server lifecycle for frontend verification:
 
 import json
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
+from runtime.shell_config import get_shell_config, ShellConfig, BASH_CLEAN_FLAGS, windows_path_to_bash_path
 
 
 class DevServerFramework(str, Enum):
@@ -182,17 +185,31 @@ def start_dev_server(
     
     command = get_start_command(framework)
     
-    if target_port != DEFAULT_PORTS.get(framework, 3000):
-        command = command + ["--port", str(target_port)]
+    shell_config_path = project_path / ".runtime" / "shell-config.yaml"
+    shell_config = ShellConfig(shell_config_path)
+    executable = shell_config.get_executable()
+    
+    if sys.platform == "win32" and executable:
+        bash_cwd = windows_path_to_bash_path(project_path)
+        command_str = " ".join(command)
+        bash_command = f"cd '{bash_cwd}' && {command_str}"
+        popen_args = [executable] + BASH_CLEAN_FLAGS + ["-c", bash_command]
+        popen_kwargs = {
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.STDOUT,
+            "text": True,
+        }
+    else:
+        popen_args = command
+        popen_kwargs = {
+            "cwd": project_path,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "text": True,
+        }
     
     try:
-        process = subprocess.Popen(
-            command,
-            cwd=project_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        process = subprocess.Popen(popen_args, **popen_kwargs)
     except (subprocess.SubprocessError, OSError) as e:
         return DevServerResult(
             success=False,

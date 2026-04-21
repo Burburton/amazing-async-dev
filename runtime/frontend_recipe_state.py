@@ -189,24 +189,30 @@ DEFAULT_PORT_PROBE_TIMEOUT_SECONDS = 10
 PORT_PATTERNS = {
     "vite": [
         r"Local:\s+http://localhost:(\d+)",
+        r"Local:\s+http://127\.0\.0\.1:(\d+)",
         r"running at http://localhost:(\d+)",
         r"port:\s*(\d+)",
+        r"http://127\.0\.0\.1:(\d+)",
     ],
     "next": [
         r"Local:\s+http://localhost:(\d+)",
+        r"Local:\s+http://127\.0\.0\.1:(\d+)",
         r"started server on port (\d+)",
         r"ready on http://localhost:(\d+)",
     ],
     "react": [
         r"running on http://localhost:(\d+)",
         r"On Your Network:\s+http://localhost:(\d+)",
+        r"http://127\.0\.0\.1:(\d+)",
     ],
     "nuxt": [
         r"Local:\s+http://localhost:(\d+)",
+        r"Local:\s+http://127\.0\.0\.1:(\d+)",
         r"listening on http://localhost:(\d+)",
     ],
     "sveltekit": [
         r"Local:\s+http://localhost:(\d+)",
+        r"Local:\s+http://127\.0\.0\.1:(\d+)",
         r"running at http://localhost:(\d+)",
     ],
     "generic": [
