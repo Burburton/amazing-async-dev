@@ -518,6 +518,50 @@ The recipe orchestrator (`runtime/frontend_verification_recipe.py`) ensures:
 
 ---
 
+### 9.12 Frontend Verification Tool Selection (Feature 063)
+
+**CRITICAL**: Frontend verification MUST use Python playwright, NOT MCP skill.
+
+#### Background
+
+The `/playwright` MCP skill invokes an external browser process that blocks the execution flow. This causes:
+- Progress blocked waiting for MCP response
+- No structured result persistence
+- Cannot integrate with `frontend_verification_recipe.py`
+
+#### Required Approach
+
+Use `runtime/browser_verifier.py` via Python:
+
+```python
+from runtime.frontend_verification_recipe import FrontendVerificationRecipe
+
+recipe = FrontendVerificationRecipe(
+    project_path=Path('path/to/project'),
+    execution_id='test-001',
+)
+result = recipe.execute()
+```
+
+#### Anti-Patterns (FORBIDDEN)
+
+| Anti-Pattern | Consequence |
+|--------------|-------------|
+| Using `/playwright` MCP skill for frontend testing | **STOP** - Will block progress |
+| Invoking Playwright MCP without Python wrapper | **STOP** - No structured results |
+| Manual browser testing without recipe | **STOP** - Use controlled recipe |
+
+#### Valid MCP Use Cases
+
+The `/playwright` MCP skill is still valid for:
+- Manual debugging during development
+- Exploratory UI testing
+- One-off browser interactions
+
+But NOT for automated frontend verification in async-dev execution.
+
+---
+
 ## 10. Governance Boundary Rules (Feature 039)
 
 ### 10.1 Repository Mode Classification
