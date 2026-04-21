@@ -1,0 +1,106 @@
+schema_type: shell-config
+version: "1.0"
+description: Shell execution configuration for cross-platform subprocess handling
+
+purpose: |
+  Allows Windows users to force bash (Git Bash) execution instead of cmd.exe.
+  Useful for projects that require Unix-style shell commands even on Windows.
+
+config_file_location:
+  description: "Shell config stored in .runtime/shell-config.yaml"
+  path: ".runtime/shell-config.yaml"
+  
+environment_variables:
+  description: "Environment variable overrides (higher priority than config file)"
+  variables:
+    ASYNCDEV_BASH_EXECUTABLE: Path to bash executable (e.g., "C:/Program Files/Git/bin/bash.exe")
+    ASYNCDEV_FORCE_BASH: Set to "true" to force bash on all platforms
+
+fields:
+  windows_bash_executable:
+    type: string
+    description: Path to bash executable for Windows subprocess calls
+    example: "C:/Program Files/Git/bin/bash.exe"
+    default: null
+    env_override: ASYNCDEV_BASH_EXECUTABLE
+    notes: |
+      - Use full path if bash is not in PATH
+      - Can use "bash" if Git Bash is in PATH
+      - Common locations:
+        - "C:/Program Files/Git/bin/bash.exe"
+        - "C:/Program Files (x86)/Git/bin/bash.exe"
+        - "C:/Users/{username}/AppData/Local/Programs/Git/bin/bash.exe"
+
+  force_bash:
+    type: boolean
+    description: Force bash execution on all platforms (not just Windows)
+    example: false
+    default: false
+    env_override: ASYNCDEV_FORCE_BASH
+    notes: |
+      - When true, uses bash even on Linux/macOS
+      - Useful for consistent shell behavior across platforms
+
+  shell_type:
+    type: enum
+    description: Preferred shell type for subprocess calls
+    values:
+      - auto  # Use platform default (cmd on Windows, bash on Unix)
+      - bash  # Always use bash
+      - sh    # Always use sh
+    example: "auto"
+    default: "auto"
+    notes: |
+      - "auto": Platform-native shell (cmd.exe on Windows, bash on Unix)
+      - "bash": Force bash via windows_bash_executable on Windows
+      - "sh": Force sh (similar to bash but more portable)
+
+default_config:
+  shell_type: auto
+  force_bash: false
+
+usage_examples:
+  basic_windows:
+    description: "Basic Windows Git Bash configuration"
+    config: |
+      # .runtime/shell-config.yaml
+      windows_bash_executable: "C:/Program Files/Git/bin/bash.exe"
+      
+  path_bash:
+    description: "Using bash if it's in PATH"
+    config: |
+      # .runtime/shell-config.yaml
+      windows_bash_executable: "bash"
+      
+  force_all_platforms:
+    description: "Force bash on all platforms for consistency"
+    config: |
+      # .runtime/shell-config.yaml
+      force_bash: true
+      windows_bash_executable: "bash"
+
+  env_override:
+    description: "Using environment variable override"
+    config: |
+      # In shell profile or CI environment
+      export ASYNCDEV_BASH_EXECUTABLE="C:/Program Files/Git/bin/bash.exe"
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  properties:
+    windows_bash_executable:
+      type: string
+      description: Path to bash executable for Windows
+    force_bash:
+      type: boolean
+      default: false
+      description: Force bash on all platforms
+    shell_type:
+      type: string
+      enum:
+        - auto
+        - bash
+        - sh
+      default: auto
+      description: Preferred shell type
