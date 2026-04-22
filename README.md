@@ -267,7 +267,10 @@ python -m pytest tests/ -v
 | Review-night | 21 | Enriched operator pack, doctor integration |
 | Resume-next-day | 33 | Decision pack alignment, prior context |
 | Plan-day | 27 | Resume context alignment, planning mode inference |
-| **Total** | **644** | |
+| Recovery Console | 10 | Operator surface for recovery |
+| Decision Inbox | 18 | Operator surface for decisions |
+| Session Start | 16 | Blocking alert, mandatory check |
+| **Total** | **714** | |
 
 ---
 
@@ -286,6 +289,9 @@ All core features complete:
 | Execution Policy | Auto-continue safe, pause for risky |
 | Decision Channel | Email-first async decisions |
 | Starter Pack Integration | Advisor → async-dev handoff |
+| Recovery Console | Operator surface for execution recovery |
+| Decision Inbox | Operator surface for decision management |
+| Session Start | Mandatory blocking state check (Feature 065) |
 
 ---
 
@@ -351,6 +357,23 @@ asyncdev policy set --mode {conservative|balanced|low_interruption}
 asyncdev email-decision create --project {id} --question "..." --options "A:...,B:..." --send
 asyncdev email-decision reply --project {id} --id {id} --command "DECISION A"
 
+# Recovery Console (Operator Surface - Phase 2)
+asyncdev recovery list [--project {id}] [--all]
+asyncdev recovery show --execution exec-{project}-{feature}
+asyncdev recovery resume --execution exec-{project}-{feature} --action {unblock|abort|continue|retry|reset}
+
+# Decision Inbox (Operator Surface - Phase 3)
+asyncdev decision list [--project {id}] [--all] [--status {status}]
+asyncdev decision show --request {request_id}
+asyncdev decision reply --request {request_id} --command "DECISION A"
+asyncdev decision wait --request {request_id} [--interval 60] [--timeout 3600]
+asyncdev decision history [--project {id}] [--all] [--limit 10]
+
+# Session Start (Mandatory - Feature 065)
+asyncdev session-start check [--project {id}]
+asyncdev session-start poll --project {id}
+asyncdev session-start status
+
 # Starter Pack (advisor integration)
 asyncdev new-product create --product-id {id} --name "{name}" --starter-pack starter-pack.yaml
 ```
@@ -361,8 +384,8 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 
 | Metric | Value |
 |--------|-------|
-| Features Complete | 36 (001-036) |
-| Tests Passing | 670 |
+| Features Complete | 40 (001-036 + Recovery Console + Decision Inbox + Session Start) |
+| Tests Passing | 714 |
 | Package State | Functional alpha |
 | Canonical Loop | ✅ Verified (3-day dogfooding) |
 | Coverage | CLI, state, policy, feedback, integration, doctor, doctor recovery, feedback handoff, feedback draft, review-night enriched, resume-next-day alignment, plan-day resume context, run-day intent alignment |

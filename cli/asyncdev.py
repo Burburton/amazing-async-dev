@@ -10,7 +10,7 @@ from rich.table import Table
 from cli.commands import plan_day, run_day, review_night, resume_next_day
 from cli.commands import init, new_product, new_feature
 from cli.commands import complete_feature, archive_feature
-from cli.commands import sqlite_status, inspect_stop
+from cli.commands import sqlite_status, inspect_stop, recovery, decision, session_start
 from cli.commands import backfill, archive, summary, feedback, policy, email_decision, snapshot, doctor, journal, gmail_auth, resend_auth, check_inbox, config, project_link, browser_test, frontend_verify_run
 from cli.utils.output_formatter import print_next_step, print_phase_indicator
 from cli.utils.path_formatter import get_relative_path
@@ -75,6 +75,9 @@ app.add_typer(sqlite_status.app, name="sqlite", help="SQLite state store queries
 
 # Register recovery commands
 app.add_typer(inspect_stop.app, name="inspect-stop", help="Inspect stop point and recovery options")
+app.add_typer(recovery.app, name="recovery", help="Execution Recovery Console (operator surface)")
+app.add_typer(decision.app, name="decision", help="Decision Inbox (operator surface - Phase 3)")
+app.add_typer(session_start.app, name="session-start", help="Mandatory blocking state check (Feature 065)")
 
 
 @app.command()

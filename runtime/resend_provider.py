@@ -739,4 +739,7 @@ def apply_resend_config_from_file(config_path: Path | None = None) -> bool:
     if config.get("sandbox_mode"):
         os.environ["RESEND_SANDBOX_MODE"] = "true"
     
+    if config.get("api_key") and config.get("from_email"):
+        os.environ["ASYNCDEV_DELIVERY_MODE"] = "resend"
+    
     return True

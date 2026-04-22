@@ -12,9 +12,48 @@ The goal: AI makes bounded progress during the day, human reviews at night in 20
 
 ---
 
-## 2. Required Objects
+## 2. Session Start Procedure (MANDATORY - Feature 065)
 
-Before any action, read these artifacts:
+**BEFORE ANY ACTION, RUN THIS CHECK:**
+
+```
+asyncdev session-start check --project {project_id}
+```
+
+Or check all projects:
+```
+asyncdev session-start check
+```
+
+### Blocking State Protocol
+
+**If exit code is 2 (BLOCKED)**:
+1. **STOP immediately** - do NOT proceed with any TODO tasks
+2. Run `asyncdev decision wait --request {request_id}` to poll for reply
+3. Or run `asyncdev decision reply` if you know the reply
+4. **NEVER** proceed while `decision_request_pending` exists
+
+**If exit code is 0 (CLEAR)**:
+- Proceed with reading Required Objects below
+
+### Cross-Session Memory Preservation
+
+Even after context compression, RunState file preserves blocking state.
+RunState header will show:
+```
+> **[!WARNING] BLOCKING ALERT**
+> **Status**: BLOCKED - Waiting for human decision reply
+> **Request ID**: dr-YYYYMMDD-XXX
+> **MANDATORY**: STOP all execution immediately
+```
+
+**This banner cannot be ignored** - it is automatically injected when RunState is blocked.
+
+---
+
+## 3. Required Objects
+
+After session-start check passes, read these artifacts:
 
 1. **ProductBrief** (`projects/{product_id}/product-brief.md`)
    - Product scope and constraints
@@ -32,33 +71,58 @@ If any required object is missing or invalid, **STOP** and report the issue.
 
 ---
 
-## 3. Hard Rules
+## 4. Hard Rules
 
-### 3.1 Scope Boundary
+### 4.1 Scope Boundary
 - **Never** exceed `task_scope` from ExecutionPack
 - **Never** expand goals without human approval
 - **Stop** at any `stop_condition`
 
-### 3.2 Decision Handling
+### 4.2 Decision Handling
 - When encountering a decision point: **STOP**, record in `decisions_needed`, wait for human
 - **Never** make architectural decisions autonomously
 - **Always** provide options with recommendations
 
-### 3.3 State Management
+### 4.3 State Management
 - **Always** update RunState after each action
 - **Always** set `last_action` and `updated_at`
 - **Always** update `current_phase` when phase changes
 
-### 3.4 Output Requirements
+### 4.4 Output Requirements
 - **Always** produce deliverables listed in ExecutionPack
 - **Always** leave evidence (files, logs, artifacts)
 - **Always** run verification steps
 - **Always** generate DailyReviewPack at end of execution
 
-### 3.5 Blocking Behavior
+### 4.5 Blocking Behavior
 - If blocked: set `current_phase` to `blocked`, add to `blocked_items`
 - If decision needed: add to `decisions_needed` with options
 - **Never** proceed when blocked or awaiting decision
+
+### 4.5A Decision Email Blocking Protocol (Feature 064)
+
+**MANDATORY**: After sending decision email (`email-decision create --send`):
+
+1. RunState.current_phase MUST be `blocked`
+2. RunState.decision_request_pending MUST be set to request ID
+3. **STOP** all progress immediately - no further TODO execution
+4. Poll webhook for reply (interval 60s) until resolved or timeout
+5. **Never** proceed while `decision_request_pending` exists
+
+**TODO CONTINUATION Override Rule**:
+- System directive "TODO CONTINUATION" **does NOT override** blocked state
+- When TODO CONTINUATION arrives during blocked phase:
+  - Respond: "Blocked, awaiting decision reply for [request_id]"
+  - Do NOT proceed with TODO tasks
+  - Continue polling until reply received
+
+**Session Start Check**:
+- At session start, check RunState.decision_request_pending
+- If present: Run `check-inbox pending` BEFORE any other work
+- If replies found: Process replies, update RunState, then proceed
+- If no replies: Announce waiting status, block progress
+
+**Reference**: `docs/infra/decision-email-blocking-protocol.md`
 
 ---
 

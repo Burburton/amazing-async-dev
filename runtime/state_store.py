@@ -1,6 +1,10 @@
-"""State store for file-based RunState and artifact management."""
+"""State store for file-based RunState and artifact management.
+
+Includes blocking alert header generation (Feature 065).
+"""
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -8,6 +12,54 @@ from typing import Any
 import yaml
 
 from runtime.adapters.filesystem_adapter import FilesystemAdapter
+
+
+BLOCKING_ALERT_TEMPLATE = """
+> **[!WARNING] BLOCKING ALERT**
+> 
+> **Status**: {status}
+> **Request ID**: {request_id}
+> **Sent At**: {sent_at}
+> 
+> **MANDATORY**: 
+> 1. **STOP all execution immediately**
+> 2. **DO NOT proceed with TODO tasks**
+> 3. Poll for decision reply: `asyncdev decision wait --request {request_id}`
+> 4. Or process reply manually: `asyncdev decision reply --request {request_id} --command "DECISION X"`
+> 
+> **Reference**: AGENTS.md Section 3.5A - Decision Email Blocking Protocol
+"""
+
+
+def generate_blocking_alert(runstate: dict[str, Any]) -> str:
+    current_phase = runstate.get("current_phase", "")
+    request_id = runstate.get("decision_request_pending")
+    sent_at = runstate.get("decision_request_sent_at", "")
+    
+    if current_phase == "blocked" and request_id:
+        return BLOCKING_ALERT_TEMPLATE.format(
+            status="BLOCKED - Waiting for human decision reply",
+            request_id=request_id,
+            sent_at=sent_at[:19] if sent_at else "N/A",
+        )
+    
+    if request_id and current_phase != "blocked":
+        return BLOCKING_ALERT_TEMPLATE.format(
+            status="WAITING_DECISION - Decision request pending",
+            request_id=request_id,
+            sent_at=sent_at[:19] if sent_at else "N/A",
+        )
+    
+    return ""
+
+
+def has_blocking_alert(content: str) -> bool:
+    return "**[!WARNING] BLOCKING ALERT**" in content
+
+
+def remove_blocking_alert(content: str) -> str:
+    pattern = r"\n> \*\*\[!WARNING\] BLOCKING ALERT\*\*.*?\n\n"
+    return re.sub(pattern, "\n", content, flags=re.DOTALL)
 
 
 class StateStore:
@@ -34,7 +86,7 @@ class StateStore:
         return None
 
     def save_runstate(self, runstate: dict[str, Any]) -> None:
-        """Save RunState to markdown file."""
+        """Save RunState to markdown file with blocking alert if needed."""
         runstate["updated_at"] = datetime.now().isoformat()
 
         self.fs.ensure_dir(self.project_path)
@@ -43,7 +95,18 @@ class StateStore:
         self.fs.ensure_dir(self.reviews_path)
 
         yaml_content = yaml.dump(runstate, default_flow_style=False, sort_keys=False)
-        markdown_content = f"""# RunState
+        
+        blocking_alert = generate_blocking_alert(runstate)
+        
+        if blocking_alert:
+            markdown_content = f"""# RunState
+{blocking_alert}
+```yaml
+{yaml_content}
+```
+"""
+        else:
+            markdown_content = f"""# RunState
 
 ```yaml
 {yaml_content}
