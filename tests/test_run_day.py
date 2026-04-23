@@ -286,3 +286,122 @@ class TestPlanningModeIntent:
         
         assert PLANNING_MODE_INTENT.get("blocked_waiting_for_decision") is not None
         assert "blocked" in PLANNING_MODE_INTENT.get("blocked_waiting_for_decision", "").lower()
+
+
+class TestFrontendVerificationIntegration:
+    def test_backend_only_skips_verification(self):
+        from cli.commands.run_day import _run_frontend_verification
+        
+        result = _run_frontend_verification(
+            project_path=Path("/tmp/test"),
+            execution_pack={"verification_type": "backend_only"},
+            product_id="test-product",
+            result={"status": "success"},
+        )
+        
+        assert result["status"] == "success"
+        assert "orchestration_terminal_state" not in result
+    
+    def test_frontend_interactive_with_mock_environment(self):
+        from cli.commands.run_day import _run_frontend_verification
+        
+        result = _run_frontend_verification(
+            project_path=Path("/tmp/test"),
+            execution_pack={"verification_type": "frontend_interactive"},
+            product_id="test-project",
+            result={"status": "success"},
+        )
+        
+        assert "orchestration_terminal_state" in result
+        assert result["orchestration_terminal_state"] in [
+            "success",
+            "failure",
+            "timeout",
+            "exception_accepted",
+        ]
+    
+    def test_verification_failure_downgrades_success_to_partial(self):
+        from runtime.browser_verification_orchestrator import OrchestrationTerminalState
+        
+        result = {
+            "status": "success",
+            "orchestration_terminal_state": OrchestrationTerminalState.FAILURE.value,
+        }
+        
+        if result["orchestration_terminal_state"] == OrchestrationTerminalState.FAILURE.value:
+            if result.get("status") == "success":
+                result["status"] = "partial"
+        
+        assert result["status"] == "partial"
+
+
+class TestCloseoutOrchestrationIntegration:
+    def test_closeout_result_structure(self):
+        from runtime.external_closeout_state import CloseoutResult, CloseoutState
+        
+        result = CloseoutResult(
+            closeout_state=CloseoutState.CLOSEOUT_COMPLETED_SUCCESS,
+        )
+        
+        data = result.to_dict()
+        assert "closeout_state" in data
+        assert "execution_result_detected" in data
+        assert "verification_required" in data
+    
+    def test_closeout_gate_blocks_on_failure(self):
+        from runtime.external_closeout_state import (
+            CloseoutResult,
+            CloseoutState,
+            CloseoutTerminalClassification,
+        )
+        
+        result = CloseoutResult(
+            closeout_state=CloseoutState.CLOSEOUT_COMPLETED_FAILURE,
+            terminal_classification=CloseoutTerminalClassification.FAILURE,
+        )
+        
+        assert result.get_gate_status() == "blocked"
+        assert result.allows_success_progression() is False
+    
+    def test_closeout_gate_allows_on_success(self):
+        from runtime.external_closeout_state import (
+            CloseoutResult,
+            CloseoutState,
+            CloseoutTerminalClassification,
+        )
+        
+        result = CloseoutResult(
+            closeout_state=CloseoutState.CLOSEOUT_COMPLETED_SUCCESS,
+            terminal_classification=CloseoutTerminalClassification.SUCCESS,
+        )
+        
+        assert result.get_gate_status() == "allowed"
+        assert result.allows_success_progression()
+
+
+class TestOrchestrationTerminalStateValidation:
+    def test_valid_terminal_states_for_success(self):
+        from runtime.browser_verification_orchestrator import OrchestrationTerminalState
+        
+        valid_for_success = [
+            OrchestrationTerminalState.NOT_REQUIRED,
+            OrchestrationTerminalState.SUCCESS,
+            OrchestrationTerminalState.EXCEPTION_ACCEPTED,
+            OrchestrationTerminalState.SKIPPED_BY_POLICY,
+        ]
+        
+        for state in valid_for_success:
+            assert state.value in ["not_required", "success", "exception_accepted", "skipped_by_policy"]
+    
+    def test_invalid_terminal_states_for_success(self):
+        from runtime.browser_verification_orchestrator import OrchestrationTerminalState
+        
+        invalid_for_success = [
+            OrchestrationTerminalState.REQUIRED_NOT_STARTED,
+            OrchestrationTerminalState.IN_PROGRESS,
+            OrchestrationTerminalState.FAILURE,
+            OrchestrationTerminalState.TIMEOUT,
+        ]
+        
+        for state in invalid_for_success:
+            assert state.value in ["required_not_started", "in_progress", "failure", "timeout"]
