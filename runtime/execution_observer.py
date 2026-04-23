@@ -1,16 +1,14 @@
-"""Execution Observer - Feature 066.
+"""Execution Observer Foundation - Feature 067.
 
-Monitors async-dev execution state and detects anomalies that require attention.
+Provides execution supervision layer for async-dev platform.
 
-Observer finds issues:
-- Stalled execution (no progress for X seconds)
-- Timeout detection (closeout/verification timeout)
-- Missing artifacts (expected but not found)
-- Verification failure
-- Closeout incomplete
-- Decision overdue
+Observer watches work:
+- Periodic inspection of active executions
+- Detection of stall/timeout/missing-artifact conditions
+- Structured findings for downstream consumption
+- Recommended actions for recovery workflows
 
-Recovery Console consumes these findings for operator action.
+This foundation enables later operator surfaces (Recovery Console, etc).
 """
 
 from dataclasses import dataclass, field
@@ -21,16 +19,19 @@ from typing import Any
 
 
 class ObserverFindingType(str, Enum):
-    """Types of findings the observer can detect."""
+    """Types of findings the observer can detect (per Feature 067 AC-004)."""
     
-    STALLED_EXECUTION = "stalled_execution"
-    TIMEOUT_DETECTED = "timeout_detected"
-    MISSING_ARTIFACT = "missing_artifact"
-    VERIFICATION_FAILURE = "verification_failure"
-    CLOSEOUT_INCOMPLETE = "closeout_incomplete"
+    # Core anomaly types (067 spec)
+    RUN_TIMEOUT = "run_timeout"
+    VERIFICATION_STALL = "verification_stall"
+    CLOSEOUT_STALL = "closeout_stall"
+    MISSING_EXECUTION_RESULT = "missing_execution_result"
+    RECOVERY_OVERDUE = "recovery_overdue"
     DECISION_OVERDUE = "decision_overdue"
+    
+    # Additional useful types
     BLOCKED_STATE = "blocked_state"
-    RECOVERY_REQUIRED = "recovery_required"
+    STALLED_EXECUTION = "stalled_execution"
 
 
 class FindingSeverity(str, Enum):
@@ -71,6 +72,8 @@ class ObserverFinding:
     resolved_at: str | None = None
     resolution_action: str | None = None
     
+    recovery_significant: bool = False
+    
     def to_dict(self) -> dict[str, Any]:
         return {
             "finding_id": self.finding_id,
@@ -88,7 +91,11 @@ class ObserverFinding:
             "resolved": self.resolved,
             "resolved_at": self.resolved_at,
             "resolution_action": self.resolution_action,
+            "recovery_significant": self.recovery_significant,
         }
+    
+    def is_recovery_significant(self) -> bool:
+        return self.recovery_significant
 
 
 @dataclass
@@ -130,8 +137,11 @@ class ObservationResult:
     def has_critical_findings(self) -> bool:
         return any(f.severity == FindingSeverity.CRITICAL for f in self.findings)
     
+    def has_recovery_significant(self) -> bool:
+        return any(f.recovery_significant for f in self.findings)
+    
     def has_recovery_required(self) -> bool:
-        return any(f.finding_type == ObserverFindingType.RECOVERY_REQUIRED for f in self.findings)
+        return any(f.finding_type == ObserverFindingType.RECOVERY_OVERDUE for f in self.findings)
 
 
 class ExecutionObserver:
@@ -233,12 +243,13 @@ class ExecutionObserver:
             
             if "status: failed" in content.lower():
                 self._add_finding(
-                    finding_type=ObserverFindingType.RECOVERY_REQUIRED,
+                    finding_type=ObserverFindingType.RECOVERY_OVERDUE,
                     severity=FindingSeverity.HIGH,
                     reason="Execution result shows failure status",
                     suggested_action="Review failure details and decide recovery path",
                     suggested_command="asyncdev recovery show --execution <id>",
                     related_artifacts=[str(result_file)],
+                    recovery_significant=True,
                 )
     
     def _check_verification_state(self) -> None:
@@ -253,12 +264,13 @@ class ExecutionObserver:
             if "browser_verification" in content and "executed: false" in content.lower():
                 if "frontend_interactive" in content or "frontend_visual" in content:
                     self._add_finding(
-                        finding_type=ObserverFindingType.VERIFICATION_FAILURE,
+                        finding_type=ObserverFindingType.VERIFICATION_STALL,
                         severity=FindingSeverity.MEDIUM,
                         reason="Frontend verification not executed",
                         suggested_action="Run frontend verification",
                         suggested_command="asyncdev verification retry --execution <id>",
                         related_artifacts=[str(result_file)],
+                        recovery_significant=True,
                     )
     
     def _check_closeout_state(self) -> None:
@@ -272,22 +284,24 @@ class ExecutionObserver:
             
             if "closeout_state" in content and "timeout" in content.lower():
                 self._add_finding(
-                    finding_type=ObserverFindingType.TIMEOUT_DETECTED,
+                    finding_type=ObserverFindingType.CLOSEOUT_STALL,
                     severity=FindingSeverity.HIGH,
                     reason="Closeout timed out",
                     suggested_action="Retry closeout or manual inspection",
                     suggested_command="asyncdev recovery resume --execution <id> --action retry",
                     related_artifacts=[str(result_file)],
+                    recovery_significant=True,
                 )
             
             if "closeout_state" in content and "recovery_required" in content.lower():
                 self._add_finding(
-                    finding_type=ObserverFindingType.CLOSEOUT_INCOMPLETE,
+                    finding_type=ObserverFindingType.CLOSEOUT_STALL,
                     severity=FindingSeverity.HIGH,
                     reason="Closeout incomplete, recovery required",
                     suggested_action="Complete closeout manually",
                     suggested_command="asyncdev recovery show --execution <id>",
                     related_artifacts=[str(result_file)],
+                    recovery_significant=True,
                 )
     
     def _check_decisions(self) -> None:
@@ -327,6 +341,7 @@ class ExecutionObserver:
         suggested_command: str = "",
         details: dict[str, Any] = {},
         related_artifacts: list[str] = [],
+        recovery_significant: bool = False,
     ) -> None:
         from runtime.state_store import StateStore
         
@@ -347,6 +362,7 @@ class ExecutionObserver:
             suggested_action=suggested_action,
             suggested_command=suggested_command,
             related_artifacts=related_artifacts,
+            recovery_significant=recovery_significant,
         )
         
         self.findings.append(finding)

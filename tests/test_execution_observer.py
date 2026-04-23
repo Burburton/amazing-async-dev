@@ -1,4 +1,4 @@
-"""Tests for Execution Observer - Feature 066."""
+"""Tests for Execution Observer Foundation - Feature 067."""
 
 import tempfile
 from pathlib import Path
@@ -19,14 +19,14 @@ from runtime.execution_observer import (
 
 class TestObserverFindingType:
     def test_finding_type_enum_values(self):
-        assert ObserverFindingType.STALLED_EXECUTION.value == "stalled_execution"
-        assert ObserverFindingType.TIMEOUT_DETECTED.value == "timeout_detected"
-        assert ObserverFindingType.MISSING_ARTIFACT.value == "missing_artifact"
-        assert ObserverFindingType.VERIFICATION_FAILURE.value == "verification_failure"
-        assert ObserverFindingType.CLOSEOUT_INCOMPLETE.value == "closeout_incomplete"
+        assert ObserverFindingType.RUN_TIMEOUT.value == "run_timeout"
+        assert ObserverFindingType.VERIFICATION_STALL.value == "verification_stall"
+        assert ObserverFindingType.CLOSEOUT_STALL.value == "closeout_stall"
+        assert ObserverFindingType.MISSING_EXECUTION_RESULT.value == "missing_execution_result"
+        assert ObserverFindingType.RECOVERY_OVERDUE.value == "recovery_overdue"
         assert ObserverFindingType.DECISION_OVERDUE.value == "decision_overdue"
         assert ObserverFindingType.BLOCKED_STATE.value == "blocked_state"
-        assert ObserverFindingType.RECOVERY_REQUIRED.value == "recovery_required"
+        assert ObserverFindingType.STALLED_EXECUTION.value == "stalled_execution"
 
 
 class TestFindingSeverity:
@@ -69,12 +69,12 @@ class TestObserverFinding:
         assert data["finding_type"] == "blocked_state"
         assert data["severity"] == "critical"
         assert data["project_id"] == "test-project"
-        assert data["suggested_command"] == "asyncdev recovery resume --action unblock"
+        assert data["recovery_significant"] is False
     
     def test_finding_resolution(self):
         finding = ObserverFinding(
             finding_id="find-003",
-            finding_type=ObserverFindingType.TIMEOUT_DETECTED,
+            finding_type=ObserverFindingType.CLOSEOUT_STALL,
             severity=FindingSeverity.HIGH,
             reason="Closeout timeout",
         )
@@ -109,9 +109,10 @@ class TestObservationResult:
         
         finding2 = ObserverFinding(
             finding_id="find-002",
-            finding_type=ObserverFindingType.RECOVERY_REQUIRED,
+            finding_type=ObserverFindingType.RECOVERY_OVERDUE,
             severity=FindingSeverity.CRITICAL,
             reason="Critical failure",
+            recovery_significant=True,
         )
         
         result = ObservationResult(
@@ -127,9 +128,9 @@ class TestObservationResult:
     def test_result_to_dict(self):
         finding = ObserverFinding(
             finding_id="find-001",
-            finding_type=ObserverFindingType.BLOCKED_STATE,
+            finding_type=ObserverFindingType.RECOVERY_OVERDUE,
             severity=FindingSeverity.HIGH,
-            reason="Blocked",
+            reason="Recovery needed",
         )
         
         result = ObservationResult(
@@ -150,9 +151,10 @@ class TestObservationResult:
     def test_has_recovery_required(self):
         finding1 = ObserverFinding(
             finding_id="find-001",
-            finding_type=ObserverFindingType.RECOVERY_REQUIRED,
+            finding_type=ObserverFindingType.RECOVERY_OVERDUE,
             severity=FindingSeverity.HIGH,
             reason="Recovery needed",
+            recovery_significant=True,
         )
         
         result = ObservationResult(
@@ -162,7 +164,7 @@ class TestObservationResult:
             findings=[finding1],
         )
         
-        assert result.has_recovery_required()
+        assert result.has_recovery_significant()
 
 
 class TestExecutionObserver:
@@ -230,7 +232,7 @@ updated_at: '2026-01-01T10:00:00'
             observer = ExecutionObserver(project_path)
             result = observer.observe()
             
-            recovery_findings = [f for f in result.findings if f.finding_type == ObserverFindingType.RECOVERY_REQUIRED]
+            recovery_findings = [f for f in result.findings if f.finding_type == ObserverFindingType.RECOVERY_OVERDUE]
             assert len(recovery_findings) >= 1
     
     def test_observer_verification_not_executed(self):
@@ -259,7 +261,7 @@ updated_at: '2026-01-01T10:00:00'
             observer = ExecutionObserver(project_path)
             result = observer.observe()
             
-            verification_findings = [f for f in result.findings if f.finding_type == ObserverFindingType.VERIFICATION_FAILURE]
+            verification_findings = [f for f in result.findings if f.finding_type == ObserverFindingType.VERIFICATION_STALL]
             assert len(verification_findings) >= 1
     
     def test_observer_closeout_timeout(self):
@@ -285,7 +287,7 @@ updated_at: '2026-01-01T10:00:00'
             observer = ExecutionObserver(project_path)
             result = observer.observe()
             
-            timeout_findings = [f for f in result.findings if f.finding_type == ObserverFindingType.TIMEOUT_DETECTED]
+            timeout_findings = [f for f in result.findings if f.finding_type == ObserverFindingType.CLOSEOUT_STALL]
             assert len(timeout_findings) >= 1
 
 

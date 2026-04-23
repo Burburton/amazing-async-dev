@@ -1,6 +1,6 @@
-"""observer command - Execution Observer CLI (Feature 066).
+"""observe-runs command - Execution Observer Foundation CLI (Feature 067).
 
-Commands to run execution observation and view findings.
+Canonical entry point for execution observation per Feature 067 spec.
 """
 
 from pathlib import Path
@@ -154,14 +154,14 @@ def types():
     table.add_column("Description")
     
     type_descriptions = {
-        ObserverFindingType.STALLED_EXECUTION: "No progress for threshold duration",
-        ObserverFindingType.TIMEOUT_DETECTED: "Closeout or verification timeout",
-        ObserverFindingType.MISSING_ARTIFACT: "Expected artifact not found",
-        ObserverFindingType.VERIFICATION_FAILURE: "Verification failed or not executed",
-        ObserverFindingType.CLOSEOUT_INCOMPLETE: "Closeout did not reach terminal state",
-        ObserverFindingType.DECISION_OVERDUE: "Decision pending over threshold",
+        ObserverFindingType.RUN_TIMEOUT: "Execution exceeded maximum duration",
+        ObserverFindingType.VERIFICATION_STALL: "Verification not progressing or overdue",
+        ObserverFindingType.CLOSEOUT_STALL: "Closeout not reaching terminal state",
+        ObserverFindingType.MISSING_EXECUTION_RESULT: "Expected execution result not found",
+        ObserverFindingType.RECOVERY_OVERDUE: "Recovery required but not addressed",
+        ObserverFindingType.DECISION_OVERDUE: "Decision request unanswered beyond threshold",
         ObserverFindingType.BLOCKED_STATE: "Execution blocked by external issue",
-        ObserverFindingType.RECOVERY_REQUIRED: "Execution requires recovery action",
+        ObserverFindingType.STALLED_EXECUTION: "No progress for threshold duration",
     }
     
     for finding_type, description in type_descriptions.items():

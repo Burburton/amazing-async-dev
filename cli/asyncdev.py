@@ -79,7 +79,7 @@ app.add_typer(recovery.app, name="recovery", help="Execution Recovery Console (o
 app.add_typer(decision.app, name="decision", help="Decision Inbox (operator surface - Phase 3)")
 app.add_typer(session_start.app, name="session-start", help="Mandatory blocking state check (Feature 065)")
 app.add_typer(verification.app, name="verification", help="Verification Console (operator surface - Priority 2)")
-app.add_typer(observer.app, name="observer", help="Execution Observer (Feature 066)")
+app.add_typer(observer.app, name="observe-runs", help="Execution Observer Foundation (Feature 067)")
 
 
 @app.command()

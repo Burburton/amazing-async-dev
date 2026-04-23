@@ -14,6 +14,7 @@
   - `062-controlled-frontend-verification-execution-recipe`
   - `064-decision-email-blocking-protocol`
   - `065-session-start-blocking-check`
+  - `067-execution-observer-foundation`
 
 ---
 
