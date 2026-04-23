@@ -316,6 +316,8 @@ def show(
             findings_table.add_column("Type", style="cyan")
             findings_table.add_column("Severity", style="yellow")
             findings_table.add_column("Reason")
+            findings_table.add_column("Action")
+            findings_table.add_column("Detected", style="dim")
             
             for f in obs_result.findings:
                 sev_style = {
@@ -324,13 +326,29 @@ def show(
                     "medium": "blue",
                 }.get(f.severity.value, "")
                 
+                detected = f.detected_at[:19] if len(f.detected_at) > 19 else f.detected_at
+                
                 findings_table.add_row(
                     f.finding_type.value,
                     f"[{sev_style}]{f.severity.value}[/{sev_style}]",
                     f.reason[:40] if len(f.reason) > 40 else f.reason,
+                    f.suggested_action[:35] if len(f.suggested_action) > 35 else f.suggested_action,
+                    detected,
                 )
             
             console.print(findings_table)
+            
+            recovery_sig = [f for f in obs_result.findings if f.recovery_significant]
+            if recovery_sig:
+                console.print(f"\n[bold red]Recovery-significant findings: {len(recovery_sig)}[/bold red]")
+            
+            if obs_result.findings:
+                for f in obs_result.findings[:3]:
+                    if f.related_artifacts:
+                        console.print(f"[dim]Related artifacts for {f.finding_type.value}:[/dim]")
+                        for artifact in f.related_artifacts[:2]:
+                            console.print(f"  [dim]- {artifact}[/dim]")
+            
             console.print(f"[dim]Summary: {obs_result.summary}[/dim]")
         else:
             console.print("[green]No observer findings[/green]")
