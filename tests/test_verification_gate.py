@@ -449,14 +449,14 @@ class TestAgentsMdSection9:
     def test_agents_md_has_section_9(self):
         """AGENTS.md should have Section 9."""
         agents_path = Path("AGENTS.md")
-        content = agents_path.read_text()
+        content = agents_path.read_text(encoding='utf-8')
         
         assert "## 9. Interactive Frontend Verification Gate" in content
 
     def test_agents_md_has_fr7_completion_gate(self):
         """AGENTS.md should have FR-7 Completion Gate."""
         agents_path = Path("AGENTS.md")
-        content = agents_path.read_text()
+        content = agents_path.read_text(encoding='utf-8')
         
         assert "FR-7" in content
         assert "Completion Gate" in content
@@ -464,7 +464,7 @@ class TestAgentsMdSection9:
     def test_agents_md_has_fr9_playwright_policy(self):
         """AGENTS.md should have FR-9 Playwright invocation policy."""
         agents_path = Path("AGENTS.md")
-        content = agents_path.read_text()
+        content = agents_path.read_text(encoding='utf-8')
         
         assert "FR-9" in content
         assert "/playwright" in content
@@ -472,7 +472,7 @@ class TestAgentsMdSection9:
     def test_agents_md_has_exception_reasons_table(self):
         """AGENTS.md should have exception reasons table."""
         agents_path = Path("AGENTS.md")
-        content = agents_path.read_text()
+        content = agents_path.read_text(encoding='utf-8')
         
         assert "playwright_unavailable" in content
         assert "environment_blocked" in content
@@ -480,6 +480,6 @@ class TestAgentsMdSection9:
     def test_agents_md_has_core_principle(self):
         """AGENTS.md should have core principle statement."""
         agents_path = Path("AGENTS.md")
-        content = agents_path.read_text()
+        content = agents_path.read_text(encoding='utf-8')
         
         assert "environment setup is not verification" in content
