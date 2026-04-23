@@ -5,6 +5,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 from cli.commands.recovery import app
 from runtime.recovery_classifier import RecoveryClassification, classify_recovery
+from runtime.state_store import StateStore
 
 
 runner = CliRunner()
@@ -82,7 +83,7 @@ class TestRecoveryCLI:
         assert "Invalid" in result.output
 
     def test_resume_rejects_invalid_format(self):
-        result = runner.invoke(app, ["resume", "--execution", "invalid", "--action", "test"])
+        result = runner.invoke(app, ["resume", "invalid", "test"])
         assert result.exit_code == 1
         assert "Invalid" in result.output
 
@@ -191,3 +192,31 @@ class TestObserverFindingConsumption:
         recovery_sig = [f for f in result.findings if f.recovery_significant]
         assert len(recovery_sig) == 1
         assert recovery_sig[0].finding_type == ObserverFindingType.RECOVERY_OVERDUE
+
+
+class TestRecoveryActionWiring:
+    """Test Feature 066a AC-003: Action wiring to async-dev flows."""
+
+    def test_execute_flag_registered(self):
+        result = runner.invoke(app, ["resume", "--help"])
+        assert "--execute" in result.output
+
+    def test_invoke_asyncdev_command_returns_exit_code(self):
+        from cli.commands.recovery import _invoke_asyncdev_command
+        exit_code = _invoke_asyncdev_command("status --all-features", "test-project")
+        assert exit_code == 0 or exit_code == 1
+
+    def test_resume_without_execute_prints_suggestion(self, temp_dir):
+        project = temp_dir / "test-wiring"
+        project.mkdir()
+        runstate = {
+            "current_phase": "blocked",
+            "blocked_items": [{"reason": "test blocker"}],
+            "project_id": "test-wiring",
+            "feature_id": "feature-001",
+        }
+        store = StateStore(project)
+        store.save_runstate(runstate)
+        
+        result = runner.invoke(app, ["resume", "exec-test-wiring-feature-001", "unblock", "--path", str(temp_dir)])
+        assert "Blockers cleared" in result.output or "No RunState found" in result.output

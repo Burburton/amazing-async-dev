@@ -289,6 +289,7 @@ All core features complete:
 | Execution Policy | Auto-continue safe, pause for risky |
 | Decision Channel | Email-first async decisions |
 | Starter Pack Integration | Advisor → async-dev handoff |
+| Execution Observer | Supervision layer for runtime health (Feature 067) |
 | Recovery Console | Operator surface for execution recovery |
 | Decision Inbox | Operator surface for decision management |
 | Session Start | Mandatory blocking state check (Feature 065) |
@@ -360,7 +361,12 @@ asyncdev email-decision reply --project {id} --id {id} --command "DECISION A"
 # Recovery Console (Operator Surface - Phase 2)
 asyncdev recovery list [--project {id}] [--all]
 asyncdev recovery show --execution exec-{project}-{feature}
-asyncdev recovery resume --execution exec-{project}-{feature} --action {unblock|abort|continue|retry|reset}
+asyncdev recovery resume --execution exec-{project}-{feature} --action {unblock|abort|continue|retry|reset} [--execute]
+
+# Execution Observer (Supervision Layer - Feature 067)
+asyncdev observe-runs --project {id}
+asyncdev observe-runs --all
+asyncdev observe-runs --severity {low|medium|high|critical}
 
 # Decision Inbox (Operator Surface - Phase 3)
 asyncdev decision list [--project {id}] [--all] [--status {status}]

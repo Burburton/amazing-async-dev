@@ -1,12 +1,15 @@
 """recovery command - Execution Recovery Console (Operator Surface).
 
 Feature: Execution Recovery Console
+Feature 066a: Wired recovery actions to async-dev flows (AC-003)
 Architecture Reference: docs/infra/async-dev-platform-architecture-product-positioning.md (Section 12.1)
 Spec: docs/infra/execution-recovery-console-spec-v1.md
 """
 
 from pathlib import Path
 from datetime import datetime
+import subprocess
+import sys
 
 import typer
 from rich.console import Console
@@ -23,9 +26,28 @@ from runtime.recovery_classifier import (
     ResumeEligibility,
 )
 from runtime.execution_observer import run_observer, ObservationResult
+from runtime.recovery_data_adapter import RecoveryDataAdapter, get_recovery_item_for_project
 
 app = typer.Typer(help="Execution Recovery Console - Operator surface for recovery operations")
 console = Console()
+
+
+def _invoke_asyncdev_command(command: str, project_id: str, extra_args: list[str] = None) -> int:
+    """Invoke an asyncdev CLI command via subprocess and return exit code."""
+    cli_path = Path(__file__).parent.parent / "asyncdev.py"
+    args = [sys.executable, str(cli_path)] + command.split() + ["--project", project_id]
+    if extra_args:
+        args.extend(extra_args)
+    
+    console.print(f"\n[cyan]Invoking: {command} --project {project_id}[/cyan]")
+    result = subprocess.run(args, capture_output=True, text=True)
+    
+    if result.stdout:
+        console.print(result.stdout)
+    if result.stderr:
+        console.print(f"[red]{result.stderr}[/red]")
+    
+    return result.returncode
 
 
 def _get_all_projects(path: Path) -> list[Path]:
@@ -35,39 +57,28 @@ def _get_all_projects(path: Path) -> list[Path]:
 
 
 def _get_recoveries_for_project(project_path: Path) -> list[dict]:
-    store = StateStore(project_path)
-    runstate = store.load_runstate()
+    adapter = RecoveryDataAdapter(project_path)
+    item = adapter.get_recovery_item()
     
-    if runstate is None:
+    if item is None:
         return []
-    
-    classification = classify_recovery(runstate)
-    
-    recovery_needed_classifications = [
-        RecoveryClassification.BLOCKED,
-        RecoveryClassification.FAILED,
-        RecoveryClassification.AWAITING_DECISION,
-        RecoveryClassification.UNSAFE_TO_RESUME,
-    ]
-    
-    if classification not in recovery_needed_classifications:
-        return []
-    
-    project_id = runstate.get("project_id", project_path.name)
-    feature_id = runstate.get("feature_id", "")
-    guidance = get_recovery_guidance(runstate)
     
     return [{
-        "project": project_id,
-        "feature": feature_id,
-        "execution_id": f"exec-{project_id}-{feature_id}",
-        "classification": classification.value,
-        "phase": runstate.get("current_phase", "unknown"),
-        "reason": guidance.get("explanation", "Unknown reason"),
-        "recommended_action": guidance.get("recommended_action", ""),
-        "updated_at": runstate.get("updated_at", ""),
-        "blocked_count": len(runstate.get("blocked_items", [])),
-        "decisions_count": len(runstate.get("decisions_needed", [])),
+        "project": item.product_id,
+        "feature": item.feature_id,
+        "execution_id": item.execution_id,
+        "classification": item.status,
+        "phase": item.phase,
+        "reason": item.recovery_reason,
+        "category": item.recovery_category,
+        "recommended_action": item.suggested_action,
+        "recommended_command": item.suggested_command,
+        "updated_at": item.last_updated_at,
+        "blocked_count": len(item.blocked_items),
+        "decisions_count": len(item.decisions_needed),
+        "observer_findings_count": len(item.observer_findings),
+        "verification_status": item.verification_status,
+        "closeout_status": item.closeout_status,
         "project_path": project_path,
     }]
 
@@ -180,8 +191,8 @@ def show(
         console.print("[yellow]Expected format: exec-{project}-{feature}[/yellow]")
         raise typer.Exit(1)
     
-    project_id = parts[1]
-    feature_id = parts[2] if len(parts) > 2 else ""
+    project_id = "-".join(parts[1:-1])
+    feature_id = parts[-1]
     
     project_path = path / project_id
     if not project_path.exists():
@@ -358,19 +369,24 @@ def show(
 
 @app.command()
 def resume(
-    execution: str = typer.Option(..., "--execution", help="Execution ID to resume"),
-    action: str = typer.Option(..., "--action", help="Recovery action"),
+    execution: str = typer.Argument(..., help="Execution ID (exec-{project}-{feature})"),
+    action: str = typer.Argument(..., help="Recovery action (unblock, abort, continue, retry, reset, defer, inspect, escalate)"),
     reason: str = typer.Option(None, "--reason", help="Reason for recovery action"),
+    execute: bool = typer.Option(False, "--execute", help="Execute the suggested asyncdev command after recovery"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
-    """Execute a recovery action to resume execution."""
+    """Execute a recovery action to resume execution.
+    
+    With --execute flag, automatically invokes the suggested asyncdev command.
+    Without --execute, updates state and prints suggested command for operator review.
+    """
     parts = execution.split("-")
     if len(parts) < 3 or parts[0] != "exec":
         console.print(f"[red]Invalid execution ID format: {execution}[/red]")
         raise typer.Exit(1)
     
-    project_id = parts[1]
-    feature_id = parts[2] if len(parts) > 2 else ""
+    project_id = "-".join(parts[1:-1])
+    feature_id = parts[-1]
     
     project_path = path / project_id
     store = StateStore(project_path)
@@ -490,6 +506,20 @@ def resume(
     sqlite_store.close()
     
     console.print(f"\n[dim]Recovery logged to SQLite[/dim]")
+    
+    if execute and action in ("unblock", "continue", "retry", "reset"):
+        next_command = {
+            "unblock": "plan-day create",
+            "continue": "plan-day create",
+            "retry": "run-day --mode external",
+            "reset": "plan-day create",
+        }
+        cmd = next_command.get(action)
+        if cmd:
+            exit_code = _invoke_asyncdev_command(cmd, project_id)
+            if exit_code != 0:
+                console.print(f"[red]Command failed with exit code {exit_code}[/red]")
+                raise typer.Exit(exit_code)
 
 
 if __name__ == "__main__":
