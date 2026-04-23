@@ -22,6 +22,7 @@ from runtime.recovery_classifier import (
     RecoveryClassification,
     ResumeEligibility,
 )
+from runtime.execution_observer import run_observer, ObservationResult
 
 app = typer.Typer(help="Execution Recovery Console - Operator surface for recovery operations")
 console = Console()
@@ -169,6 +170,7 @@ def list(
 @app.command()
 def show(
     execution: str = typer.Option(..., "--execution", help="Execution ID to inspect"),
+    observe: bool = typer.Option(False, "--observe", help="Run observer for additional findings"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Show detailed recovery information for an execution."""
@@ -303,6 +305,35 @@ def show(
     
     for action, desc in available_actions:
         console.print(f"  [cyan]{action}[/cyan]: {desc}")
+    
+    if observe:
+        console.print("\n[bold]Observer Findings:[/bold]")
+        
+        obs_result = run_observer(project_path)
+        
+        if obs_result.findings:
+            findings_table = Table()
+            findings_table.add_column("Type", style="cyan")
+            findings_table.add_column("Severity", style="yellow")
+            findings_table.add_column("Reason")
+            
+            for f in obs_result.findings:
+                sev_style = {
+                    "critical": "red bold",
+                    "high": "yellow",
+                    "medium": "blue",
+                }.get(f.severity.value, "")
+                
+                findings_table.add_row(
+                    f.finding_type.value,
+                    f"[{sev_style}]{f.severity.value}[/{sev_style}]",
+                    f.reason[:40] if len(f.reason) > 40 else f.reason,
+                )
+            
+            console.print(findings_table)
+            console.print(f"[dim]Summary: {obs_result.summary}[/dim]")
+        else:
+            console.print("[green]No observer findings[/green]")
     
     console.print(f"\n[dim]Run: asyncdev recovery resume --execution {execution} --action <action>[/dim]")
 

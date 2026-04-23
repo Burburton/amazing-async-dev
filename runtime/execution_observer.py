@@ -1,0 +1,368 @@
+"""Execution Observer - Feature 066.
+
+Monitors async-dev execution state and detects anomalies that require attention.
+
+Observer finds issues:
+- Stalled execution (no progress for X seconds)
+- Timeout detection (closeout/verification timeout)
+- Missing artifacts (expected but not found)
+- Verification failure
+- Closeout incomplete
+- Decision overdue
+
+Recovery Console consumes these findings for operator action.
+"""
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any
+
+
+class ObserverFindingType(str, Enum):
+    """Types of findings the observer can detect."""
+    
+    STALLED_EXECUTION = "stalled_execution"
+    TIMEOUT_DETECTED = "timeout_detected"
+    MISSING_ARTIFACT = "missing_artifact"
+    VERIFICATION_FAILURE = "verification_failure"
+    CLOSEOUT_INCOMPLETE = "closeout_incomplete"
+    DECISION_OVERDUE = "decision_overdue"
+    BLOCKED_STATE = "blocked_state"
+    RECOVERY_REQUIRED = "recovery_required"
+
+
+class FindingSeverity(str, Enum):
+    """Severity levels for observer findings."""
+    
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFO = "info"
+
+
+@dataclass
+class ObserverFinding:
+    """Single finding from execution observation.
+    
+    Captures an anomaly or issue detected during execution monitoring.
+    """
+    
+    finding_id: str
+    finding_type: ObserverFindingType
+    severity: FindingSeverity
+    execution_id: str | None = None
+    project_id: str | None = None
+    feature_id: str | None = None
+    
+    reason: str = ""
+    details: dict[str, Any] = field(default_factory=dict)
+    
+    suggested_action: str = ""
+    suggested_command: str = ""
+    
+    detected_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    
+    related_artifacts: list[str] = field(default_factory=list)
+    
+    resolved: bool = False
+    resolved_at: str | None = None
+    resolution_action: str | None = None
+    
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "finding_id": self.finding_id,
+            "finding_type": self.finding_type.value,
+            "severity": self.severity.value,
+            "execution_id": self.execution_id,
+            "project_id": self.project_id,
+            "feature_id": self.feature_id,
+            "reason": self.reason,
+            "details": self.details,
+            "suggested_action": self.suggested_action,
+            "suggested_command": self.suggested_command,
+            "detected_at": self.detected_at,
+            "related_artifacts": self.related_artifacts,
+            "resolved": self.resolved,
+            "resolved_at": self.resolved_at,
+            "resolution_action": self.resolution_action,
+        }
+
+
+@dataclass
+class ObservationResult:
+    """Result of execution observation run.
+    
+    Contains all findings detected in a single observation pass.
+    """
+    
+    observation_id: str
+    project_id: str
+    started_at: str
+    finished_at: str | None = None
+    
+    findings: list[ObserverFinding] = field(default_factory=list)
+    
+    execution_state_analyzed: bool = False
+    artifacts_checked: bool = False
+    verification_state_checked: bool = False
+    closeout_state_checked: bool = False
+    
+    summary: str = ""
+    
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "observation_id": self.observation_id,
+            "project_id": self.project_id,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "findings_count": len(self.findings),
+            "findings": [f.to_dict() for f in self.findings],
+            "execution_state_analyzed": self.execution_state_analyzed,
+            "artifacts_checked": self.artifacts_checked,
+            "verification_state_checked": self.verification_state_checked,
+            "closeout_state_checked": self.closeout_state_checked,
+            "summary": self.summary,
+        }
+    
+    def has_critical_findings(self) -> bool:
+        return any(f.severity == FindingSeverity.CRITICAL for f in self.findings)
+    
+    def has_recovery_required(self) -> bool:
+        return any(f.finding_type == ObserverFindingType.RECOVERY_REQUIRED for f in self.findings)
+
+
+class ExecutionObserver:
+    """Observer that monitors async-dev execution state.
+    
+    Scans execution artifacts and state to detect anomalies requiring attention.
+    """
+    
+    STALLED_THRESHOLD_SECONDS = 300  # 5 minutes no progress = stalled
+    TIMEOUT_THRESHOLD_SECONDS = 120  # 2 minutes over expected = timeout
+    DECISION_OVERDUE_THRESHOLD_SECONDS = 3600  # 1 hour waiting = overdue
+    
+    def __init__(self, project_path: Path):
+        self.project_path = project_path
+        self.findings: list[ObserverFinding] = []
+    
+    def observe(self) -> ObservationResult:
+        """Run observation on project execution state.
+        
+        Returns ObservationResult with all detected findings.
+        """
+        observation_id = f"obs-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        started_at = datetime.now().isoformat()
+        
+        self.findings = []
+        
+        self._check_execution_state()
+        self._check_artifacts()
+        self._check_verification_state()
+        self._check_closeout_state()
+        self._check_decisions()
+        
+        finished_at = datetime.now().isoformat()
+        
+        summary = self._generate_summary()
+        
+        return ObservationResult(
+            observation_id=observation_id,
+            project_id=self.project_path.name,
+            started_at=started_at,
+            finished_at=finished_at,
+            findings=self.findings,
+            execution_state_analyzed=True,
+            artifacts_checked=True,
+            verification_state_checked=True,
+            closeout_state_checked=True,
+            summary=summary,
+        )
+    
+    def _check_execution_state(self) -> None:
+        from runtime.state_store import StateStore
+        
+        store = StateStore(self.project_path)
+        runstate = store.load_runstate()
+        
+        if runstate is None:
+            return
+        
+        phase = runstate.get("current_phase", "")
+        blocked_items = runstate.get("blocked_items", [])
+        updated_at_str = runstate.get("updated_at", "")
+        
+        if phase == "blocked" and blocked_items:
+            self._add_finding(
+                finding_type=ObserverFindingType.BLOCKED_STATE,
+                severity=FindingSeverity.HIGH,
+                reason=f"Execution blocked: {blocked_items}",
+                suggested_action="Resolve blocker before continuing",
+                suggested_command="asyncdev recovery show --execution <id>",
+            )
+        
+        if phase == "executing" and updated_at_str:
+            try:
+                updated_at = datetime.fromisoformat(updated_at_str)
+                elapsed = (datetime.now() - updated_at).total_seconds()
+                
+                if elapsed > self.STALLED_THRESHOLD_SECONDS:
+                    self._add_finding(
+                        finding_type=ObserverFindingType.STALLED_EXECUTION,
+                        severity=FindingSeverity.HIGH,
+                        reason=f"No progress for {elapsed:.0f} seconds",
+                        details={"elapsed_seconds": elapsed},
+                        suggested_action="Inspect execution state",
+                        suggested_command="asyncdev recovery show --execution <id>",
+                    )
+            except (ValueError, TypeError):
+                pass
+    
+    def _check_artifacts(self) -> None:
+        results_dir = self.project_path / "execution-results"
+        
+        if not results_dir.exists():
+            return
+        
+        result_files = list(results_dir.glob("*.md"))
+        
+        for result_file in result_files:
+            content = result_file.read_text(encoding="utf-8")
+            
+            if "status: failed" in content.lower():
+                self._add_finding(
+                    finding_type=ObserverFindingType.RECOVERY_REQUIRED,
+                    severity=FindingSeverity.HIGH,
+                    reason="Execution result shows failure status",
+                    suggested_action="Review failure details and decide recovery path",
+                    suggested_command="asyncdev recovery show --execution <id>",
+                    related_artifacts=[str(result_file)],
+                )
+    
+    def _check_verification_state(self) -> None:
+        results_dir = self.project_path / "execution-results"
+        
+        if not results_dir.exists():
+            return
+        
+        for result_file in results_dir.glob("*.md"):
+            content = result_file.read_text(encoding="utf-8")
+            
+            if "browser_verification" in content and "executed: false" in content.lower():
+                if "frontend_interactive" in content or "frontend_visual" in content:
+                    self._add_finding(
+                        finding_type=ObserverFindingType.VERIFICATION_FAILURE,
+                        severity=FindingSeverity.MEDIUM,
+                        reason="Frontend verification not executed",
+                        suggested_action="Run frontend verification",
+                        suggested_command="asyncdev verification retry --execution <id>",
+                        related_artifacts=[str(result_file)],
+                    )
+    
+    def _check_closeout_state(self) -> None:
+        results_dir = self.project_path / "execution-results"
+        
+        if not results_dir.exists():
+            return
+        
+        for result_file in results_dir.glob("*.md"):
+            content = result_file.read_text(encoding="utf-8")
+            
+            if "closeout_state" in content and "timeout" in content.lower():
+                self._add_finding(
+                    finding_type=ObserverFindingType.TIMEOUT_DETECTED,
+                    severity=FindingSeverity.HIGH,
+                    reason="Closeout timed out",
+                    suggested_action="Retry closeout or manual inspection",
+                    suggested_command="asyncdev recovery resume --execution <id> --action retry",
+                    related_artifacts=[str(result_file)],
+                )
+            
+            if "closeout_state" in content and "recovery_required" in content.lower():
+                self._add_finding(
+                    finding_type=ObserverFindingType.CLOSEOUT_INCOMPLETE,
+                    severity=FindingSeverity.HIGH,
+                    reason="Closeout incomplete, recovery required",
+                    suggested_action="Complete closeout manually",
+                    suggested_command="asyncdev recovery show --execution <id>",
+                    related_artifacts=[str(result_file)],
+                )
+    
+    def _check_decisions(self) -> None:
+        from runtime.state_store import StateStore
+        
+        store = StateStore(self.project_path)
+        runstate = store.load_runstate()
+        
+        if runstate is None:
+            return
+        
+        decision_request_sent_at = runstate.get("decision_request_sent_at", "")
+        
+        if decision_request_sent_at:
+            try:
+                sent_at = datetime.fromisoformat(decision_request_sent_at)
+                elapsed = (datetime.now() - sent_at).total_seconds()
+                
+                if elapsed > self.DECISION_OVERDUE_THRESHOLD_SECONDS:
+                    self._add_finding(
+                        finding_type=ObserverFindingType.DECISION_OVERDUE,
+                        severity=FindingSeverity.MEDIUM,
+                        reason=f"Decision pending for {elapsed:.0f} seconds",
+                        details={"elapsed_seconds": elapsed},
+                        suggested_action="Check decision inbox or provide reply",
+                        suggested_command="asyncdev decision wait --request <id>",
+                    )
+            except (ValueError, TypeError):
+                pass
+    
+    def _add_finding(
+        self,
+        finding_type: ObserverFindingType,
+        severity: FindingSeverity,
+        reason: str,
+        suggested_action: str = "",
+        suggested_command: str = "",
+        details: dict[str, Any] = {},
+        related_artifacts: list[str] = [],
+    ) -> None:
+        from runtime.state_store import StateStore
+        
+        store = StateStore(self.project_path)
+        runstate = store.load_runstate() or {}
+        
+        finding_id = f"find-{datetime.now().strftime('%Y%m%d%H%M%S')}-{len(self.findings)}"
+        
+        finding = ObserverFinding(
+            finding_id=finding_id,
+            finding_type=finding_type,
+            severity=severity,
+            execution_id=runstate.get("active_task", ""),
+            project_id=runstate.get("project_id", self.project_path.name),
+            feature_id=runstate.get("feature_id", ""),
+            reason=reason,
+            details=details,
+            suggested_action=suggested_action,
+            suggested_command=suggested_command,
+            related_artifacts=related_artifacts,
+        )
+        
+        self.findings.append(finding)
+    
+    def _generate_summary(self) -> str:
+        if not self.findings:
+            return "No issues detected. Execution state appears healthy."
+        
+        critical = sum(1 for f in self.findings if f.severity == FindingSeverity.CRITICAL)
+        high = sum(1 for f in self.findings if f.severity == FindingSeverity.HIGH)
+        medium = sum(1 for f in self.findings if f.severity == FindingSeverity.MEDIUM)
+        
+        return f"Detected {len(self.findings)} findings: {critical} critical, {high} high, {medium} medium"
+
+
+def run_observer(project_path: Path) -> ObservationResult:
+    """Convenience function to run observation on a project."""
+    observer = ExecutionObserver(project_path)
+    return observer.observe()
