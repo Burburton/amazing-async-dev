@@ -1,0 +1,378 @@
+schema_type: acceptance-result
+version: "1.0"
+description: Structured output from independent acceptance validation (Feature 069)
+
+required:
+  - acceptance_result_id
+  - acceptance_pack_id
+  - terminal_state
+  - findings
+  - accepted_criteria
+  - failed_criteria
+  - missing_evidence
+  - validator_identity
+  - validated_at
+  - attempt_number
+
+optional:
+  - remediation_guidance
+  - conditional_notes
+  - escalate_reason
+  - next_recommended_action
+  - validation_duration
+
+fields:
+  acceptance_result_id:
+    type: string
+    description: Unique identifier for this acceptance result
+    pattern: "^ar-[0-9]{8}-[0-9]{3}$"
+    example: "ar-20260423-001"
+    required: true
+
+  acceptance_pack_id:
+    type: string
+    description: Reference to the AcceptancePack being validated
+    pattern: "^ap-[0-9]{8}-[0-9]{3}$"
+    example: "ap-20260423-001"
+    required: true
+
+  terminal_state:
+    type: enum
+    description: Terminal state of acceptance validation
+    values:
+      - accepted
+      - rejected
+      - conditional
+      - manual_review
+      - escalated
+    example: "accepted"
+    required: true
+    notes: |
+      Terminal State Validity for Completion:
+      - accepted: Valid for completion (all criteria satisfied)
+      - conditional: Valid for completion (accepted with documented caveats)
+      - rejected: NOT valid for completion (needs rework)
+      - manual_review: NOT valid for completion (needs human judgment)
+      - escalated: NOT valid for completion (needs escalation resolution)
+
+  findings:
+    type: array
+    description: Per-criterion evaluation results
+    items_type: object
+    min_items: 1
+    example:
+      - criterion_id: "AC-001"
+        criterion_description: "AcceptancePack schema exists"
+        status: "satisfied"
+        evidence_links: ["schemas/acceptance-pack.schema.yaml"]
+        verification_method: "file_existence_check"
+      - criterion_id: "AC-002"
+        criterion_description: "AcceptanceResult schema exists"
+        status: "satisfied"
+        evidence_links: ["schemas/acceptance-result.schema.yaml"]
+        verification_method: "file_existence_check"
+    required: true
+
+  accepted_criteria:
+    type: array
+    description: List of criterion_ids that passed
+    items_type: string
+    example: ["AC-001", "AC-002", "AC-003"]
+    required: true
+
+  failed_criteria:
+    type: array
+    description: List of criterion_ids that failed
+    items_type: string
+    example: []
+    required: true
+
+  missing_evidence:
+    type: array
+    description: Evidence gaps preventing acceptance determination
+    items_type: object
+    example: []
+    properties:
+      criterion_id:
+        type: string
+        description: Which criterion needs evidence
+      required_evidence_type:
+        type: string
+        description: What evidence type is needed
+      suggested_artifact:
+        type: string
+        description: Hint for what to provide
+    required: true
+
+  validator_identity:
+    type: object
+    description: Identity of the validator that performed acceptance
+    properties:
+      validator_type:
+        type: enum
+        description: Type of validator
+        values:
+          - ai_session
+          - human_review
+          - automated_script
+      validator_name:
+        type: string
+        description: Name or identifier of validator
+      validator_session:
+        type: string
+        description: Session ID if AI validator
+    example:
+      validator_type: "ai_session"
+      validator_name: "acceptance-validator-v1"
+      validator_session: "ses_abc123"
+    required: true
+
+  validated_at:
+    type: datetime
+    description: Timestamp when validation completed
+    example: "2026-04-23T15:00:00"
+    required: true
+
+  attempt_number:
+    type: integer
+    description: Which attempt number this is (1-N)
+    min: 1
+    example: 1
+    required: true
+
+  remediation_guidance:
+    type: object
+    description: Guidance for fixing failed criteria
+    properties:
+      must_fix:
+        type: array
+        description: Items that must be fixed before re-acceptance
+        items_type: object
+      suggested_actions:
+        type: array
+        description: Recommended remediation steps
+        items_type: string
+      estimated_effort:
+        type: string
+        description: Rough estimate of fix effort
+    example:
+      must_fix:
+        - criterion_id: "AC-004"
+          action: "Create acceptance-pack.template.md"
+          priority: "critical"
+      suggested_actions:
+        - "Copy template structure from execution-pack.template.md"
+      estimated_effort: "30 minutes"
+    required: false
+
+  conditional_notes:
+    type: string
+    description: Caveats when acceptance is conditional
+    example: "Accepted with note: examples demonstrate accepted state only, rejected/conditional examples pending"
+    required: false
+
+  escalate_reason:
+    type: object
+    description: Reason for escalation if terminal_state is escalated
+    properties:
+      escalation_type:
+        type: enum
+        description: Type of escalation
+        values:
+          - criterion_ambiguity
+          - evidence_insufficient
+          - policy_conflict
+          - unknown_blocker
+      description:
+        type: string
+        description: Why this needs escalation
+      suggested_resolution:
+        type: string
+        description: What might resolve the escalation
+    example:
+      escalation_type: "criterion_ambiguity"
+      description: "AC-007 interpretation unclear - is template required or optional?"
+      suggested_resolution: "Clarify criterion with feature owner"
+    required: false
+
+  next_recommended_action:
+    type: string
+    description: Recommended next action based on terminal_state
+    example: "Proceed to feature completion - all criteria satisfied"
+    required: false
+
+  validation_duration:
+    type: duration
+    description: Time spent on validation
+    example: "15m"
+    required: false
+
+lifecycle:
+  created_by: acceptance_runner (Feature 071)
+  update_frequency: never (immutable)
+  consumed_by:
+    - recovery integration (Feature 072)
+    - completion gating (Feature 075)
+    - operator surfaces (Feature 074)
+    - archive_pack creation
+
+validation:
+  - acceptance_result_id must match pattern
+  - terminal_state must be valid enum
+  - findings must have at least 1 item
+  - each finding must have criterion_id, status
+  - if terminal_state is rejected, failed_criteria must have items
+  - if terminal_state is conditional, conditional_notes must be present
+  - if terminal_state is escalated, escalate_reason must be present
+  - attempt_number must be >= 1
+
+usage_rules:
+  for_completion_gate:
+    - terminal_state must be 'accepted' or 'conditional' to allow completion
+    - terminal_state 'rejected' triggers recovery/rework loop
+  for_recovery_integration:
+    - failed_criteria maps to recovery_items
+    - remediation_guidance.suggested_actions maps to fix_work items
+  for_archive_pack:
+    - accepted_criteria maps to archive_pack.acceptance_result.satisfied
+    - failed_criteria maps to archive_pack.acceptance_result.unsatisfied
+    - terminal_state maps to archive_pack.acceptance_result.overall
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - acceptance_result_id
+    - acceptance_pack_id
+    - terminal_state
+    - findings
+    - accepted_criteria
+    - failed_criteria
+    - missing_evidence
+    - validator_identity
+    - validated_at
+    - attempt_number
+  properties:
+    acceptance_result_id:
+      type: string
+      pattern: "^ar-[0-9]{8}-[0-9]{3}$"
+    acceptance_pack_id:
+      type: string
+      pattern: "^ap-[0-9]{8}-[0-9]{3}$"
+    terminal_state:
+      type: string
+      enum:
+        - accepted
+        - rejected
+        - conditional
+        - manual_review
+        - escalated
+    findings:
+      type: array
+      items:
+        type: object
+        required:
+          - criterion_id
+          - status
+        properties:
+          criterion_id:
+            type: string
+          criterion_description:
+            type: string
+          status:
+            type: string
+            enum:
+              - satisfied
+              - failed
+              - partial
+              - needs_evidence
+          evidence_links:
+            type: array
+            items:
+              type: string
+          gap_description:
+            type: string
+          verification_method:
+            type: string
+      minItems: 1
+    accepted_criteria:
+      type: array
+      items:
+        type: string
+    failed_criteria:
+      type: array
+      items:
+        type: string
+    missing_evidence:
+      type: array
+      items:
+        type: object
+        properties:
+          criterion_id:
+            type: string
+          required_evidence_type:
+            type: string
+          suggested_artifact:
+            type: string
+    validator_identity:
+      type: object
+      required:
+        - validator_type
+        - validator_name
+      properties:
+        validator_type:
+          type: string
+          enum:
+            - ai_session
+            - human_review
+            - automated_script
+        validator_name:
+          type: string
+        validator_session:
+          type: string
+    validated_at:
+      type: string
+      format: date-time
+    attempt_number:
+      type: integer
+      minimum: 1
+    remediation_guidance:
+      type: object
+      properties:
+        must_fix:
+          type: array
+          items:
+            type: object
+            properties:
+              criterion_id:
+                type: string
+              action:
+                type: string
+              priority:
+                type: string
+        suggested_actions:
+          type: array
+          items:
+            type: string
+        estimated_effort:
+          type: string
+    conditional_notes:
+      type: string
+    escalate_reason:
+      type: object
+      properties:
+        escalation_type:
+          type: string
+          enum:
+            - criterion_ambiguity
+            - evidence_insufficient
+            - policy_conflict
+            - unknown_blocker
+        description:
+          type: string
+        suggested_resolution:
+          type: string
+    next_recommended_action:
+      type: string
+    validation_duration:
+      type: string

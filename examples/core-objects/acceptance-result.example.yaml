@@ -1,0 +1,84 @@
+schema_type: acceptance-result
+version: "1.0"
+
+acceptance_result_id: "ar-20260423-001"
+acceptance_pack_id: "ap-20260423-001"
+
+terminal_state: "accepted"
+
+findings:
+  - criterion_id: "AC-001"
+    criterion_description: "AcceptancePack schema exists with all required fields defined"
+    status: "satisfied"
+    evidence_links:
+      - "schemas/acceptance-pack.schema.yaml"
+    verification_method: "file_existence_check"
+  
+  - criterion_id: "AC-002"
+    criterion_description: "AcceptanceResult schema exists with terminal state enum and findings structure"
+    status: "satisfied"
+    evidence_links:
+      - "schemas/acceptance-result.schema.yaml"
+    verification_method: "file_existence_check"
+  
+  - criterion_id: "AC-003"
+    criterion_description: "AcceptancePack template exists and renders correctly"
+    status: "satisfied"
+    evidence_links:
+      - "templates/acceptance-pack.template.md"
+    verification_method: "file_existence_check"
+  
+  - criterion_id: "AC-004"
+    criterion_description: "AcceptanceResult template exists and documents terminal state validity"
+    status: "satisfied"
+    evidence_links:
+      - "templates/acceptance-result.template.md"
+    verification_method: "file_existence_check"
+  
+  - criterion_id: "AC-005"
+    criterion_description: "Example files demonstrate realistic acceptance states"
+    status: "satisfied"
+    evidence_links:
+      - "examples/core-objects/acceptance-pack.example.yaml"
+      - "examples/core-objects/acceptance-result.example.yaml"
+    verification_method: "file_existence_check"
+  
+  - criterion_id: "AC-006"
+    criterion_description: "Architecture docs reference acceptance model"
+    status: "satisfied"
+    evidence_links:
+      - "docs/architecture.md"
+    verification_method: "content_search"
+  
+  - criterion_id: "AC-007"
+    criterion_description: "Verification vs acceptance distinction is documented"
+    status: "satisfied"
+    evidence_links:
+      - "docs/architecture.md"
+      - "docs/infra/069-acceptance-artifact-model-foundation.md"
+    verification_method: "content_search"
+
+accepted_criteria:
+  - "AC-001"
+  - "AC-002"
+  - "AC-003"
+  - "AC-004"
+  - "AC-005"
+  - "AC-006"
+  - "AC-007"
+
+failed_criteria: []
+
+missing_evidence: []
+
+validator_identity:
+  validator_type: "ai_session"
+  validator_name: "acceptance-validator-v1"
+  validator_session: "ses_abc123"
+
+validated_at: "2026-04-23T15:00:00"
+attempt_number: 1
+
+next_recommended_action: "Proceed to feature completion - all acceptance criteria satisfied"
+
+validation_duration: "10m"

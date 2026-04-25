@@ -1,0 +1,308 @@
+schema_type: acceptance-pack
+version: "1.0"
+description: Structured input package for independent acceptance validation (Feature 069)
+
+required:
+  - acceptance_pack_id
+  - feature_id
+  - product_id
+  - execution_result_id
+  - acceptance_criteria
+  - implementation_summary
+  - evidence_artifacts
+  - verification_summary
+  - triggered_at
+  - trigger_reason
+
+optional:
+  - observer_findings_summary
+  - changed_files
+  - notes_for_validator
+  - prior_attempt_reference
+
+fields:
+  acceptance_pack_id:
+    type: string
+    description: Unique identifier for this acceptance pack
+    pattern: "^ap-[0-9]{8}-[0-9]{3}$"
+    example: "ap-20260423-001"
+    required: true
+
+  feature_id:
+    type: string
+    description: Reference to the feature being validated
+    pattern: "^\\d{3}-[a-z0-9-]+$"
+    example: "069-acceptance-artifact-model-foundation"
+    required: true
+
+  product_id:
+    type: string
+    description: Product context for this acceptance
+    example: "amazing-async-dev"
+    required: true
+
+  execution_result_id:
+    type: string
+    description: Reference to the ExecutionResult being validated
+    pattern: "^exec-[0-9]{8}-[0-9]{3}$"
+    example: "exec-20260423-001"
+    required: true
+
+  acceptance_criteria:
+    type: array
+    description: Structured acceptance criteria to evaluate
+    items_type: object
+    min_items: 1
+    example:
+      - criterion_id: "AC-001"
+        description: "AcceptancePack schema exists with required fields"
+        evidence_type_hint: "file_existence"
+        priority: "critical"
+      - criterion_id: "AC-002"
+        description: "AcceptanceResult schema exists with terminal states"
+        evidence_type_hint: "file_existence"
+        priority: "critical"
+    required: true
+
+  implementation_summary:
+    type: string
+    description: Summary of what was implemented for validation
+    min_length: 50
+    example: "Created AcceptancePack and AcceptanceResult schemas following existing patterns. Added templates and examples for both artifacts. Updated architecture docs."
+    required: true
+
+  evidence_artifacts:
+    type: array
+    description: Artifacts available for acceptance validation
+    items_type: object
+    example:
+      - name: "acceptance-pack.schema.yaml"
+        path: "schemas/acceptance-pack.schema.yaml"
+        type: "schema"
+      - name: "acceptance-result.schema.yaml"
+        path: "schemas/acceptance-result.schema.yaml"
+        type: "schema"
+    required: true
+
+  verification_summary:
+    type: object
+    description: Summary of verification layer results (execution correctness)
+    properties:
+      verification_type:
+        type: string
+        description: Classification from verification_classifier
+      browser_verification_executed:
+        type: boolean
+        description: Whether browser verification ran
+      browser_verification_passed:
+        type: integer
+        description: Number of passed browser scenarios
+      browser_verification_failed:
+        type: integer
+        description: Number of failed browser scenarios
+      orchestration_terminal_state:
+        type: string
+        description: Terminal state from Feature 060 orchestration
+      closeout_terminal_state:
+        type: string
+        description: Terminal state from Feature 061 closeout
+    example:
+      verification_type: "backend_only"
+      browser_verification_executed: false
+      orchestration_terminal_state: "not_required"
+      closeout_terminal_state: "success"
+    required: true
+
+  triggered_at:
+    type: datetime
+    description: Timestamp when acceptance was triggered
+    example: "2026-04-23T14:30:00"
+    required: true
+
+  trigger_reason:
+    type: enum
+    description: Why acceptance was triggered
+    values:
+      - execution_result_complete
+      - operator_request
+      - feature_complete_candidate
+      - revalidation_after_fix
+    example: "execution_result_complete"
+    required: true
+
+  observer_findings_summary:
+    type: object
+    description: Summary of observer findings (Feature 067) if available
+    properties:
+      total_findings:
+        type: integer
+        description: Total number of findings
+      recovery_significant_count:
+        type: integer
+        description: Findings marked recovery_significant
+      critical_count:
+        type: integer
+        description: Critical severity findings
+      high_count:
+        type: integer
+        description: High severity findings
+    example:
+      total_findings: 3
+      recovery_significant_count: 1
+      critical_count: 0
+      high_count: 1
+    required: false
+
+  changed_files:
+    type: array
+    description: Files changed in this execution
+    items_type: string
+    example:
+      - "schemas/acceptance-pack.schema.yaml"
+      - "schemas/acceptance-result.schema.yaml"
+      - "templates/acceptance-pack.template.md"
+    required: false
+
+  notes_for_validator:
+    type: string
+    description: Additional context for the validator
+    example: "Focus on schema completeness. Templates can be partial."
+    required: false
+
+  prior_attempt_reference:
+    type: string
+    description: Reference to prior acceptance attempt if this is a retry
+    pattern: "^ar-[0-9]{8}-[0-9]{3}$"
+    example: "ar-20260422-001"
+    required: false
+
+lifecycle:
+  created_by: acceptance_trigger logic (Feature 070)
+  update_frequency: never (immutable)
+  consumed_by:
+    - acceptance_runner (Feature 071)
+    - validator session
+
+validation:
+  - acceptance_pack_id must match pattern
+  - acceptance_criteria must have at least 1 item
+  - each acceptance_criteria item must have criterion_id, description, priority
+  - implementation_summary must be at least 50 characters
+  - execution_result_id must reference valid ExecutionResult
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  required:
+    - acceptance_pack_id
+    - feature_id
+    - product_id
+    - execution_result_id
+    - acceptance_criteria
+    - implementation_summary
+    - evidence_artifacts
+    - verification_summary
+    - triggered_at
+    - trigger_reason
+  properties:
+    acceptance_pack_id:
+      type: string
+      pattern: "^ap-[0-9]{8}-[0-9]{3}$"
+    feature_id:
+      type: string
+      pattern: "^\\d{3}-[a-z0-9-]+$"
+    product_id:
+      type: string
+    execution_result_id:
+      type: string
+      pattern: "^exec-[0-9]{8}-[0-9]{3}$"
+    acceptance_criteria:
+      type: array
+      items:
+        type: object
+        required:
+          - criterion_id
+          - description
+          - priority
+        properties:
+          criterion_id:
+            type: string
+          description:
+            type: string
+          evidence_type_hint:
+            type: string
+            enum:
+              - file_existence
+              - content_validation
+              - behavior_verification
+              - manual_review
+          priority:
+            type: string
+            enum:
+              - critical
+              - required
+              - optional
+      minItems: 1
+    implementation_summary:
+      type: string
+      minLength: 50
+    evidence_artifacts:
+      type: array
+      items:
+        type: object
+        required:
+          - name
+          - path
+          - type
+        properties:
+          name:
+            type: string
+          path:
+            type: string
+          type:
+            type: string
+    verification_summary:
+      type: object
+      properties:
+        verification_type:
+          type: string
+        browser_verification_executed:
+          type: boolean
+        browser_verification_passed:
+          type: integer
+        browser_verification_failed:
+          type: integer
+        orchestration_terminal_state:
+          type: string
+        closeout_terminal_state:
+          type: string
+    triggered_at:
+      type: string
+      format: date-time
+    trigger_reason:
+      type: string
+      enum:
+        - execution_result_complete
+        - operator_request
+        - feature_complete_candidate
+        - revalidation_after_fix
+    observer_findings_summary:
+      type: object
+      properties:
+        total_findings:
+          type: integer
+        recovery_significant_count:
+          type: integer
+        critical_count:
+          type: integer
+        high_count:
+          type: integer
+    changed_files:
+      type: array
+      items:
+        type: string
+    notes_for_validator:
+      type: string
+    prior_attempt_reference:
+      type: string
+      pattern: "^ar-[0-9]{8}-[0-9]{3}$"

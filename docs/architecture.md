@@ -832,6 +832,92 @@ Operator (Layer B)          Kernel (Layer A)           Policy (Layer C)
 
 ---
 
+## Acceptance Layer Model (Feature 069)
+
+async-dev supports independent acceptance validation as a separate layer from verification.
+
+### Verification vs Acceptance
+
+| Layer | Purpose | Question | Trigger |
+|-------|---------|----------|---------|
+| Verification | Execution correctness | "Did it run correctly?" | After run-day execution |
+| Acceptance | Requirement fulfillment | "Does it meet the criteria?" | After ExecutionResult completes |
+
+### Acceptance Artifacts
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     ACCEPTANCE ARTIFACT FLOW                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   ExecutionResult ─────► AcceptancePack ─────► AcceptanceResult      │
+│   (implementation)       (input package)      (validation outcome)   │
+│                                                                      │
+│                          │                                          │
+│                          ▼                                          │
+│                                                                      │
+│                   Independent Validator                              │
+│                   (separate AI session, human, or script)            │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### AcceptancePack Structure
+
+Input package for validator:
+
+| Field | Description |
+|-------|-------------|
+| acceptance_pack_id | Unique identifier (ap-YYYYMMDD-###) |
+| feature_id | Feature being validated |
+| execution_result_id | Reference to implementation result |
+| acceptance_criteria | Structured criteria from FeatureSpec |
+| implementation_summary | What was implemented |
+| evidence_artifacts | Paths to artifacts for validation |
+| verification_summary | Verification layer result summary |
+
+### AcceptanceResult Structure
+
+Output from validator:
+
+| Field | Description |
+|-------|-------------|
+| acceptance_result_id | Unique identifier (ar-YYYYMMDD-###) |
+| terminal_state | ACCEPTED/REJECTED/CONDITIONAL/MANUAL_REVIEW/ESCALATED |
+| findings | Per-criterion evaluation results |
+| accepted_criteria | List of satisfied criterion_ids |
+| failed_criteria | List of failed criterion_ids |
+| remediation_guidance | How to fix rejected criteria |
+| validator_identity | Who performed validation |
+| attempt_number | Retry tracking (1-N) |
+
+### Terminal State Validity
+
+| State | Valid for Completion? | Action |
+|-------|------------------------|--------|
+| ACCEPTED | ✅ Yes | Proceed to feature completion |
+| CONDITIONAL | ✅ Yes | Proceed with documented caveats |
+| REJECTED | ❌ No | Trigger rework/recovery loop |
+| MANUAL_REVIEW | ❌ No | Wait for human judgment |
+| ESCALATED | ❌ No | Resolve escalation first |
+
+### Acceptance Integration Points
+
+```
+AcceptancePack consumes:
+├── ExecutionResult (implementation outcome)
+├── FeatureSpec.acceptance_criteria (validation targets)
+├── verification_summary (execution correctness proof)
+
+AcceptanceResult feeds:
+├── Recovery integration (Feature 072) → rework items
+├── Completion gating (Feature 075) → block premature completion
+├── Operator surfaces (Feature 074) → acceptance visibility
+├── ArchivePack.acceptance_result → completion summary
+```
+
+---
+
 ## Next Steps
 
 After understanding this architecture:
