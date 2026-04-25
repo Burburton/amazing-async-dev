@@ -166,8 +166,12 @@ class AcceptanceRunner:
         conditional_criteria: list[str] = []
         
         for criterion in acceptance_pack.acceptance_criteria:
-            criterion_id = criterion.get("criterion_id", criterion.get("id", ""))
-            criterion_text = criterion.get("text", criterion.get("description", ""))
+            if isinstance(criterion, str):
+                criterion_id = criterion
+                criterion_text = criterion
+            else:
+                criterion_id = criterion.get("criterion_id", criterion.get("id", ""))
+                criterion_text = criterion.get("text", criterion.get("description", criterion_id))
             
             finding = self._evaluate_criterion(
                 criterion_id,
@@ -287,9 +291,14 @@ class AcceptanceRunner:
         for criterion_id in failed_criteria:
             criterion_text = ""
             for criterion in acceptance_criteria:
-                if criterion.get("criterion_id", criterion.get("id", "")) == criterion_id:
-                    criterion_text = criterion.get("text", criterion.get("description", ""))
-                    break
+                if isinstance(criterion, str):
+                    if criterion == criterion_id:
+                        criterion_text = criterion
+                        break
+                else:
+                    if criterion.get("criterion_id", criterion.get("id", "")) == criterion_id:
+                        criterion_text = criterion.get("text", criterion.get("description", criterion_id))
+                        break
             
             remediation.append(RemediationGuidance(
                 criterion_id=criterion_id,

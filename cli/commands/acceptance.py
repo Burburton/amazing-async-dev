@@ -172,7 +172,7 @@ def run(
         console.print(f"\n[yellow]Acceptance not ready: {readiness_result.readiness.value}[/yellow]")
         
         for prereq in readiness_result.prerequisites_checked:
-            status_icon = "[green]✓[/green]" if prereq.satisfied else "[red]✗[/red]"
+            status_icon = "[green]OK[/green]" if prereq.satisfied else "[red]FAIL[/red]"
             console.print(f"  {status_icon} {prereq.name}: {prereq.description}")
             if prereq.failure_reason:
                 console.print(f"    [red]{prereq.failure_reason}[/red]")
@@ -345,7 +345,7 @@ def result(
         console.print("\n[bold]Findings:[/bold]")
         
         for finding in findings:
-            result_icon = "[green]✓[/green]" if finding.get("result") == "passed" else "[red]✗[/red]" if finding.get("result") == "failed" else "[yellow]?[/yellow]"
+            result_icon = "[green]PASS[/green]" if finding.get("result") == "passed" else "[red]FAIL[/red]" if finding.get("result") == "failed" else "[yellow]SKIP[/yellow]"
             console.print(f"  {result_icon} {finding.get('criterion_id')}: {finding.get('criterion_text', '')[:50]}")
             if finding.get("notes"):
                 console.print(f"    {finding.get('notes')}")

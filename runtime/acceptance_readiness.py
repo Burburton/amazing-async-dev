@@ -12,6 +12,7 @@ Integration with:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -19,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.state_store import StateStore
+from runtime.artifact_router import get_feature_spec_path
 
 
 class AcceptanceReadiness(str, Enum):
@@ -308,11 +310,15 @@ def check_acceptance_readiness(
     feature_id = runstate.get("feature_id", "")
     feature_spec = None
     if feature_id:
-        feature_spec_path = project_path / "features" / feature_id / "feature-spec.yaml"
+        feature_spec_path = get_feature_spec_path(project_path, feature_id)
         if feature_spec_path.exists():
             import yaml
-            with open(feature_spec_path, encoding="utf-8") as f:
-                feature_spec = yaml.safe_load(f)
+            content = feature_spec_path.read_text(encoding="utf-8")
+            yaml_match = re.search(r"```yaml\n(.*?)\n```", content, re.DOTALL)
+            if yaml_match:
+                feature_spec = yaml.safe_load(yaml_match.group(1))
+            else:
+                feature_spec = yaml.safe_load(content)
     
     # Run all prerequisite checks
     prerequisites: list[PrerequisiteCheck] = []

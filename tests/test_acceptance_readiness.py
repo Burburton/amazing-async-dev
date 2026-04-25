@@ -156,15 +156,19 @@ browser_verification:
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-001"
+            features_dir = project_path / "docs" / "features" / "feat-001"
             features_dir.mkdir(parents=True)
             
-            feature_spec_path = features_dir / "feature-spec.yaml"
-            feature_spec_path.write_text(yaml.dump({
-                "feature_id": "feat-001",
-                "name": "Test Feature",
-                "acceptance_criteria": ["AC-001: Works correctly"],
-            }))
+            feature_spec_path = features_dir / "feature-spec.md"
+            feature_spec_path.write_text("""# FeatureSpec
+
+```yaml
+feature_id: feat-001
+name: Test Feature
+acceptance_criteria:
+  - AC-001: Works correctly
+```
+""")
             
             runstate_dir = project_path / "state"
             runstate_dir.mkdir()
@@ -219,15 +223,18 @@ orchestration_terminal_state: success
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-002"
+            features_dir = project_path / "docs" / "features" / "feat-002"
             features_dir.mkdir(parents=True)
             
-            feature_spec_path = features_dir / "feature-spec.yaml"
-            feature_spec_path.write_text(yaml.dump({
-                "feature_id": "feat-002",
-                "name": "No Criteria Feature",
-                "acceptance_criteria": [],
-            }))
+            feature_spec_path = features_dir / "feature-spec.md"
+            feature_spec_path.write_text("""# FeatureSpec
+
+```yaml
+feature_id: feat-002
+name: No Criteria Feature
+acceptance_criteria: []
+```
+""")
             
             yield project_path
 
@@ -344,13 +351,18 @@ orchestration_terminal_state: success
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-001"
+            features_dir = project_path / "docs" / "features" / "feat-001"
             features_dir.mkdir(parents=True)
             
-            feature_spec_path = features_dir / "feature-spec.yaml"
-            feature_spec_path.write_text(yaml.dump({
-                "acceptance_criteria": ["AC-001"],
-            }))
+            feature_spec_path = features_dir / "feature-spec.md"
+            feature_spec_path.write_text("""# FeatureSpec
+
+```yaml
+feature_id: feat-001
+acceptance_criteria:
+  - AC-001
+```
+""")
             
             from runtime.state_store import StateStore
             store = StateStore(project_path)

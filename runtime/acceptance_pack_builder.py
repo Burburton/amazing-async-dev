@@ -19,6 +19,8 @@ from typing import Any
 
 from runtime.state_store import StateStore
 from runtime.validator_types import ValidatorType
+from runtime.artifact_router import get_feature_spec_path
+import re
 
 
 @dataclass
@@ -169,11 +171,15 @@ def build_acceptance_pack(
     feature_id = runstate.get("feature_id", "")
     product_id = runstate.get("project_id", project_path.name)
     
-    feature_spec_path = project_path / "features" / feature_id / "feature-spec.yaml"
     feature_spec = None
+    feature_spec_path = get_feature_spec_path(project_path, feature_id)
     if feature_spec_path.exists():
-        with open(feature_spec_path, encoding="utf-8") as f:
-            feature_spec = yaml.safe_load(f)
+        content = feature_spec_path.read_text(encoding="utf-8")
+        yaml_match = re.search(r"```yaml\n(.*?)\n```", content, re.DOTALL)
+        if yaml_match:
+            feature_spec = yaml.safe_load(yaml_match.group(1))
+        else:
+            feature_spec = yaml.safe_load(content)
     
     if feature_spec is None:
         return None

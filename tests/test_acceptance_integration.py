@@ -85,19 +85,24 @@ browser_verification:
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-flow"
+            features_dir = project_path / "docs" / "features" / "feat-flow"
             features_dir.mkdir(parents=True)
             
-            spec_path = features_dir / "feature-spec.yaml"
-            spec_path.write_text(yaml.dump({
-                "feature_id": "feat-flow",
-                "name": "Integration Test Feature",
-                "acceptance_criteria": [
-                    {"criterion_id": "AC-001", "text": "Feature implements core functionality"},
-                    {"criterion_id": "AC-002", "text": "Tests pass successfully"},
-                    {"criterion_id": "AC-003", "text": "Code follows conventions"},
-                ],
-            }))
+            spec_path = features_dir / "feature-spec.md"
+            spec_path.write_text("""# FeatureSpec
+
+```yaml
+feature_id: feat-flow
+name: Integration Test Feature
+acceptance_criteria:
+  - criterion_id: AC-001
+    text: Feature implements core functionality
+  - criterion_id: AC-002
+    text: Tests pass successfully
+  - criterion_id: AC-003
+    text: Code follows conventions
+```
+""")
             
             store = StateStore(project_path)
             store.save_runstate({
@@ -222,16 +227,19 @@ artifacts_created: []
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-recovery"
+            features_dir = project_path / "docs" / "features" / "feat-recovery"
             features_dir.mkdir(parents=True)
             
-            spec_path = features_dir / "feature-spec.yaml"
-            spec_path.write_text(yaml.dump({
-                "feature_id": "feat-recovery",
-                "acceptance_criteria": [
-                    {"criterion_id": "AC-001", "text": "Must have evidence"},
-                ],
-            }))
+            spec_path = features_dir / "feature-spec.md"
+            spec_path.write_text("""# FeatureSpec
+
+```yaml
+feature_id: feat-recovery
+acceptance_criteria:
+  - criterion_id: AC-001
+    text: Must have evidence
+```
+""")
             
             store = StateStore(project_path)
             store.save_runstate({
@@ -304,16 +312,19 @@ artifacts_created:
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-loop"
+            features_dir = project_path / "docs" / "features" / "feat-loop"
             features_dir.mkdir(parents=True)
             
-            spec_path = features_dir / "feature-spec.yaml"
-            spec_path.write_text(yaml.dump({
-                "feature_id": "feat-loop",
-                "acceptance_criteria": [
-                    {"criterion_id": "AC-001", "text": "Works"},
-                ],
-            }))
+            spec_path = features_dir / "feature-spec.md"
+            spec_path.write_text("""# FeatureSpec
+
+```yaml
+feature_id: feat-loop
+acceptance_criteria:
+  - criterion_id: AC-001
+    text: Works
+```
+""")
             
             store = StateStore(project_path)
             store.save_runstate({
@@ -372,14 +383,19 @@ artifacts_created: [{"name": "a", "path": "a.py"}]
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-console"
+            features_dir = project_path / "docs" / "features" / "feat-console"
             features_dir.mkdir(parents=True)
             
-            spec_path = features_dir / "feature-spec.yaml"
-            spec_path.write_text(yaml.dump({
-                "feature_id": "feat-console",
-                "acceptance_criteria": [{"criterion_id": "AC-001", "text": "Works"}],
-            }))
+            spec_path = features_dir / "feature-spec.md"
+            spec_path.write_text("""# FeatureSpec
+
+```yaml
+feature_id: feat-console
+acceptance_criteria:
+  - criterion_id: AC-001
+    text: Works
+```
+""")
             
             store = StateStore(project_path)
             store.save_runstate({
@@ -438,14 +454,19 @@ artifacts_created: []
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-policy"
+            features_dir = project_path / "docs" / "features" / "feat-policy"
             features_dir.mkdir(parents=True)
             
-            spec_path = features_dir / "feature-spec.yaml"
-            spec_path.write_text(yaml.dump({
-                "feature_id": "feat-policy",
-                "acceptance_criteria": [{"criterion_id": "AC-001", "text": "Works"}],
-            }))
+            spec_path = features_dir / "feature-spec.md"
+            spec_path.write_text("""# FeatureSpec
+
+```yaml
+feature_id: feat-policy
+acceptance_criteria:
+  - criterion_id: AC-001
+    text: Works
+```
+""")
             
             store = StateStore(project_path)
             store.save_runstate({

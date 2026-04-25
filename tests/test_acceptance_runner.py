@@ -209,18 +209,22 @@ browser_verification:
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-001"
+            features_dir = project_path / "docs" / "features" / "feat-001"
             features_dir.mkdir(parents=True)
             
-            feature_spec_path = features_dir / "feature-spec.yaml"
-            feature_spec_path.write_text(yaml.dump({
-                "feature_id": "feat-001",
-                "name": "Test Feature",
-                "acceptance_criteria": [
-                    {"criterion_id": "AC-001", "text": "Feature works correctly"},
-                    {"criterion_id": "AC-002", "text": "Edge cases handled"},
-                ],
-            }))
+            feature_spec_path = features_dir / "feature-spec.md"
+            feature_spec_path.write_text("""# FeatureSpec
+
+```yaml
+feature_id: feat-001
+name: Test Feature
+acceptance_criteria:
+  - criterion_id: AC-001
+    text: Feature works correctly
+  - criterion_id: AC-002
+    text: Edge cases handled
+```
+""")
             
             from runtime.state_store import StateStore
             store = StateStore(project_path)
@@ -503,16 +507,19 @@ artifacts_created:
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-full"
+            features_dir = project_path / "docs" / "features" / "feat-full"
             features_dir.mkdir(parents=True)
             
-            feature_spec_path = features_dir / "feature-spec.yaml"
-            feature_spec_path.write_text(yaml.dump({
-                "feature_id": "feat-full",
-                "acceptance_criteria": [
-                    {"criterion_id": "AC-001", "text": "Works"},
-                ],
-            }))
+            feature_spec_path = features_dir / "feature-spec.md"
+            feature_spec_path.write_text("""# FeatureSpec
+
+```yaml
+feature_id: feat-full
+acceptance_criteria:
+  - criterion_id: AC-001
+    text: Works
+```
+""")
             
             from runtime.state_store import StateStore
             store = StateStore(project_path)
