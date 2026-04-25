@@ -183,7 +183,7 @@ class AcceptanceRecoveryAdapter:
         )
         
         recovery_pack_id = ""
-        acceptance_recovery_packs_dir = self.project_path / "acceptance-recovery-packs"
+        acceptance_recovery_packs_dir = self.project_path / "acceptance-recovery"
         if acceptance_recovery_packs_dir.exists():
             packs = sorted(
                 acceptance_recovery_packs_dir.glob("*.md"),

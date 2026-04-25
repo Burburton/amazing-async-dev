@@ -35,6 +35,14 @@ class ArtifactType(str, Enum):
     DECISION_REQUEST = "decision_request"
     
     DAILY_REVIEW_PACK = "daily_review_pack"
+    
+    ACCEPTANCE_PACK = "acceptance_pack"
+    ACCEPTANCE_RESULT = "acceptance_result"
+    ACCEPTANCE_RECOVERY_PACK = "acceptance_recovery_pack"
+    ACCEPTANCE_HISTORY = "acceptance_history"
+    OBSERVER_FINDINGS = "observer_findings"
+    
+    EVIDENCE_SUMMARY = "evidence_summary"
 
 
 PRODUCT_OWNED_ARTIFACTS = {
@@ -57,6 +65,12 @@ ORCHESTRATION_OWNED_ARTIFACTS = {
     ArtifactType.PROJECT_LINK,
     ArtifactType.DECISION_REQUEST,
     ArtifactType.DAILY_REVIEW_PACK,
+    ArtifactType.ACCEPTANCE_PACK,
+    ArtifactType.ACCEPTANCE_RESULT,
+    ArtifactType.ACCEPTANCE_RECOVERY_PACK,
+    ArtifactType.ACCEPTANCE_HISTORY,
+    ArtifactType.OBSERVER_FINDINGS,
+    ArtifactType.EVIDENCE_SUMMARY,
 }
 
 
@@ -204,6 +218,85 @@ def get_runstate_path(project_path: Path) -> Path:
         Path to runstate.md location
     """
     result = route_artifact(ArtifactType.RUNSTATE, project_path, "runstate.md")
+    return result.target_path
+
+
+def get_acceptance_pack_path(project_path: Path, pack_id: str) -> Path:
+    """Get path for AcceptancePack (always in orchestration repo).
+    
+    Args:
+        project_path: Project directory path
+        pack_id: Acceptance pack identifier
+        
+    Returns:
+        Path to acceptance-pack location
+    """
+    result = route_artifact(
+        ArtifactType.ACCEPTANCE_PACK,
+        project_path,
+        f"acceptance-packs/{pack_id}.md",
+    )
+    return result.target_path
+
+
+def get_acceptance_result_path(project_path: Path, result_id: str) -> Path:
+    """Get path for AcceptanceResult (always in orchestration repo).
+    
+    Args:
+        project_path: Project directory path
+        result_id: Acceptance result identifier
+        
+    Returns:
+        Path to acceptance-result location
+    """
+    result = route_artifact(
+        ArtifactType.ACCEPTANCE_RESULT,
+        project_path,
+        f"acceptance-results/{result_id}.md",
+    )
+    return result.target_path
+
+
+def get_acceptance_recovery_pack_path(project_path: Path, pack_id: str) -> Path:
+    """Get path for AcceptanceRecoveryPack (always in orchestration repo).
+    
+    Args:
+        project_path: Project directory path
+        pack_id: Acceptance recovery pack identifier
+        
+    Returns:
+        Path to acceptance-recovery-pack location
+    """
+    result = route_artifact(
+        ArtifactType.ACCEPTANCE_RECOVERY_PACK,
+        project_path,
+        f"acceptance-recovery/{pack_id}.md",
+    )
+    return result.target_path
+
+
+def get_evidence_summary_path(project_path: Path, feature_id: str | None = None) -> Path:
+    """Get path for EvidenceSummary (always in orchestration repo).
+    
+    Args:
+        project_path: Project directory path
+        feature_id: Optional feature ID for feature-level summary
+        
+    Returns:
+        Path to evidence-summary location
+    """
+    if feature_id:
+        result = route_artifact(
+            ArtifactType.EVIDENCE_SUMMARY,
+            project_path,
+            f"evidence-summaries/{feature_id}-evidence-summary.md",
+        )
+    else:
+        result = route_artifact(
+            ArtifactType.EVIDENCE_SUMMARY,
+            project_path,
+            "evidence-summary.md",
+        )
     return result.target_path
 
 
