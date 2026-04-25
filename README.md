@@ -297,6 +297,8 @@ All core features complete:
 | Decision Inbox | Operator surface for decision management |
 | Session Start | Mandatory blocking state check (Feature 065) |
 | Acceptance Console | Operator surface for acceptance validation (Feature 077) |
+| Acceptance Recovery | Acceptance × Recovery Console integration (Feature 078) |
+| Evidence Summary | Rolled-up project/feature evidence view (Feature 079) |
 
 ---
 
@@ -392,6 +394,12 @@ asyncdev acceptance result --project {id} [--result-id {id}]
 asyncdev acceptance retry --project {id} [--execution {id}]
 asyncdev acceptance recovery --project {id}
 asyncdev acceptance gate --project {id}
+
+# Evidence Summary Console (Feature 079)
+asyncdev evidence summary --project {id} [--feature {id}] [--save]
+asyncdev evidence latest --project {id} --type {execution_result|acceptance_result|...}
+asyncdev evidence generate --project {id} [--feature {id}]
+asyncdev evidence questions --project {id}
 
 # Starter Pack (advisor integration)
 asyncdev new-product create --product-id {id} --name "{name}" --starter-pack starter-pack.yaml
