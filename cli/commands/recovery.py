@@ -180,6 +180,30 @@ def list(
     console.print(f"[dim]Use 'asyncdev recovery resume --execution <id> --action <action>' to recover[/dim]")
 
 
+def _parse_execution_id(execution: str, path: Path) -> tuple[str, str]:
+    """Parse execution ID by matching against existing project directories.
+    
+    Handles hyphenated project/feature IDs like:
+    - exec-acceptance-pilot-001-001-backend-cli-test
+    - project_id: acceptance-pilot-001
+    - feature_id: 001-backend-cli-test
+    """
+    parts = execution.split("-")
+    if len(parts) < 3 or parts[0] != "exec":
+        return None, None
+    
+    # Try to find project_id by matching against existing directories
+    rest = parts[1:]  # All parts after "exec"
+    for i in range(len(rest), 0, -1):
+        candidate_project = "-".join(rest[:i])
+        if (path / candidate_project).exists():
+            feature_id = "-".join(rest[i:])
+            return candidate_project, feature_id
+    
+    # Fallback: use first segment as project, rest as feature
+    return rest[0], "-".join(rest[1:])
+
+
 @app.command()
 def show(
     execution: str = typer.Option(..., "--execution", help="Execution ID to inspect"),
@@ -187,14 +211,12 @@ def show(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Show detailed recovery information for an execution."""
-    parts = execution.split("-")
-    if len(parts) < 3 or parts[0] != "exec":
+    project_id, feature_id = _parse_execution_id(execution, path)
+    
+    if project_id is None:
         console.print(f"[red]Invalid execution ID format: {execution}[/red]")
         console.print("[yellow]Expected format: exec-{project}-{feature}[/yellow]")
         raise typer.Exit(1)
-    
-    project_id = "-".join(parts[1:-1])
-    feature_id = parts[-1]
     
     project_path = path / project_id
     if not project_path.exists():
