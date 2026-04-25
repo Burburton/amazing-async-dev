@@ -29,13 +29,13 @@ python cli/asyncdev.py new-feature create --product-id my-first-app --feature-id
 python cli/asyncdev.py plan-day create --product-id my-first-app --feature-id feature-001 --task "Create hello-world.txt"
 
 # 6. Run (external tool mode - safest for first run)
-python cli/asyncdev.py run-day --product-id my-first-app --mode external
+python cli/asyncdev.py run-day --project my-first-app --mode external
 
 # 7. Review tonight
-python cli/asyncdev.py review-night generate --product-id my-first-app
+python cli/asyncdev.py review-night generate --project my-first-app
 
 # 8. Resume tomorrow
-python cli/asyncdev.py resume-next-day continue-loop --product-id my-first-app --decision approve
+python cli/asyncdev.py resume-next-day continue-loop --project my-first-app --decision approve
 ```
 
 ---
@@ -75,7 +75,7 @@ This mode generates an `ExecutionPack.md` file that you can hand to any AI tool 
 - No API keys required
 
 ```bash
-python cli/asyncdev.py run-day --product-id my-first-app --mode external
+python cli/asyncdev.py run-day --project my-first-app --mode external
 ```
 
 Then open the generated `ExecutionPack.md` and hand it to your preferred AI tool.
@@ -339,7 +339,7 @@ asyncdev new-feature create --product-id {id} --feature-id {id} --name "{name}"
 asyncdev plan-day create --product-id {id} --feature-id {id} --task "{task}"
 asyncdev run-day --product-id {id} --mode {external|live|mock}
 asyncdev review-night generate --product-id {id}
-asyncdev resume-next-day continue-loop --product-id {id} --decision {approve|revise|defer}
+asyncdev resume-next-day continue-loop --project {id} --decision {approve|revise|defer}
 
 # Completion & Archive
 asyncdev complete-feature mark --product-id {id} --feature-id {id}

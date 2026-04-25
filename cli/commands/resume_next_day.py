@@ -264,7 +264,7 @@ def _get_status_color(status: str) -> str:
 
 @app.command()
 def continue_loop(
-    project: str = typer.Option("demo-product-001", help="Project ID"),
+    project: str = typer.Option(None, "--project", "-p", help="Project ID"),
     decision: str = typer.Option("approve", help="Human decision: approve/revise/defer/redefine"),
     revise_choice: str = typer.Option(None, help="Choice if decision=revise"),
     dry_run: bool = typer.Option(False, help="Preview without saving"),
@@ -277,6 +277,16 @@ def continue_loop(
     - acceptance_recovery_pending: Failed acceptance requires remediation
     - acceptance_terminal_state failure: Re-acceptance needed after recovery
     """
+    if project is None:
+        console.print("[yellow]Multiple projects found. Specify --project <id>[/yellow]")
+        project_dirs = list(path.iterdir())
+        if project_dirs:
+            console.print("[cyan]Available projects:[/cyan]")
+            for p in project_dirs[:5]:
+                if p.is_dir() and (p / "runstate.md").exists():
+                    console.print(f"  - {p.name}")
+        raise typer.Exit(1)
+    
     project_path = path / project
     store = StateStore(project_path)
     logger = get_logger(project_path)
@@ -285,6 +295,8 @@ def continue_loop(
 
     if runstate is None:
         console.print("[red]No RunState found[/red]")
+        console.print(f"[yellow]Project path: {project_path}[/yellow]")
+        console.print("[cyan]Make sure the project exists and has a runstate.md file[/cyan]")
         logger.close()
         raise typer.Exit(1)
 
@@ -332,8 +344,8 @@ def continue_loop(
         store = StateStore(project_path)
         execution_result = store.load_execution_result(execution_id) or {}
         
-        execution_result["browser_verification"] = post_external_result["browser_verification"]
-        execution_result["orchestration_terminal_state"] = post_external_result["orchestration_terminal_state"]
+        execution_result["browser_verification"] = post_external_result.get("browser_verification", {})
+        execution_result["orchestration_terminal_state"] = post_external_result.get("closeout_terminal_state", "not_required")
         
         store.save_execution_result(execution_result)
         console.print("[cyan]Updated ExecutionResult with verification data[/cyan]")
@@ -499,10 +511,14 @@ def continue_loop(
 
 @app.command()
 def status(
-    project: str = typer.Option("demo-product-001", help="Project ID"),
+    project: str = typer.Option(None, "--project", "-p", help="Project ID"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Show current RunState status for resume."""
+    if project is None:
+        console.print("[yellow]Specify --project <id> to see status[/yellow]")
+        return
+    
     project_path = path / project
     store = StateStore(project_path)
     runstate = store.load_runstate()
@@ -572,13 +588,17 @@ if __name__ == "__main__":
 
 @app.command()
 def unblock(
-    project: str = typer.Option("demo-product-001", help="Project ID"),
+    project: str = typer.Option(None, "--project", "-p", help="Project ID"),
     reason: str = typer.Option(None, help="Resolution note for blocker"),
     retry: bool = typer.Option(False, help="Retry the same task"),
     alternative: str = typer.Option(None, help="Alternative task to try"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Resume from blocked state to executing."""
+    if project is None:
+        console.print("[red]Must specify --project <id>[/red]")
+        raise typer.Exit(1)
+    
     project_path = path / project
     store = StateStore(project_path)
     logger = get_logger(project_path)
@@ -586,6 +606,7 @@ def unblock(
 
     if runstate is None:
         console.print("[red]No RunState found[/red]")
+        console.print(f"[yellow]Project path: {project_path}[/yellow]")
         logger.close()
         raise typer.Exit(1)
 
@@ -660,13 +681,17 @@ def unblock(
 
 @app.command()
 def handle_failed(
-    project: str = typer.Option("demo-product-001", help="Project ID"),
+    project: str = typer.Option(None, "--project", "-p", help="Project ID"),
     report: bool = typer.Option(False, help="Generate failure report"),
     escalate: bool = typer.Option(False, help="Escalate as decision needed"),
     abandon: bool = typer.Option(False, help="Abandon task and move to next"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Handle failed execution state."""
+    if project is None:
+        console.print("[red]Must specify --project <id>[/red]")
+        raise typer.Exit(1)
+    
     project_path = path / project
     store = StateStore(project_path)
     logger = get_logger(project_path)
@@ -674,6 +699,7 @@ def handle_failed(
 
     if runstate is None:
         console.print("[red]No RunState found[/red]")
+        console.print(f"[yellow]Project path: {project_path}[/yellow]")
         logger.close()
         raise typer.Exit(1)
 
