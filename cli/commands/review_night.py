@@ -1,4 +1,4 @@
-"""review-night command - Generate nightly review pack."""
+"""review-night command - Generate nightly review pack with auto-email notification (Feature 080)."""
 
 from pathlib import Path
 
@@ -9,6 +9,7 @@ from rich.table import Table
 
 from runtime.state_store import StateStore
 from runtime.review_pack_builder import build_daily_review_pack
+from runtime.auto_day_end_email import check_and_trigger_day_end
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import get_relative_path
 
@@ -83,6 +84,15 @@ def generate(
     store.save_daily_review_pack(review_pack)
     runstate["current_phase"] = "reviewing"
     store.save_runstate(runstate)
+
+    email_result = check_and_trigger_day_end(project_path, review_pack)
+    
+    if email_result.triggered:
+        console.print(f"\n[green]Day-end summary email sent: {email_result.resend_message_id}[/green]")
+    elif email_result.skipped_reason:
+        console.print(f"\n[dim]Day-end email skipped: {email_result.skipped_reason}[/dim]")
+    elif email_result.error_message:
+        console.print(f"\n[yellow]Day-end email failed: {email_result.error_message}[/yellow]")
 
     review_path = store.reviews_path / f"{review_pack['date']}-review.md"
 

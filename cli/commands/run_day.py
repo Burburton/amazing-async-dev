@@ -560,6 +560,9 @@ def _handle_closeout_result(
     
     store.save_runstate(runstate)
     
+    if runstate.get("decisions_needed") or runstate.get("blocked_items"):
+        _auto_trigger_if_needed(store.project_path, TriggerSource.EXTERNAL_TOOL_AUTO)
+    
     logger.log_transition(
         from_phase=previous_phase,
         to_phase=runstate["current_phase"],
@@ -703,6 +706,10 @@ def _run_live_mode(
         event_data={"phase": "reviewing"},
     )
     engine.close()
+    
+    if result.get("decisions_required") or result.get("blocked_reasons"):
+        _auto_trigger_if_needed(store.project_path, TriggerSource.RUN_DAY_AUTO)
+    
     logger.close()
 
     result_path = store.execution_results_path / f"{execution_id}.md"
