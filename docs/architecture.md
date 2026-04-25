@@ -739,6 +739,99 @@ This enables:
 
 ---
 
+## Platform Layer Model
+
+async-dev is structured as a three-layer platform:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     PLATFORM LAYER STRUCTURE                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   Layer C: Policy / Recipe                                          │
+│   ─────────────────────────                                         │
+│   • FrontendVerificationRecipe (Feature 062)                        │
+│   • Browser verification orchestration (Features 059-060)           │
+│   • External closeout policy (Feature 061)                          │
+│   • Verification gating policy                                      │
+│   • Human decision escalation policy (Feature 064)                  │
+│   • Auto-continue execution policy                                  │
+│                                                                      │
+│   ───────────────────────────────────────────────────────────────   │
+│                                                                      │
+│   Layer B: Operator Surfaces                                        │
+│   ─────────────────────────                                        │
+│   • Recovery Console (Feature 066) → asyncdev recovery             │
+│   • Decision Inbox → asyncdev decision                             │
+│   • Session Start (Feature 065) → asyncdev session-start           │
+│   • Execution Observer CLI (Feature 067) → asyncdev observe-runs   │
+│   • Verification Console (proposed) → asyncdev verification        │
+│                                                                      │
+│   ───────────────────────────────────────────────────────────────   │
+│                                                                      │
+│   Layer A: Execution Kernel                                         │
+│   ─────────────────────────────                                     │
+│   • Day loop commands (plan-day, run-day, review-night, resume)    │
+│   • ExecutionPack generation, ExecutionResult persistence          │
+│   • SQLite state store, RunState management                        │
+│   • Verification orchestration (Features 056-062)                  │
+│   • Closeout handling                                               │
+│   • Recovery flows                                                  │
+│   • ExecutionObserver runtime (supervision foundation)             │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer Descriptions
+
+| Layer | Name | Purpose | Maturity |
+|-------|------|---------|----------|
+| **Layer A** | Execution Kernel | Core execution engine, state management, day loop | Functional alpha, verified through dogfooding |
+| **Layer B** | Operator Surfaces | Human-facing operational control/visibility | Implemented (066, 067, 065), functional alpha |
+| **Layer C** | Policy/Recipe Layer | Work-type-specific execution policies | Partially implemented, hardening in progress |
+
+### Layer Interactions
+
+```
+Operator (Layer B)          Kernel (Layer A)           Policy (Layer C)
+      │                          │                           │
+      │  ── observes ───────────►│                           │
+      │                          │                           │
+      │  ── triggers recovery ──►│◄── applies policy ────────│
+      │                          │                           │
+      │  ── requests decision ──►│◄── escalation rules ──────│
+      │                          │                           │
+      │                          │◄── verification recipe ───│
+```
+
+### Capability Mapping
+
+| Capability | Layer | CLI Command |
+|------------|-------|-------------|
+| Day loop execution | Kernel | `asyncdev plan-day`, `run-day`, `review-night`, `resume-next-day` |
+| State persistence | Kernel | Internal (SQLite, file artifacts) |
+| Recovery Console | Operator | `asyncdev recovery list/show/resume` |
+| Decision Inbox | Operator | `asyncdev decision list/show/reply/wait` |
+| Session Start | Operator | `asyncdev session-start check/poll/status` |
+| Execution Observer | Operator | `asyncdev observe-runs run/status/types` |
+| Frontend verification | Policy | Internal (FrontendVerificationRecipe) |
+| Browser verification | Policy | Internal (BrowserVerificationOrchestrator) |
+| Closeout policy | Policy | Internal (ExternalExecutionCloseout) |
+
+### Platform Evolution Phases
+
+| Phase | Focus | Status |
+|-------|-------|--------|
+| Phase 0 | Platform definition, architecture | ✅ Complete |
+| Phase 1 | Kernel stabilization, day loop hardening | ✅ Complete (026-036 milestone) |
+| Phase 2 | First operator product (Recovery Console) | ✅ Implemented (Feature 066) |
+| Phase 3 | Decision surface | ✅ Implemented (Decision Inbox) |
+| Phase 4 | Unified platform shell | Future |
+
+**Note**: Platform phases (0-4) are distinct from email/reporting roadmap phases (1-5) defined in the decision channel spec.
+
+---
+
 ## Next Steps
 
 After understanding this architecture:
@@ -747,3 +840,4 @@ After understanding this architecture:
 3. Read examples/ for concrete instances
 4. Try a day loop with demo product
 5. For managed external products, read docs/infra/039-artifact-ownership-storage-boundary.md
+6. For platform positioning, read docs/infra/async-dev-platform-architecture-product-positioning.md

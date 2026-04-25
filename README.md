@@ -232,11 +232,11 @@ amazing-async-dev/
 │  ├─ terminology.md
 │  ├─ real-asyncdev-consumption-pilot.md
 │  └─ contract-validation-report.md
-├─ schemas/            # Artifact schemas (14 files)
+├─ schemas/            # Artifact schemas (YAML)
 ├─ templates/          # Fillable templates
 ├─ runtime/            # State management, adapters
-├─ cli/                # CLI commands (18 modules)
-├─ tests/              # 670 pytest tests
+├─ cli/                # CLI commands
+├─ tests/              # pytest tests
 ├─ examples/
 │  ├─ README.md                  # Onboarding guide - start here
 │  ├─ single-feature-day-loop/   # Default onboarding example
@@ -254,23 +254,25 @@ amazing-async-dev/
 python -m pytest tests/ -v
 ```
 
-| Category | Tests | Coverage |
-|----------|-------|----------|
-| CLI commands | 50+ | All asyncdev commands |
-| Phase transitions | 18 | RunState transitions |
-| Artifact format | 23 | YAML/Markdown generation |
-| Error handling | 21 | Missing state, invalid inputs |
-| SQLite persistence | 20 | State store, recovery |
-| Policy & decisions | 71 | Auto-continue, email channel |
-| Integration | 18 | Advisor starter pack consumption |
-| Snapshot | 18 | Workspace visibility, cross-repo state |
-| Review-night | 21 | Enriched operator pack, doctor integration |
-| Resume-next-day | 33 | Decision pack alignment, prior context |
-| Plan-day | 27 | Resume context alignment, planning mode inference |
-| Recovery Console | 10 | Operator surface for recovery |
-| Decision Inbox | 18 | Operator surface for decisions |
-| Session Start | 16 | Blocking alert, mandatory check |
-| **Total** | **714** | |
+| Category | Coverage |
+|----------|----------|
+| CLI commands | All asyncdev commands |
+| Phase transitions | RunState transitions |
+| Artifact format | YAML/Markdown generation |
+| Error handling | Missing state, invalid inputs |
+| SQLite persistence | State store, recovery |
+| Policy & decisions | Auto-continue, email channel |
+| Integration | Advisor starter pack consumption |
+| Snapshot | Workspace visibility, cross-repo state |
+| Review-night | Enriched operator pack, doctor integration |
+| Resume-next-day | Decision pack alignment, prior context |
+| Plan-day | Resume context alignment, planning mode inference |
+| Recovery Console | Operator surface for recovery |
+| Decision Inbox | Operator surface for decisions |
+| Session Start | Blocking alert, mandatory check |
+| Execution Observer | Supervision layer (Feature 067) |
+
+Run `pytest --collect-only` for current count.
 
 ---
 
@@ -390,19 +392,20 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 
 | Metric | Value |
 |--------|-------|
-| Features Complete | 40 (001-036 + Recovery Console + Decision Inbox + Session Start) |
-| Tests Passing | 714 |
+| Platform Layers | Execution Kernel (Layer A) + Operator Surfaces (Layer B) + Policy/Recipe (Layer C) |
 | Package State | Functional alpha |
 | Canonical Loop | ✅ Verified (3-day dogfooding) |
-| Coverage | CLI, state, policy, feedback, integration, doctor, doctor recovery, feedback handoff, feedback draft, review-night enriched, resume-next-day alignment, plan-day resume context, run-day intent alignment |
+| Kernel Stability | Hardened (026-036 milestone complete) |
 
 **What this means:**
-- All core features are implemented and tested
-- Package works for real async development workflows
-- Canonical operator loop validated through real dogfooding
-- UX hardening applied (run-day --project parameter)
+- Execution kernel is stable and verified through real dogfooding
+- Operator surfaces (Recovery Console, Decision Inbox, Session Start, Observer) implemented
+- Policy/recipe layer partially implemented (frontend verification, closeout)
+- Platform structure documented in docs/architecture.md
 - Not formally released (no PyPI package, no version tag)
 - Suitable for early adopters willing to clone and run
+
+See docs/architecture.md for platform layer model.
 
 ---
 

@@ -6,7 +6,7 @@
 - **Feature Name**: `Recovery Console Integration into async-dev`
 - **Feature Type**: `integration / operator surface hardening / platform wiring`
 - **Priority**: `High`
-- **Status**: `Proposed`
+- **Status**: `Implemented`
 - **Owner**: `async-dev`
 - **Related Features**:
   - `063-execution-observer-foundation`
