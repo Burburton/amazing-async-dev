@@ -954,6 +954,65 @@ Observer (Feature 067) emits findings:
 - `ACCEPTANCE_BLOCKED` → HIGH severity, recovery_significant=True
 - `ACCEPTANCE_OVERDUE` → MEDIUM severity, prolonged readiness without trigger
 
+### Acceptance Console (Feature 074)
+
+Operator surface for acceptance visibility:
+
+| Command | Purpose |
+|---------|---------|
+| `list_acceptance_results` | Show all acceptance runs with status filter |
+| `show_acceptance_result` | Detailed view of findings and remediation |
+| `show_acceptance_history` | Attempt lineage for a feature |
+| `show_recovery_status` | Pending recovery items from failed acceptance |
+| `get_acceptance_summary` | Overall feature acceptance status |
+
+### Acceptance Gating (Feature 075)
+
+Completion gate validates acceptance state:
+
+| Policy Mode | Behavior |
+|-------------|----------|
+| `strict` | Acceptance required, must pass or be conditional |
+| `relaxed` | Acceptance optional, allows no_acceptance |
+| `optional` | No acceptance requirement |
+| `bypass_allowed` | Manual override permitted |
+
+**Bypass Scenarios**:
+- `no_acceptance_criteria` — Feature has no criteria defined
+- `feature_spec_missing` — No FeatureSpec to validate
+- `manual_override` — Operator decision to bypass
+
+**Completion Gate Results**:
+
+| Result | Allowed? | Meaning |
+|--------|----------|---------|
+| `allowed` | ✅ Yes | Ready for completion |
+| `bypass_allowed` | ✅ Yes | Bypass approved |
+| `blocked_acceptance_required` | ❌ No | No acceptance run yet |
+| `blocked_acceptance_failed` | ❌ No | Acceptance rejected |
+| `blocked_acceptance_pending` | ❌ No | Manual review/escalation pending |
+| `blocked_recovery_items` | ❌ No | Recovery items unresolved |
+
+### Acceptance Re-Loop (Feature 073)
+
+Iterative acceptance until terminal state:
+
+```
+Run acceptance → Failed → Create recovery → Fix → Re-run → Success
+```
+
+**Loop States**:
+
+| State | Terminal? | Meaning |
+|-------|-----------|---------|
+| `terminal_success` | ✅ Yes | Accepted or conditional |
+| `terminal_failure` | ✅ Yes | Max attempts reached |
+| `terminal_escalation` | ✅ Yes | Escalation unresolved |
+| `max_attempts_reached` | ✅ Yes | Exceeded 5 retries |
+| `recovery_in_progress` | ❌ No | Working on fixes |
+
+**Max Attempts**: Default 5, prevents endless blind loops.
+
 ---
 
 ## Next Steps
