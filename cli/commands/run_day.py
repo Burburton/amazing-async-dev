@@ -393,6 +393,71 @@ def _run_external_mode(
     )
 
 
+def _check_acceptance_readiness_and_trigger(
+    project_path: Path,
+    execution_id: str,
+    feature_id: str,
+    logger,
+    console: Console,
+) -> None:
+    """Check acceptance readiness after closeout success (Feature 077 AC-006)."""
+    from runtime.acceptance_readiness import (
+        check_acceptance_readiness,
+        AcceptanceReadiness,
+        AcceptanceTriggerPolicyMode,
+    )
+    from runtime.acceptance_runner import run_acceptance_from_execution
+    from runtime.reacceptance_loop import get_or_create_attempt_history, save_attempt_history
+    
+    console.print("\n[bold cyan]Checking acceptance readiness...[/bold cyan]")
+    
+    readiness_result = check_acceptance_readiness(
+        project_path,
+        execution_id,
+        AcceptanceTriggerPolicyMode.FEATURE_COMPLETION_ONLY,
+    )
+    
+    console.print(f"  Readiness: {readiness_result.readiness.value}")
+    
+    for prereq in readiness_result.prerequisites_checked:
+        status_icon = "[green]✓[/green]" if prereq.satisfied else "[yellow]○[/yellow]"
+        console.print(f"    {status_icon} {prereq.name}")
+    
+    if readiness_result.readiness == AcceptanceReadiness.READY:
+        console.print("\n[green]Acceptance ready - triggering automatically[/green]")
+        
+        logger.log_event(
+            ExecutionEventType.RUN_DAY_STARTED,
+            feature_id=feature_id,
+            event_data={"acceptance_triggered": True, "execution_id": execution_id},
+        )
+        
+        result = run_acceptance_from_execution(project_path, execution_id)
+        
+        if result:
+            history = get_or_create_attempt_history(project_path, feature_id, execution_id)
+            history.add_attempt(result)
+            save_attempt_history(project_path, history)
+            
+            console.print(f"\n[bold]Acceptance Result: {result.terminal_state.value}[/bold]")
+            console.print(f"  Accepted: {len(result.accepted_criteria)}")
+            console.print(f"  Failed: {len(result.failed_criteria)}")
+            
+            if result.terminal_state.value in ["accepted", "conditional"]:
+                console.print("[green]Feature ready for completion[/green]")
+            else:
+                console.print("[yellow]Acceptance requires attention[/yellow]")
+                console.print("[cyan]Run 'asyncdev acceptance recovery' for details[/cyan]")
+    elif readiness_result.readiness == AcceptanceReadiness.NO_CRITERIA:
+        console.print("\n[yellow]No acceptance criteria defined - skipping acceptance[/yellow]")
+    elif readiness_result.readiness == AcceptanceReadiness.POLICY_SKIPPED:
+        console.print("\n[yellow]Policy prevents auto-trigger - manual acceptance available[/yellow]")
+        console.print("[cyan]Run 'asyncdev acceptance run' to trigger manually[/cyan]")
+    else:
+        console.print(f"\n[yellow]Acceptance not ready: {readiness_result.readiness.value}[/yellow]")
+        console.print("[cyan]Run 'asyncdev acceptance status' for details[/cyan]")
+
+
 def _handle_closeout_result(
     closeout_result: CloseoutResult,
     execution_id: str,
@@ -469,6 +534,14 @@ def _handle_closeout_result(
         runstate["current_phase"] = "reviewing"
         runstate["last_action"] = f"External closeout completed: {execution_id}"
         runstate["next_recommended_action"] = "Generate DailyReviewPack"
+        
+        _check_acceptance_readiness_and_trigger(
+            store.project_path,
+            execution_id,
+            feature_id,
+            logger,
+            console,
+        )
     elif terminal_classification == CloseoutTerminalClassification.RECOVERY_REQUIRED:
         runstate["current_phase"] = "reviewing"
         runstate["last_action"] = f"External closeout recovery needed: {execution_id}"

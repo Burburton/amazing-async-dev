@@ -64,6 +64,13 @@ class RecoveryClassification(str, Enum):
     
     Recovery: Cannot resume archived feature.
     """
+    
+    AWAITING_ACCEPTANCE = "awaiting_acceptance"
+    """Acceptance validation failed, recovery pending (Feature 077).
+    
+    Recovery: Run 'asyncdev acceptance recovery' for remediation guidance,
+    then 'asyncdev acceptance retry' after fixes applied.
+    """
 
 
 class ResumeEligibility(str, Enum):
@@ -86,79 +93,61 @@ class ResumeEligibility(str, Enum):
     
     NOT_RESUMABLE = "not_resumable"
     """Feature completed or archived, cannot resume."""
+    
+    NEEDS_ACCEPTANCE = "needs_acceptance"
+    """Resume blocked by failed acceptance, recovery required (Feature 077)."""
 
 
 def classify_recovery(runstate: dict[str, Any]) -> RecoveryClassification:
-    """Classify the recovery state of a workflow.
-    
-    Args:
-        runstate: Current RunState dictionary
-        
-    Returns:
-        RecoveryClassification indicating current recovery state
-    """
     phase = runstate.get("current_phase", "planning")
     blocked_items = runstate.get("blocked_items", [])
     decisions_needed = runstate.get("decisions_needed", [])
+    acceptance_recovery_pending = runstate.get("acceptance_recovery_pending", False)
+    acceptance_terminal_state = runstate.get("acceptance_terminal_state", "")
     
-    # Check archived/completed first (terminal states)
     if phase == "archived":
         return RecoveryClassification.ALREADY_ARCHIVED
     if phase == "completed":
         return RecoveryClassification.ALREADY_COMPLETED
     
-    # Check blocked
+    if acceptance_recovery_pending or acceptance_terminal_state in ("failure", "recovery_required"):
+        return RecoveryClassification.AWAITING_ACCEPTANCE
+    
     if phase == "blocked" or blocked_items:
         return RecoveryClassification.BLOCKED
     
-    # Check awaiting decision
     if decisions_needed:
         return RecoveryClassification.AWAITING_DECISION
     
-    # Check failed (implied by phase stuck in executing without progress)
-    # This is a heuristic - if last_action mentions failure
     last_action = runstate.get("last_action", "")
     if "failed" in last_action.lower() or "error" in last_action.lower():
         return RecoveryClassification.FAILED
     
-    # Check reviewing phase (normal pause after execution)
     if phase == "reviewing":
         return RecoveryClassification.NORMAL_PAUSE
     
-    # Check planning phase (normal start of day)
     if phase == "planning":
         return RecoveryClassification.READY_TO_RESUME
     
-    # Check executing phase (could be interrupted)
     if phase == "executing":
-        # Check if there's an active execution
         active_task = runstate.get("active_task")
         if active_task:
             return RecoveryClassification.UNSAFE_TO_RESUME
         return RecoveryClassification.NORMAL_PAUSE
     
-    # Default fallback
     return RecoveryClassification.UNSAFE_TO_RESUME
 
 
 def check_resume_eligibility(runstate: dict[str, Any]) -> ResumeEligibility:
-    """Check if workflow can be safely resumed.
-    
-    Args:
-        runstate: Current RunState dictionary
-        
-    Returns:
-        ResumeEligibility indicating resume eligibility
-    """
     classification = classify_recovery(runstate)
     
-    # Map classification to eligibility
     eligibility_map = {
         RecoveryClassification.READY_TO_RESUME: ResumeEligibility.ELIGIBLE,
         RecoveryClassification.NORMAL_PAUSE: ResumeEligibility.ELIGIBLE,
         RecoveryClassification.AWAITING_DECISION: ResumeEligibility.NEEDS_DECISION,
         RecoveryClassification.BLOCKED: ResumeEligibility.NEEDS_UNBLOCK,
         RecoveryClassification.FAILED: ResumeEligibility.NEEDS_FAILURE_HANDLING,
+        RecoveryClassification.AWAITING_ACCEPTANCE: ResumeEligibility.NEEDS_ACCEPTANCE,
         RecoveryClassification.UNSAFE_TO_RESUME: ResumeEligibility.INCONSISTENT_STATE,
         RecoveryClassification.ALREADY_COMPLETED: ResumeEligibility.NOT_RESUMABLE,
         RecoveryClassification.ALREADY_ARCHIVED: ResumeEligibility.NOT_RESUMABLE,
@@ -224,6 +213,11 @@ def get_recovery_guidance(runstate: dict[str, Any]) -> dict[str, Any]:
             "recommended_action": "No action needed",
             "explanation": "Feature archived. Cannot resume.",
             "warnings": ["Feature archived, resume not possible"],
+        },
+        RecoveryClassification.AWAITING_ACCEPTANCE: {
+            "recommended_action": "asyncdev acceptance recovery",
+            "explanation": "Acceptance validation failed. Recovery required before resume.",
+            "warnings": ["Acceptance terminal state requires remediation"],
         },
     }
     

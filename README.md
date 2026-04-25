@@ -213,6 +213,7 @@ This system enforces:
 | `ExecutionPack` | Package for daytime AI execution |
 | `ExecutionResult` | Structured outcome of execution |
 | `DailyReviewPack` | Nightly summary for human review |
+| `AcceptanceResult` | Validation outcome against acceptance criteria (Feature 069) |
 
 ---
 
@@ -295,6 +296,7 @@ All core features complete:
 | Recovery Console | Operator surface for execution recovery |
 | Decision Inbox | Operator surface for decision management |
 | Session Start | Mandatory blocking state check (Feature 065) |
+| Acceptance Console | Operator surface for acceptance validation (Feature 077) |
 
 ---
 
@@ -381,6 +383,15 @@ asyncdev decision history [--project {id}] [--all] [--limit 10]
 asyncdev session-start check [--project {id}]
 asyncdev session-start poll --project {id}
 asyncdev session-start status
+
+# Acceptance Console (Feature 077)
+asyncdev acceptance run --project {id} [--execution {id}] [--policy-mode {strict|relaxed}]
+asyncdev acceptance status --project {id}
+asyncdev acceptance history --project {id} [--limit 10]
+asyncdev acceptance result --project {id} [--result-id {id}]
+asyncdev acceptance retry --project {id} [--execution {id}]
+asyncdev acceptance recovery --project {id}
+asyncdev acceptance gate --project {id}
 
 # Starter Pack (advisor integration)
 asyncdev new-product create --product-id {id} --name "{name}" --starter-pack starter-pack.yaml

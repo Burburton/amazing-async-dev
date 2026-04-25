@@ -10,7 +10,7 @@ from rich.table import Table
 from cli.commands import plan_day, run_day, review_night, resume_next_day
 from cli.commands import init, new_product, new_feature
 from cli.commands import complete_feature, archive_feature
-from cli.commands import sqlite_status, inspect_stop, recovery, decision, session_start, verification, observer
+from cli.commands import sqlite_status, inspect_stop, recovery, decision, session_start, verification, observer, acceptance
 from cli.commands import backfill, archive, summary, feedback, policy, email_decision, snapshot, doctor, journal, gmail_auth, resend_auth, check_inbox, config, project_link, browser_test, frontend_verify_run
 from cli.utils.output_formatter import print_next_step, print_phase_indicator
 from cli.utils.path_formatter import get_relative_path
@@ -80,6 +80,8 @@ app.add_typer(decision.app, name="decision", help="Decision Inbox (operator surf
 app.add_typer(session_start.app, name="session-start", help="Mandatory blocking state check (Feature 065)")
 app.add_typer(verification.app, name="verification", help="Verification Console (operator surface - Priority 2)")
 app.add_typer(observer.app, name="observe-runs", help="Execution Observer Foundation (Feature 067)")
+
+app.add_typer(acceptance.app, name="acceptance", help="Acceptance Console - Operator surface for acceptance validation (Feature 077)")
 
 
 @app.command()

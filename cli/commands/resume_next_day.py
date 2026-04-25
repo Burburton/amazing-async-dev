@@ -271,7 +271,12 @@ def continue_loop(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
     force: bool = typer.Option(False, help="Force resume even if eligibility check fails"),
 ):
-    """Process human decision and continue day loop."""
+    """Process human decision and continue day loop (Feature 077 integration).
+    
+    Handles acceptance-related blocking states:
+    - acceptance_recovery_pending: Failed acceptance requires remediation
+    - acceptance_terminal_state failure: Re-acceptance needed after recovery
+    """
     project_path = path / project
     store = StateStore(project_path)
     logger = get_logger(project_path)
@@ -345,15 +350,25 @@ def continue_loop(
 
     if eligibility not in (ResumeEligibility.ELIGIBLE, ResumeEligibility.NEEDS_DECISION) and not force:
         guidance = get_recovery_guidance(runstate)
-        console.print(Panel("Resume Blocked", title="Recovery Check", border_style="red"))
-        console.print(f"[yellow]Classification: {classification.value}[/yellow]")
-        console.print(f"[yellow]Eligibility: {eligibility.value}[/yellow]")
-        console.print(f"\n[bold]Recommended Action:[/bold] {guidance['recommended_action']}")
-        console.print(f"[bold]Explanation:[/bold] {guidance['explanation']}")
-        if guidance.get("warnings"):
-            for w in guidance["warnings"]:
-                console.print(f"[red]Warning: {w}[/red]")
-        console.print("\n[cyan]Use --force to override, or follow recommended action above[/cyan]")
+        
+        if eligibility == ResumeEligibility.NEEDS_ACCEPTANCE:
+            console.print(Panel("Resume Blocked - Acceptance Required", title="Recovery Check", border_style="yellow"))
+            console.print(f"[yellow]Classification: {classification.value}[/yellow]")
+            console.print(f"[yellow]Acceptance terminal state: {runstate.get('acceptance_terminal_state', 'unknown')}[/yellow]")
+            console.print(f"\n[bold]Acceptance recovery is pending[/bold]")
+            console.print("[cyan]Run 'asyncdev acceptance recovery' for remediation guidance[/cyan]")
+            console.print("[cyan]After fixes: 'asyncdev acceptance retry'[/cyan]")
+        else:
+            console.print(Panel("Resume Blocked", title="Recovery Check", border_style="red"))
+            console.print(f"[yellow]Classification: {classification.value}[/yellow]")
+            console.print(f"[yellow]Eligibility: {eligibility.value}[/yellow]")
+            console.print(f"\n[bold]Recommended Action:[/bold] {guidance['recommended_action']}")
+            console.print(f"[bold]Explanation:[/bold] {guidance['explanation']}")
+            if guidance.get("warnings"):
+                for w in guidance["warnings"]:
+                    console.print(f"[red]Warning: {w}[/red]")
+            console.print("\n[cyan]Use --force to override, or follow recommended action above[/cyan]")
+        
         logger.log_event(
             ExecutionEventType.RESUME_BLOCKED,
             feature_id=feature_id,
