@@ -122,7 +122,8 @@ def list(
         "failed": 0,
         "blocked": 1,
         "awaiting_decision": 2,
-        "unsafe_to_resume": 3,
+        "awaiting_acceptance": 3,
+        "unsafe_to_resume": 4,
     }
     
     all_recoveries.sort(key=lambda r: (
@@ -142,6 +143,7 @@ def list(
         "failed": "red",
         "blocked": "orange1",
         "awaiting_decision": "yellow",
+        "awaiting_acceptance": "cyan",
         "unsafe_to_resume": "magenta",
     }
     
@@ -288,6 +290,48 @@ def show(
             console.print(f"  ExecutionResults: {len(results)} files")
             console.print(f"    Latest: {results[-1].name}")
     
+    acceptance_status = runstate.get("acceptance_terminal_state", "")
+    acceptance_recovery_pending = runstate.get("acceptance_recovery_pending", False)
+    
+    if acceptance_status or acceptance_recovery_pending or classification == RecoveryClassification.AWAITING_ACCEPTANCE:
+        console.print("\n[bold cyan]Acceptance Recovery:[/bold cyan]")
+        
+        if acceptance_status:
+            console.print(f"  Terminal State: {acceptance_status}")
+        
+        if acceptance_recovery_pending:
+            console.print(f"  Recovery Pending: Yes")
+            recovery_pack_id = runstate.get("acceptance_recovery_pack_id", "")
+            if recovery_pack_id:
+                console.print(f"  Recovery Pack: {recovery_pack_id}")
+        
+        acceptance_results_dir = project_path / "acceptance-results"
+        if acceptance_results_dir.exists():
+            acc_results = sorted(acceptance_results_dir.glob("*.md"))
+            if acc_results:
+                console.print(f"  Acceptance Results: {len(acc_results)} files")
+                console.print(f"    Latest: {acc_results[-1].name}")
+        
+        from runtime.acceptance_recovery_adapter import AcceptanceRecoveryAdapter
+        adapter = AcceptanceRecoveryAdapter(project_path)
+        summary = adapter.get_acceptance_recovery_summary(feature_id, runstate)
+        
+        if summary and summary.recovery_significant:
+            console.print(f"\n  [bold]Failed Criteria: {len(summary.latest_failed_criteria)}[/bold]")
+            for criterion in summary.latest_failed_criteria[:5]:
+                console.print(f"    [red]- {criterion}[/red]")
+            
+            if summary.latest_remediation_summary:
+                console.print(f"\n  [bold]Remediation Guidance:[/bold]")
+                for remediation in summary.latest_remediation_summary[:3]:
+                    console.print(f"    [{remediation.get('priority', 'medium')}]{remediation.get('criterion_id', '')}[/{remediation.get('priority', 'medium')}]: {remediation.get('suggested_fix', '')[:50]}")
+            
+            if summary.needs_reacceptance:
+                console.print(f"\n  [yellow]Re-acceptance Required: {summary.reacceptance_required_reason}[/yellow]")
+                console.print(f"  [cyan]Next Action: {summary.recommended_action}[/cyan]")
+                if summary.suggested_command:
+                    console.print(f"  [cyan]Command: {summary.suggested_command}[/cyan]")
+    
     console.print("\n[bold]Available Recovery Actions:[/bold]")
     
     action_map = {
@@ -303,6 +347,12 @@ def show(
         RecoveryClassification.AWAITING_DECISION: [
             ("continue", "Apply pending decision and continue"),
             ("defer", "Defer and wait"),
+            ("abort", "Abort execution"),
+        ],
+        RecoveryClassification.AWAITING_ACCEPTANCE: [
+            ("retry_acceptance", "Retry acceptance validation"),
+            ("address_recovery", "Address recovery items"),
+            ("escalate_acceptance", "Escalate acceptance issue"),
             ("abort", "Abort execution"),
         ],
         RecoveryClassification.UNSAFE_TO_RESUME: [

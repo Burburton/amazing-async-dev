@@ -26,6 +26,13 @@ from runtime.execution_observer import (
     ObserverFinding,
     ObservationResult,
 )
+from runtime.acceptance_recovery_adapter import (
+    AcceptanceRecoverySummary,
+    AcceptanceRecoveryAdapter,
+    get_acceptance_recovery_for_project,
+    is_acceptance_recovery_significant,
+    AcceptanceRecoveryCategory,
+)
 
 
 @dataclass
@@ -57,6 +64,16 @@ class RecoveryItem:
     blocked_items: list[str] = field(default_factory=list)
     decisions_needed: list[Any] = field(default_factory=list)
     
+    acceptance_recovery_summary: AcceptanceRecoverySummary | None = None
+    acceptance_status: str = ""
+    acceptance_blocking: bool = False
+    acceptance_attempt_count: int = 0
+    latest_acceptance_result_ref: str = ""
+    latest_failed_criteria_summary: list[str] = field(default_factory=list)
+    acceptance_remediation_summary: list[Any] = field(default_factory=list)
+    reacceptance_required: bool = False
+    acceptance_next_action: str = ""
+    
     last_updated_at: str = ""
     
     def to_dict(self) -> dict[str, Any]:
@@ -80,6 +97,15 @@ class RecoveryItem:
             "linked_artifacts": self.linked_artifacts,
             "blocked_items_count": len(self.blocked_items),
             "decisions_needed_count": len(self.decisions_needed),
+            "acceptance_status": self.acceptance_status,
+            "acceptance_blocking": self.acceptance_blocking,
+            "acceptance_attempt_count": self.acceptance_attempt_count,
+            "latest_acceptance_result_ref": self.latest_acceptance_result_ref,
+            "latest_failed_criteria_summary": self.latest_failed_criteria_summary,
+            "acceptance_remediation_summary": self.acceptance_remediation_summary,
+            "reacceptance_required": self.reacceptance_required,
+            "acceptance_next_action": self.acceptance_next_action,
+            "acceptance_recovery_summary": self.acceptance_recovery_summary.to_dict() if self.acceptance_recovery_summary else None,
             "last_updated_at": self.last_updated_at,
         }
 
@@ -116,6 +142,7 @@ class RecoveryDataAdapter:
             RecoveryClassification.FAILED,
             RecoveryClassification.AWAITING_DECISION,
             RecoveryClassification.UNSAFE_TO_RESUME,
+            RecoveryClassification.AWAITING_ACCEPTANCE,
         ]
         
         if classification not in recovery_needed_classifications:
@@ -153,6 +180,30 @@ class RecoveryDataAdapter:
         
         last_updated_at = runstate.get("updated_at", "")
         
+        acceptance_recovery_summary = None
+        acceptance_status = ""
+        acceptance_blocking = False
+        acceptance_attempt_count = 0
+        latest_acceptance_result_ref = ""
+        latest_failed_criteria_summary = []
+        acceptance_remediation_summary = []
+        reacceptance_required = False
+        acceptance_next_action = ""
+        
+        if classification == RecoveryClassification.AWAITING_ACCEPTANCE or feature_id:
+            acceptance_adapter = AcceptanceRecoveryAdapter(self.project_path)
+            acceptance_recovery_summary = acceptance_adapter.get_acceptance_recovery_summary(feature_id, runstate)
+            
+            if acceptance_recovery_summary:
+                acceptance_status = acceptance_recovery_summary.latest_status
+                acceptance_blocking = acceptance_recovery_summary.is_blocking_completion
+                acceptance_attempt_count = acceptance_recovery_summary.attempt_count
+                latest_acceptance_result_ref = acceptance_recovery_summary.acceptance_result_id
+                latest_failed_criteria_summary = acceptance_recovery_summary.latest_failed_criteria
+                acceptance_remediation_summary = acceptance_recovery_summary.latest_remediation_summary
+                reacceptance_required = acceptance_recovery_summary.needs_reacceptance
+                acceptance_next_action = acceptance_recovery_summary.recommended_action
+        
         return RecoveryItem(
             run_id=run_id,
             execution_id=execution_id,
@@ -171,6 +222,15 @@ class RecoveryDataAdapter:
             linked_artifacts=linked_artifacts,
             blocked_items=blocked_items,
             decisions_needed=decisions_needed,
+            acceptance_recovery_summary=acceptance_recovery_summary,
+            acceptance_status=acceptance_status,
+            acceptance_blocking=acceptance_blocking,
+            acceptance_attempt_count=acceptance_attempt_count,
+            latest_acceptance_result_ref=latest_acceptance_result_ref,
+            latest_failed_criteria_summary=latest_failed_criteria_summary,
+            acceptance_remediation_summary=acceptance_remediation_summary,
+            reacceptance_required=reacceptance_required,
+            acceptance_next_action=acceptance_next_action,
             last_updated_at=last_updated_at,
         )
     
