@@ -32,6 +32,11 @@ class ObserverFindingType(str, Enum):
     # Additional useful types
     BLOCKED_STATE = "blocked_state"
     STALLED_EXECUTION = "stalled_execution"
+    
+    # Acceptance readiness types (Feature 070)
+    ACCEPTANCE_READY = "acceptance_ready"
+    ACCEPTANCE_BLOCKED = "acceptance_blocked"
+    ACCEPTANCE_OVERDUE = "acceptance_overdue"
 
 
 class FindingSeverity(str, Enum):
@@ -116,6 +121,7 @@ class ObservationResult:
     artifacts_checked: bool = False
     verification_state_checked: bool = False
     closeout_state_checked: bool = False
+    acceptance_readiness_checked: bool = False
     
     summary: str = ""
     
@@ -131,6 +137,7 @@ class ObservationResult:
             "artifacts_checked": self.artifacts_checked,
             "verification_state_checked": self.verification_state_checked,
             "closeout_state_checked": self.closeout_state_checked,
+            "acceptance_readiness_checked": self.acceptance_readiness_checked,
             "summary": self.summary,
         }
     
@@ -173,6 +180,7 @@ class ExecutionObserver:
         self._check_verification_state()
         self._check_closeout_state()
         self._check_decisions()
+        self._check_acceptance_readiness()
         
         finished_at = datetime.now().isoformat()
         
@@ -188,6 +196,7 @@ class ExecutionObserver:
             artifacts_checked=True,
             verification_state_checked=True,
             closeout_state_checked=True,
+            acceptance_readiness_checked=True,
             summary=summary,
         )
     
@@ -331,6 +340,56 @@ class ExecutionObserver:
                     )
             except (ValueError, TypeError):
                 pass
+    
+    def _check_acceptance_readiness(self) -> None:
+        from runtime.acceptance_readiness import check_acceptance_readiness, AcceptanceTriggerPolicyMode
+        
+        results_dir = self.project_path / "execution-results"
+        
+        if not results_dir.exists():
+            return
+        
+        for result_file in results_dir.glob("*.md"):
+            content = result_file.read_text(encoding="utf-8")
+            
+            execution_id = self._extract_execution_id(result_file.name)
+            
+            if execution_id and "status: success" in content.lower():
+                try:
+                    readiness_result = check_acceptance_readiness(
+                        self.project_path,
+                        execution_id,
+                        AcceptanceTriggerPolicyMode.FEATURE_COMPLETION_ONLY,
+                    )
+                    
+                    if readiness_result.readiness.value == "ready":
+                        self._add_finding(
+                            finding_type=ObserverFindingType.ACCEPTANCE_READY,
+                            severity=FindingSeverity.INFO,
+                            reason="Execution ready for acceptance validation",
+                            details={"prerequisites_failed": readiness_result.prerequisites_failed},
+                            suggested_action="Trigger acceptance validation",
+                            suggested_command="asyncdev acceptance trigger --execution <id>",
+                            related_artifacts=[str(result_file)],
+                        )
+                    elif readiness_result.readiness.value == "blocked":
+                        self._add_finding(
+                            finding_type=ObserverFindingType.ACCEPTANCE_BLOCKED,
+                            severity=FindingSeverity.HIGH,
+                            reason="Acceptance blocked by missing prerequisites",
+                            details={"prerequisites_failed": readiness_result.prerequisites_failed, "blocking_reasons": readiness_result.blocking_reasons},
+                            suggested_action="Resolve blockers before acceptance",
+                            suggested_command="asyncdev recovery show --execution <id>",
+                            related_artifacts=[str(result_file)],
+                            recovery_significant=True,
+                        )
+                except Exception:
+                    pass
+    
+    def _extract_execution_id(self, filename: str) -> str | None:
+        if filename.endswith(".md"):
+            return filename[:-3]
+        return None
     
     def _add_finding(
         self,

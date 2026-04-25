@@ -1,0 +1,136 @@
+schema_type: acceptance-trigger-policy
+version: "1.0"
+description: Policy for acceptance trigger decisions (Feature 070)
+
+policy_modes:
+  always_trigger:
+    description: "Trigger acceptance after every successful execution"
+    auto_trigger: true
+    trigger_conditions:
+      - execution_complete
+      - closeout_success
+      - verification_pass
+      - no_blockers
+      - no_pending_decisions
+      - feature_spec_has_criteria
+    notes: "Most aggressive mode - useful for critical features or continuous validation"
+
+  feature_completion_only:
+    description: "Only trigger when feature is marked as completion candidate"
+    auto_trigger: true
+    trigger_conditions:
+      - execution_complete
+      - closeout_success
+      - verification_pass
+      - no_blockers
+      - no_pending_decisions
+      - feature_spec_has_criteria
+      - feature_completion_candidate
+    notes: "Default mode - balances automation with feature lifecycle"
+
+  manual_only:
+    description: "Never auto-trigger, require operator request"
+    auto_trigger: false
+    trigger_conditions: []
+    notes: "Conservative mode - operator controls acceptance timing"
+
+default_mode: "feature_completion_only"
+
+prerequisites:
+  execution_complete:
+    description: "ExecutionResult exists with success status"
+    check_method: "execution_result.status == 'success'"
+    failure_consequence: "Cannot accept incomplete or failed execution"
+    
+  closeout_success:
+    description: "Closeout completed successfully"
+    check_method: "execution_result.closeout_terminal_state == 'success'"
+    failure_consequence: "Cannot accept before execution lifecycle complete"
+    
+  verification_pass:
+    description: "Verification passed or not required"
+    check_method: "orchestration_terminal_state in ['success', 'not_required', 'exception_accepted', 'skipped_by_policy']"
+    failure_consequence: "Cannot accept with failed verification"
+    
+  no_blockers:
+    description: "No blocked items present"
+    check_method: "len(runstate.blocked_items) == 0"
+    failure_consequence: "Cannot accept while execution blocked"
+    
+  no_pending_decisions:
+    description: "No pending decisions needed"
+    check_method: "len(runstate.decisions_needed) == 0"
+    failure_consequence: "Cannot accept with unresolved decisions"
+    
+  feature_spec_has_criteria:
+    description: "FeatureSpec has acceptance criteria defined"
+    check_method: "len(feature_spec.acceptance_criteria) >= 1"
+    failure_consequence: "No criteria to validate against"
+    
+  feature_completion_candidate:
+    description: "Feature is marked as completion candidate"
+    check_method: "runstate.feature_completion_candidate == true OR execution signals completion"
+    failure_consequence: "Not yet a feature completion candidate"
+
+trigger_failure_reasons:
+  execution_not_complete:
+    category: "prerequisite_failure"
+    message: "ExecutionResult.status is '{status}', not 'success'"
+    suggested_action: "Wait for execution to complete successfully"
+    
+  closeout_failed:
+    category: "prerequisite_failure"
+    message: "closeout_terminal_state is '{state}', not 'success'"
+    suggested_action: "Resolve closeout failure before acceptance"
+    
+  verification_failed:
+    category: "prerequisite_failure"
+    message: "Verification failed: {failed_count} scenarios failed"
+    suggested_action: "Fix verification failures before acceptance"
+    
+  blockers_present:
+    category: "blocked"
+    message: "{count} blocked items present"
+    suggested_action: "Resolve blockers: asyncdev resume-next-day unblock"
+    
+  decisions_pending:
+    category: "decision_required"
+    message: "{count} decisions pending"
+    suggested_action: "Resolve decisions: asyncdev decision reply"
+    
+  no_criteria:
+    category: "configuration"
+    message: "FeatureSpec has no acceptance_criteria"
+    suggested_action: "Add acceptance criteria to FeatureSpec"
+    
+  policy_manual_only:
+    category: "policy"
+    message: "Policy 'manual_only' prevents auto-trigger"
+    suggested_action: "Manually trigger acceptance when ready"
+
+integration_points:
+  - AcceptanceReadiness.check_acceptance_readiness
+  - Observer.ACCEPTANCE_READY finding
+  - Observer.ACCEPTANCE_BLOCKED finding
+  - Feature 071 acceptance runner trigger
+  - Recovery Console acceptance readiness display
+
+json_schema:
+  "$schema": "http://json-schema.org/draft-07/schema#"
+  type: object
+  properties:
+    policy_mode:
+      type: string
+      enum:
+        - always_trigger
+        - feature_completion_only
+        - manual_only
+      default: "feature_completion_only"
+    auto_trigger:
+      type: boolean
+      description: Whether policy allows automatic triggering
+    trigger_conditions:
+      type: array
+      items:
+        type: string
+      description: Prerequisites required for trigger

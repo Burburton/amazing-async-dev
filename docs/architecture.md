@@ -916,6 +916,44 @@ AcceptanceResult feeds:
 ├── ArchivePack.acceptance_result → completion summary
 ```
 
+### Acceptance Trigger Semantics (Feature 070)
+
+Acceptance is triggered when prerequisites are satisfied:
+
+| Prerequisite | Check |
+|--------------|-------|
+| execution_complete | ExecutionResult.status == 'success' |
+| closeout_success | closeout_terminal_state == 'success' |
+| verification_pass | orchestration_terminal_state in valid_for_success |
+| no_blockers | blocked_items empty |
+| no_pending_decisions | decisions_needed empty |
+| feature_spec_has_criteria | FeatureSpec has acceptance_criteria |
+
+**Policy Modes**:
+
+| Mode | Auto-trigger? | Use Case |
+|------|----------------|----------|
+| always_trigger | Yes | Critical features requiring immediate validation |
+| feature_completion_only | Yes (default) | Standard feature completion workflow |
+| manual_only | No | Conservative - operator requests acceptance |
+
+**Readiness States**:
+
+| State | Meaning | Action |
+|-------|---------|--------|
+| ready | All prerequisites satisfied | Can trigger acceptance |
+| not_ready | Prerequisites not met | Wait for completion |
+| blocked | Explicit blocker present | Resolve blocker first |
+| policy_skipped | Manual_only policy prevents trigger | Operator must request |
+| no_criteria | FeatureSpec has no acceptance_criteria | Add criteria first |
+
+**Observer Integration**:
+
+Observer (Feature 067) emits findings:
+- `ACCEPTANCE_READY` → INFO severity, suggests trigger command
+- `ACCEPTANCE_BLOCKED` → HIGH severity, recovery_significant=True
+- `ACCEPTANCE_OVERDUE` → MEDIUM severity, prolonged readiness without trigger
+
 ---
 
 ## Next Steps
