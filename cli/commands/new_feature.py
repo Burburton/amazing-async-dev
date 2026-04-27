@@ -109,7 +109,11 @@ def list(
 
     root = Path(path)
     product_dir = root / product_id
-    features_dir = product_dir / "features"
+    
+    features_dir = product_dir / "docs" / "features"
+    
+    if not features_dir.exists():
+        features_dir = product_dir / "features"
 
     console.print(Panel(f"Features: {product_id}", border_style="blue"))
 
@@ -124,10 +128,21 @@ def list(
         return
 
     for f in features:
-        spec_path = f / "feature-spec.yaml"
+        spec_path = f / "feature-spec.md"
+        if not spec_path.exists():
+            spec_path = f / "feature-spec.yaml"
+        
         if spec_path.exists():
-            with open(spec_path, encoding="utf-8") as fp:
-                spec = yaml.safe_load(fp)
+            content = spec_path.read_text(encoding="utf-8")
+            
+            yaml_start = content.find("```yaml")
+            yaml_end = content.find("```", yaml_start + 7) if yaml_start != -1 else -1
+            
+            if yaml_start != -1 and yaml_end != -1:
+                spec = yaml.safe_load(content[yaml_start + 7:yaml_end])
+            else:
+                spec = yaml.safe_load(content)
+            
             console.print(f"[bold]{f.name}[/bold]: {spec.get('name', 'N/A')}")
             console.print(f"  Goal: {spec.get('goal', 'N/A')[:50]}...")
         else:

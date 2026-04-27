@@ -386,14 +386,20 @@ artifacts_created:
 ```
 """)
             
-            features_dir = project_path / "features" / "feat-trigger"
+            features_dir = project_path / "docs" / "features" / "feat-trigger"
             features_dir.mkdir(parents=True)
             
-            spec_path = features_dir / "feature-spec.yaml"
-            spec_path.write_text(yaml.dump({
-                "feature_id": "feat-trigger",
-                "acceptance_criteria": [{"criterion_id": "AC-001", "text": "Works"}],
-            }))
+            spec_path = features_dir / "feature-spec.md"
+            spec_content = """# FeatureSpec
+
+```yaml
+feature_id: feat-trigger
+acceptance_criteria:
+  - criterion_id: AC-001
+    text: Works
+```
+"""
+            spec_path.write_text(spec_content)
             
             store = StateStore(project_path)
             store.save_runstate({

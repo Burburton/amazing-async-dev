@@ -34,7 +34,7 @@ class TestNewFeatureCreate:
         ])
 
         assert result.exit_code == 0
-        assert (temp_dir / "test-product" / "features" / "001-test").exists()
+        assert (temp_dir / "test-product" / "docs" / "features" / "001-test").exists()
 
     def test_creates_feature_spec_yaml(self, temp_dir):
         """new-feature should create feature-spec.yaml."""
@@ -54,11 +54,18 @@ class TestNewFeatureCreate:
             "--path", str(temp_dir),
         ])
 
-        spec_path = temp_dir / "test-product" / "features" / "001-test" / "feature-spec.yaml"
+        spec_path = temp_dir / "test-product" / "docs" / "features" / "001-test" / "feature-spec.md"
         assert spec_path.exists()
 
-        with open(spec_path) as f:
-            spec = yaml.safe_load(f)
+        content = spec_path.read_text(encoding="utf-8")
+        yaml_start = content.find("```yaml")
+        yaml_end = content.find("```", yaml_start + 7)
+        
+        assert yaml_start != -1
+        assert yaml_end != -1
+        
+        yaml_content = content[yaml_start + 7:yaml_end]
+        spec = yaml.safe_load(yaml_content)
 
         assert spec["feature_id"] == "001-test"
         assert spec["name"] == "Test Feature"
