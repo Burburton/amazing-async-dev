@@ -141,13 +141,27 @@ class LatestTruthResolver:
     - recovery_data_adapter.py (glob + last index)
     - acceptance_runner.py (mtime + feature_id filter)
     - summary.py (list[-1])
+    
+    Enhanced with pointer file support (C-006):
+    - Checks pointer files first for faster resolution
+    - Falls back to glob + mtime if pointer missing
     """
     
-    def __init__(self, project_path: Path):
+    def __init__(self, project_path: Path, use_pointer: bool = True):
         self.project_path = project_path
+        self.use_pointer = use_pointer
     
     def get_latest_execution_result(self) -> tuple[str, Path | None]:
-        """Get latest execution result ID and path."""
+        """Get latest execution result ID and path.
+        
+        Uses pointer file if available (C-006), falls back to glob + mtime.
+        """
+        if self.use_pointer:
+            from runtime.latest_pointer_manager import read_latest_pointer
+            target_id, target_path = read_latest_pointer(self.project_path, "execution_result")
+            if target_id and target_path:
+                return target_id, target_path
+        
         results_dir = self.project_path / "execution-results"
         if not results_dir.exists():
             return "", None
@@ -165,7 +179,16 @@ class LatestTruthResolver:
         return latest.stem, latest
     
     def get_latest_execution_pack(self) -> tuple[str, Path | None]:
-        """Get latest execution pack ID and path."""
+        """Get latest execution pack ID and path.
+        
+        Uses pointer file if available (C-006), falls back to glob + mtime.
+        """
+        if self.use_pointer:
+            from runtime.latest_pointer_manager import read_latest_pointer
+            target_id, target_path = read_latest_pointer(self.project_path, "execution_pack")
+            if target_id and target_path:
+                return target_id, target_path
+        
         packs_dir = self.project_path / "execution-packs"
         if not packs_dir.exists():
             return "", None
@@ -183,7 +206,17 @@ class LatestTruthResolver:
         return latest.stem, latest
     
     def get_latest_acceptance_result(self, feature_id: str | None = None) -> tuple[str, Path | None]:
-        """Get latest acceptance result ID and path."""
+        """Get latest acceptance result ID and path.
+        
+        Uses pointer file if available (C-006), falls back to glob + mtime.
+        Note: Pointer doesn't filter by feature_id; fallback scan does.
+        """
+        if self.use_pointer and feature_id is None:
+            from runtime.latest_pointer_manager import read_latest_pointer
+            target_id, target_path = read_latest_pointer(self.project_path, "acceptance_result")
+            if target_id and target_path:
+                return target_id, target_path
+        
         results_dir = self.project_path / "acceptance-results"
         if not results_dir.exists():
             return "", None
@@ -206,7 +239,16 @@ class LatestTruthResolver:
         return "", None
     
     def get_latest_recovery_pack(self) -> tuple[str, Path | None]:
-        """Get latest acceptance recovery pack ID and path."""
+        """Get latest acceptance recovery pack ID and path.
+        
+        Uses pointer file if available (C-006), falls back to glob + mtime.
+        """
+        if self.use_pointer:
+            from runtime.latest_pointer_manager import read_latest_pointer
+            target_id, target_path = read_latest_pointer(self.project_path, "acceptance_recovery_pack")
+            if target_id and target_path:
+                return target_id, target_path
+        
         packs_dir = self.project_path / "acceptance-recovery"
         if not packs_dir.exists():
             return "", None
@@ -223,14 +265,53 @@ class LatestTruthResolver:
         latest = packs[0]
         return latest.stem, latest
     
+    def get_latest_observer_findings(self) -> tuple[str, Path | None]:
+        """Get latest observer findings ID and path.
+        
+        Uses pointer file if available (C-006), falls back to glob + mtime.
+        """
+        if self.use_pointer:
+            from runtime.latest_pointer_manager import read_latest_pointer
+            target_id, target_path = read_latest_pointer(self.project_path, "observer_findings")
+            if target_id and target_path:
+                return target_id, target_path
+        
+        findings_dir = self.project_path / "observer-findings"
+        if not findings_dir.exists():
+            return "", None
+        
+        findings = sorted(
+            findings_dir.glob("*.md"),
+            key=lambda f: f.stat().st_mtime,
+            reverse=True,
+        )
+        
+        if not findings:
+            return "", None
+        
+        latest = findings[0]
+        return latest.stem, latest
+    
     def get_latest_artifact(self, artifact_type: str) -> tuple[str, Path | None]:
-        """Generic latest artifact resolver by type."""
+        """Generic latest artifact resolver by type.
+        
+        Uses pointer file if available (C-006), falls back to glob + mtime.
+        """
+        if self.use_pointer:
+            from runtime.latest_pointer_manager import read_latest_pointer, POINTER_FILES
+            
+            if artifact_type in POINTER_FILES:
+                target_id, target_path = read_latest_pointer(self.project_path, artifact_type)
+                if target_id and target_path:
+                    return target_id, target_path
+        
         type_to_dir = {
             "execution_result": "execution-results",
             "execution_pack": "execution-packs",
             "acceptance_result": "acceptance-results",
             "acceptance_pack": "acceptance-packs",
             "acceptance_recovery_pack": "acceptance-recovery",
+            "observer_findings": "observer-findings",
             "daily_review": "reviews",
         }
         
