@@ -281,18 +281,15 @@ class RecoveryDataAdapter:
     
     def _check_verification_status(self) -> str:
         """Check verification status from execution results."""
-        results_dir = self.project_path / "execution-results"
+        from runtime.evidence_rollup import LatestTruthResolver
         
-        if not results_dir.exists():
+        resolver = LatestTruthResolver(self.project_path)
+        result_id, result_path = resolver.get_latest_execution_result()
+        
+        if not result_path:
             return "no_results"
         
-        result_files = list(results_dir.glob("*.md"))
-        
-        if not result_files:
-            return "no_results"
-        
-        latest_result = result_files[-1]
-        content = latest_result.read_text(encoding="utf-8")
+        content = result_path.read_text(encoding="utf-8")
         
         if "browser_verification" in content:
             if "executed: true" in content.lower():
@@ -310,18 +307,15 @@ class RecoveryDataAdapter:
     
     def _check_closeout_status(self) -> str:
         """Check closeout status from execution results."""
-        results_dir = self.project_path / "execution-results"
+        from runtime.evidence_rollup import LatestTruthResolver
         
-        if not results_dir.exists():
+        resolver = LatestTruthResolver(self.project_path)
+        result_id, result_path = resolver.get_latest_execution_result()
+        
+        if not result_path:
             return "no_results"
         
-        result_files = list(results_dir.glob("*.md"))
-        
-        if not result_files:
-            return "no_results"
-        
-        latest_result = result_files[-1]
-        content = latest_result.read_text(encoding="utf-8")
+        content = result_path.read_text(encoding="utf-8")
         
         if "closeout_state" in content:
             if "closeout_completed_success" in content.lower():
@@ -340,23 +334,23 @@ class RecoveryDataAdapter:
     
     def _collect_artifacts(self) -> list[str]:
         """Collect linked artifacts from canonical sources (066a AC-004)."""
+        from runtime.evidence_rollup import LatestTruthResolver
+        
         artifacts = []
         
         runstate_path = self.project_path / "runstate.md"
         if runstate_path.exists():
             artifacts.append(str(runstate_path))
         
-        execution_packs_dir = self.project_path / "execution-packs"
-        if execution_packs_dir.exists():
-            packs = sorted(execution_packs_dir.glob("*.md"))
-            if packs:
-                artifacts.append(str(packs[-1]))
+        resolver = LatestTruthResolver(self.project_path)
         
-        execution_results_dir = self.project_path / "execution-results"
-        if execution_results_dir.exists():
-            results = sorted(execution_results_dir.glob("*.md"))
-            if results:
-                artifacts.append(str(results[-1]))
+        pack_id, pack_path = resolver.get_latest_execution_pack()
+        if pack_path:
+            artifacts.append(str(pack_path))
+        
+        result_id, result_path = resolver.get_latest_execution_result()
+        if result_path:
+            artifacts.append(str(result_path))
         
         return artifacts
 

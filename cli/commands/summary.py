@@ -18,6 +18,7 @@ from rich.table import Table
 
 from runtime.state_store import StateStore
 from runtime.review_pack_builder import build_daily_review_pack
+from runtime.evidence_rollup import LatestTruthResolver
 from cli.utils.output_formatter import print_next_step
 from cli.utils.path_formatter import get_relative_path
 
@@ -56,14 +57,14 @@ def today(
         console.print("[dim]Run 'asyncdev status --all' to see all projects[/dim]")
         raise typer.Exit(1)
     
-    results = list(store.execution_results_path.glob("exec-*.md"))
-    if not results:
+    resolver = LatestTruthResolver(project_path)
+    execution_id, execution_result_path = resolver.get_latest_execution_result()
+    
+    if not execution_result_path:
         console.print("[yellow]No ExecutionResult found for today[/yellow]")
         console.print("[dim]Run 'asyncdev run-day' first[/dim]")
         raise typer.Exit(1)
     
-    latest_result = results[-1]
-    execution_id = latest_result.stem
     execution_result = store.load_execution_result(execution_id)
     
     if execution_result is None:
@@ -191,15 +192,18 @@ def _find_active_project(path: Path) -> str:
 
 def _load_latest_review_pack(path: Path, project: str) -> dict | None:
     """Load the latest DailyReviewPack for project."""
+    from runtime.evidence_rollup import LatestTruthResolver
+    
     project_path = path / project
     store = StateStore(project_path)
     
-    reviews = list(store.reviews_path.glob("*-review.md"))
-    if not reviews:
+    resolver = LatestTruthResolver(project_path)
+    review_id, review_path = resolver.get_latest_artifact("daily_review")
+    
+    if not review_path:
         return None
     
-    latest = reviews[-1]
-    return store.load_daily_review_pack(latest.stem.replace("-review", ""))
+    return store.load_daily_review_pack(review_path.stem.replace("-review", ""))
 
 
 def _display_management_summary(review_pack: dict, root: Path) -> None:

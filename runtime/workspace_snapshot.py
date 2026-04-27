@@ -121,22 +121,18 @@ def _gather_execution_state(project_path: Path, snapshot: WorkspaceSnapshot) -> 
 
 def _gather_verification_signal(project_path: Path, snapshot: WorkspaceSnapshot) -> None:
     """Check for verification artifacts."""
-    results_dir = project_path / "execution-results"
+    from runtime.evidence_rollup import LatestTruthResolver
     
-    if not results_dir.exists():
+    resolver = LatestTruthResolver(project_path)
+    result_id, result_path = resolver.get_latest_execution_result()
+    
+    if not result_path:
         snapshot.verification_status = "not_run"
         return
     
-    result_files = sorted(results_dir.glob("*.md"), reverse=True)
+    snapshot.verification_artifact = str(result_path.relative_to(project_path))
     
-    if not result_files:
-        snapshot.verification_status = "not_run"
-        return
-    
-    latest_result = result_files[0]
-    snapshot.verification_artifact = str(latest_result.relative_to(project_path))
-    
-    with open(latest_result, encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         content = f.read()
     
     yaml_block_start = content.find("```yaml")
@@ -153,20 +149,16 @@ def _gather_verification_signal(project_path: Path, snapshot: WorkspaceSnapshot)
 
 def _gather_review_signal(project_path: Path, snapshot: WorkspaceSnapshot) -> None:
     """Check for review artifacts."""
-    reviews_dir = project_path / "reviews"
+    from runtime.evidence_rollup import LatestTruthResolver
     
-    if not reviews_dir.exists():
+    resolver = LatestTruthResolver(project_path)
+    review_id, review_path = resolver.get_latest_artifact("daily_review")
+    
+    if not review_path:
         snapshot.review_status = "missing"
         return
     
-    review_files = sorted(reviews_dir.glob("*.md"), reverse=True)
-    
-    if not review_files:
-        snapshot.review_status = "missing"
-        return
-    
-    latest_review = review_files[0]
-    snapshot.review_artifact = str(latest_review.relative_to(project_path))
+    snapshot.review_artifact = str(review_path.relative_to(project_path))
     snapshot.review_status = "present"
 
 
