@@ -437,7 +437,21 @@ class ExecutionObserver:
         return f"Detected {len(self.findings)} findings: {critical} critical, {high} high, {medium} medium"
 
 
-def run_observer(project_path: Path) -> ObservationResult:
-    """Convenience function to run observation on a project."""
+def run_observer(project_path: Path, persist: bool = True) -> ObservationResult:
+    """Run observation on a project, optionally persisting result.
+    
+    Args:
+        project_path: Path to project directory
+        persist: Whether to persist findings to disk (default True)
+        
+    Returns:
+        ObservationResult with all detected findings
+    """
     observer = ExecutionObserver(project_path)
-    return observer.observe()
+    result = observer.observe()
+    
+    if persist:
+        from runtime.observer_finding_store import save_observation_result
+        save_observation_result(result, project_path)
+    
+    return result

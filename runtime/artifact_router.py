@@ -300,6 +300,41 @@ def get_evidence_summary_path(project_path: Path, feature_id: str | None = None)
     return result.target_path
 
 
+def get_observer_findings_path(project_path: Path, observation_id: str) -> Path:
+    """Get path for ObserverFindings (always in orchestration repo).
+    
+    Args:
+        project_path: Project directory path
+        observation_id: Observation identifier (e.g., obs-20260427120000)
+        
+    Returns:
+        Path to observer-findings location
+    """
+    result = route_artifact(
+        ArtifactType.OBSERVER_FINDINGS,
+        project_path,
+        f"observer-findings/{observation_id}.md",
+    )
+    return result.target_path
+
+
+def get_observer_findings_dir(project_path: Path) -> Path:
+    """Get directory for all observer findings (always in orchestration repo).
+    
+    Args:
+        project_path: Project directory path
+        
+    Returns:
+        Path to observer-findings directory
+    """
+    result = route_artifact(
+        ArtifactType.OBSERVER_FINDINGS,
+        project_path,
+        "observer-findings",
+    )
+    return result.target_path
+
+
 def route_new_feature(
     project_path: Path,
     feature_id: str,
