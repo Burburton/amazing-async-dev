@@ -23,14 +23,38 @@ app = typer.Typer(help="Evidence Summary Console - Rolled-up project/feature evi
 console = Console()
 
 
+def _auto_detect_project(path: Path) -> str | None:
+    """Auto-detect single project when only one exists."""
+    if not path.exists():
+        return None
+    
+    projects = [p for p in path.iterdir() if p.is_dir() and not p.name.startswith(".")]
+    
+    if len(projects) == 1:
+        return projects[0].name
+    
+    return None
+
+
 @app.command()
 def summary(
-    project: str = typer.Option(..., "--project", help="Project ID"),
+    project: str = typer.Option(None, "--project", help="Project ID (auto-detected if single project)"),
     feature: str = typer.Option(None, "--feature", help="Feature ID for feature-level summary"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
     save: bool = typer.Option(False, "--save", help="Save summary to file"),
 ):
     """Show rolled-up evidence summary for project or feature."""
+    
+    if not project:
+        project = _auto_detect_project(path)
+        if not project:
+            projects = [p.name for p in path.iterdir() if p.is_dir() and not p.name.startswith(".")] if path.exists() else []
+            if len(projects) == 0:
+                console.print("[yellow]No projects found[/yellow]")
+            elif len(projects) > 1:
+                console.print("[yellow]Multiple projects found. Specify --project[/yellow]")
+                console.print(f"[dim]Available: {', '.join(projects)}[/dim]")
+            raise typer.Exit(1)
     
     project_path = path / project
     if not project_path.exists():
@@ -122,11 +146,17 @@ def summary(
 
 @app.command()
 def latest(
-    project: str = typer.Option(..., "--project", help="Project ID"),
+    project: str = typer.Option(None, "--project", help="Project ID (auto-detected if single project)"),
     artifact_type: str = typer.Option("execution_result", "--type", help="Artifact type to resolve"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Resolve latest artifact of given type."""
+    
+    if not project:
+        project = _auto_detect_project(path)
+        if not project:
+            console.print("[yellow]Specify --project or ensure single project exists[/yellow]")
+            raise typer.Exit(1)
     
     project_path = path / project
     if not project_path.exists():
@@ -149,11 +179,17 @@ def latest(
 
 @app.command()
 def generate(
-    project: str = typer.Option(..., "--project", help="Project ID"),
+    project: str = typer.Option(None, "--project", help="Project ID (auto-detected if single project)"),
     feature: str = typer.Option(None, "--feature", help="Feature ID for feature-level summary"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Generate and save evidence summary file."""
+    
+    if not project:
+        project = _auto_detect_project(path)
+        if not project:
+            console.print("[yellow]Specify --project or ensure single project exists[/yellow]")
+            raise typer.Exit(1)
     
     project_path = path / project
     if not project_path.exists():
@@ -172,10 +208,16 @@ def generate(
 
 @app.command()
 def questions(
-    project: str = typer.Option(..., "--project", help="Project ID"),
+    project: str = typer.Option(None, "--project", help="Project ID (auto-detected if single project)"),
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Answer canonical evidence questions per 079 Section 7.1."""
+    
+    if not project:
+        project = _auto_detect_project(path)
+        if not project:
+            console.print("[yellow]Specify --project or ensure single project exists[/yellow]")
+            raise typer.Exit(1)
     
     project_path = path / project
     if not project_path.exists():

@@ -96,6 +96,26 @@ BYPASS_SCENARIOS = [
 ]
 
 
+def _get_failed_criteria_summary(project_path: Path, acceptance_result_id: str | None) -> str:
+    """Get summary of failed criteria from acceptance result."""
+    if not acceptance_result_id:
+        return ""
+    
+    result = load_acceptance_result(project_path, acceptance_result_id)
+    if not result:
+        return ""
+    
+    failed_criteria = result.failed_criteria
+    
+    if not failed_criteria:
+        return ""
+    
+    if len(failed_criteria) <= 3:
+        return ", ".join(failed_criteria)
+    
+    return f"{', '.join(failed_criteria[:3])} (+{len(failed_criteria) - 3} more)"
+
+
 def check_completion_gate(
     project_path: Path,
     feature_id: str,
@@ -149,13 +169,21 @@ def check_completion_gate(
         )
     
     if acceptance_status == "rejected":
+        failed_criteria_summary = _get_failed_criteria_summary(project_path, acceptance_result_id)
+        
+        blocking_reason = "Acceptance rejected."
+        if failed_criteria_summary:
+            blocking_reason += f" Failed criteria: {failed_criteria_summary}"
+        else:
+            blocking_reason += " Address recovery items before completion."
+        
         return CompletionGateCheck(
             result=CompletionGateResult.BLOCKED_ACCEPTANCE_FAILED,
             feature_id=feature_id,
             acceptance_status=acceptance_status,
             acceptance_result_id=acceptance_result_id,
             terminal_state=terminal_state,
-            blocking_reason="Acceptance rejected. Address recovery items before completion.",
+            blocking_reason=blocking_reason,
             required_acceptance=True,
         )
     
