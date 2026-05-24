@@ -377,11 +377,25 @@ class TestEmailConfig:
     """Tests for EmailConfig."""
 
     def test_default_config(self):
-        """EmailConfig should have default values."""
-        config = EmailConfig()
-        assert config.delivery_mode == "mock_file"
-        assert config.smtp_port == 587
-        assert config.subject_prefix == "[async-dev]"
+        """EmailConfig should have default values when no env vars are set."""
+        import os
+        # Save and remove env var to test true default
+        saved_mode = os.environ.pop("ASYNCDEV_DELIVERY_MODE", None)
+        saved_port = os.environ.pop("ASYNCDEV_SMTP_PORT", None)
+        saved_prefix = os.environ.pop("ASYNCDEV_SUBJECT_PREFIX", None)
+        try:
+            config = EmailConfig()
+            assert config.delivery_mode == "mock_file"
+            assert config.smtp_port == 587
+            assert config.subject_prefix == "[async-dev]"
+        finally:
+            # Restore env vars
+            if saved_mode is not None:
+                os.environ["ASYNCDEV_DELIVERY_MODE"] = saved_mode
+            if saved_port is not None:
+                os.environ["ASYNCDEV_SMTP_PORT"] = saved_port
+            if saved_prefix is not None:
+                os.environ["ASYNCDEV_SUBJECT_PREFIX"] = saved_prefix
 
     def test_env_override(self):
         """EmailConfig should use env variables."""

@@ -71,8 +71,8 @@ terminal_state: rejected
 attempt_number: 1
 accepted_criteria: []
 failed_criteria:
-  - AC-001: Feature works correctly
-  - AC-002: Tests pass
+  - AC-001
+  - AC-002
 conditional_criteria: []
 remediation_guidance:
   - criterion_id: AC-001

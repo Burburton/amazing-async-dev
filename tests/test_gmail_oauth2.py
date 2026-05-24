@@ -296,9 +296,13 @@ class TestEmailConfigOAuth2Integration:
     def test_email_config_oauth2_disabled_by_default(self):
         from runtime.email_sender import EmailConfig
         
-        config = EmailConfig()
-        
-        assert config.use_oauth2 == False
+        saved = os.environ.pop("ASYNCDEV_USE_OAUTH2", None)
+        try:
+            config = EmailConfig()
+            assert config.use_oauth2 == False
+        finally:
+            if saved is not None:
+                os.environ["ASYNCDEV_USE_OAUTH2"] = saved
 
     def test_email_config_can_enable_oauth2(self, temp_dir, valid_token_data):
         from runtime.email_sender import EmailConfig
