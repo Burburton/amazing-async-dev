@@ -17,12 +17,19 @@
         <div class="recommendation-hint">
             💡 AI Recommends: <strong>{{ recommendation }}</strong>
         </div>
-        {% endif %}
+        <div class="action-buttons">
+            {% for option in options[:3] %}
+            <a href="{{ reply_base_url }}?decision={{ option.id }}&request={{ request_id }}" class="btn btn-{{ loop.index0|default(0) == 0 and 'primary' or 'secondary' }}">{{ option.label }}</a>
+            {% endfor %}
+            <a href="mailto:?subject=Approve%20Decision&body=DECISION%20{{ options[0].id|default('A') if recommendation == options[0].label else 'A' }}%0ARequest%3A%20{{ request_id }}" class="btn btn-success">✓ Quick Approve</a>
+        </div>
+        {% else %}
         <div class="action-buttons">
             {% for option in options[:3] %}
             <a href="{{ reply_base_url }}?decision={{ option.id }}&request={{ request_id }}" class="btn btn-{{ loop.index0|default(0) == 0 and 'primary' or 'secondary' }}">{{ option.label }}</a>
             {% endfor %}
         </div>
+        {% endif %}
     </div>
 </div>
 
