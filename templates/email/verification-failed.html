@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Failed Alert</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .alert-warning {
+            background-color: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-left: 4px solid #d97706;
+            color: #92400e;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .alert-warning h1 {
+            margin: 0 0 10px 0;
+            color: #d97706;
+            font-size: 24px;
+        }
+        .meta {
+            background-color: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .meta p {
+            margin: 5px 0;
+        }
+        .meta strong {
+            display: inline-block;
+            width: 120px;
+        }
+        .failure-details {
+            background-color: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .screenshot-link {
+            display: inline-block;
+            padding: 8px 12px;
+            background-color: #fef3c7;
+            border-radius: 4px;
+            margin: 5px;
+            text-decoration: none;
+            color: #92400e;
+        }
+        .actions {
+            margin: 20px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            margin: 5px;
+        }
+        .btn-primary {
+            background-color: #d97706;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #6b7280;
+            color: white;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="alert-warning">
+            <h1>⚠️ Verification Failed</h1>
+            <p>Browser verification did not pass. Review the details below.</p>
+        </div>
+
+        <div class="meta">
+            <p><strong>Project:</strong> {{ project_id }}</p>
+            <p><strong>Feature:</strong> {{ feature_id }}</p>
+            <p><strong>Verification ID:</strong> {{ verification_id }}</p>
+            <p><strong>Failed At:</strong> {{ failed_at }}</p>
+        </div>
+
+        {% if what_was_verified %}
+        <h3>What Was Being Verified</h3>
+        <p>{{ what_was_verified }}</p>
+        {% endif %}
+
+        {% if failure_reason %}
+        <div class="failure-details">
+            <h3 style="margin-top: 0;">Failure Reason</h3>
+            <p>{{ failure_reason }}</p>
+        </div>
+        {% endif %}
+
+        {% if scenarios_run > 0 %}
+        <h3>Test Results</h3>
+        <p>{{ scenarios_passed }} passed / {{ scenarios_run }} total scenarios</p>
+        {% endif %}
+
+        {% if screenshot_urls %}
+        <h3>Screenshots</h3>
+        {% for url in screenshot_urls %}
+        <a href="{{ url }}" class="screenshot-link">📸 Screenshot {{ loop.index }}</a>
+        {% endfor %}
+        {% endif %}
+
+        <div class="actions">
+            <h3>Recovery Options</h3>
+            <a href="{{ retry_url }}" class="btn btn-primary">🔄 Retry Verification</a>
+            <a href="{{ view_details_url }}" class="btn btn-secondary">📋 View Details</a>
+        </div>
+
+        <div class="footer">
+            <p>This is an automated alert from async-dev.</p>
+        </div>
+    </div>
+</body>
+</html>

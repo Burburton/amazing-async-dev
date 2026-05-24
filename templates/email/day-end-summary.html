@@ -1,0 +1,95 @@
+{% extends "_base.html" %}
+
+{% block content %}
+<div class="header">
+    <h1>📋 Daily Review Summary</h1>
+</div>
+
+<div class="meta">
+    <p><strong>Date:</strong> {{ date }}</p>
+    <p><strong>Project:</strong> {{ product_id }}</p>
+    <p><strong>Feature:</strong> {{ feature_id }}</p>
+</div>
+
+{% if today_goal %}
+<div class="section">
+    <div class="section-title">Today's Goal</div>
+    <p>{{ today_goal }}</p>
+</div>
+{% endif %}
+
+{% if completed %}
+<div class="section">
+    <div class="section-title">✓ Completed Items</div>
+    <ul>
+    {% for item in completed %}
+        <li class="completed">{{ item }}</li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% if blocked %}
+<div class="section">
+    <div class="section-title">⚠️ Blocked Items</div>
+    {% for block in blocked %}
+    <div class="alert alert-danger">
+        <strong>{{ block.item }}</strong>
+        {% if block.reason %}<p>{{ block.reason }}</p>{% endif %}
+        {% if block.resolution %}<p><em>Resolution: {{ block.resolution }}</em></p>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if decisions %}
+<div class="section">
+    <div class="section-title">⚠️ Decisions Required</div>
+    {% for decision in decisions %}
+    <div class="decision">
+        <h3>{{ loop.index }}. {{ decision.question }}</h3>
+        <div class="options">
+            {% for option in decision.options %}
+            <a href="{{ reply_base_url }}?decision={{ option.id }}&request={{ request_id }}" class="btn btn-outline">{{ option.label }}</a>
+            {% endfor %}
+        </div>
+        {% if decision.recommendation %}
+        <p><em>Recommendation: {{ decision.recommendation }}</em></p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if tomorrow_plan %}
+<div class="section">
+    <div class="section-title">📅 Tomorrow's Plan</div>
+    <p>{{ tomorrow_plan }}</p>
+</div>
+{% endif %}
+
+{% if doctor_status %}
+<div class="section">
+    <div class="section-title">Workspace Status</div>
+    <div class="alert alert-info">
+        <p><strong>{{ doctor_status }}</strong></p>
+        {% if recommended_action %}
+        <p>{{ recommended_action }}</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if artifact_links %}
+<div class="section">
+    <div class="section-title">🔗 Artifacts</div>
+    {% for link in artifact_links %}
+    <a href="{{ link.url }}" class="artifact-link">{{ link.name }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="footer">
+    <p>Reply with your decisions or <a href="{{ reply_base_url }}">open in browser</a></p>
+</div>
+{% endblock %}

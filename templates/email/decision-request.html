@@ -1,0 +1,57 @@
+{% extends "_base.html" %}
+
+{% block content %}
+<div class="header">
+    <h1>⚠️ Decision Required</h1>
+</div>
+
+<div class="meta">
+    <p><strong>Project:</strong> {{ product_id }}</p>
+    <p><strong>Feature:</strong> {{ feature_id }}</p>
+    <p><strong>Request ID:</strong> {{ request_id }}</p>
+    <p><strong>Sent:</strong> {{ sent_at }}</p>
+</div>
+
+<div class="alert alert-warning">
+    <h2 style="margin-top: 0;">{{ question }}</h2>
+</div>
+
+<div class="section">
+    <div class="section-title">Options</div>
+    {% for option in options %}
+    <div class="option">
+        <a href="{{ reply_base_url }}?decision={{ option.id }}&request={{ request_id }}" class="btn btn-primary">{{ option.label }}</a>
+    </div>
+    {% endfor %}
+</div>
+
+{% if recommendation %}
+<div class="recommendation">
+    <h3>💡 Recommendation</h3>
+    <p>{{ recommendation }}</p>
+</div>
+{% endif %}
+
+{% if defer_impact %}
+<div class="section">
+    <h3>Impact if Deferred</h3>
+    <p>{{ defer_impact }}</p>
+</div>
+{% endif %}
+
+{% if next_action %}
+<div class="section">
+    <h3>Next Action After Reply</h3>
+    <p>{{ next_action }}</p>
+</div>
+{% endif %}
+
+<div class="section">
+    <div class="section-title">Or Reply by Email</div>
+    <p>Simply reply with: <code>DECISION A</code>, <code>DECISION B</code>, or <code>DEFER</code></p>
+</div>
+
+<div class="footer">
+    <p>Request ID: {{ request_id }}</p>
+</div>
+{% endblock %}

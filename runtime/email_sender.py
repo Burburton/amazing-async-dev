@@ -12,6 +12,37 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 
+def render_html_email(template_name: str, context: dict[str, Any]) -> str:
+    """Render HTML email template.
+
+    Args:
+        template_name: Name of template file (without path)
+        context: Template context dict
+
+    Returns:
+        Rendered HTML string
+    """
+    try:
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+        templates_path = Path(__file__).parent.parent / "templates" / "email"
+        if not templates_path.exists():
+            return ""
+
+        env = Environment(
+            loader=FileSystemLoader(str(templates_path)),
+            autoescape=select_autoescape(["html", "xml"]),
+        )
+        env.filters["default"] = lambda v, d="": v if v else d
+
+        template = env.get_template(template_name)
+        return template.render(**context)
+    except ImportError:
+        return ""
+    except Exception:
+        return ""
+
+
 class EmailConfig:
     """Email configuration loaded from env and config file."""
     
@@ -119,12 +150,17 @@ class EmailSender:
         """Mock send - write to file."""
         request_id = request.get("decision_request_id", "unknown")
         mock_path = self.config.mock_outbox_path / f"{request_id}.md"
-        
+
+        self.config.mock_outbox_path.mkdir(parents=True, exist_ok=True)
+
+        subject, plain_text, html_text = self._build_multipart_email(request)
         email_content = self._build_email_content(request)
-        
-        with open(mock_path, "w") as f:
-            f.write(email_content)
-        
+
+        content_for_file = f"{email_content}\n\n--- HTML VERSION ---\n\n{html_text}"
+
+        with open(mock_path, "w", encoding="utf-8") as f:
+            f.write(content_for_file)
+
         return True, str(mock_path)
     
     def _send_console(self, request: dict[str, Any]) -> tuple[bool, None]:
@@ -215,8 +251,15 @@ class EmailSender:
         """Build full email content."""
         subject = self._build_subject(request)
         body = self._build_body(request)
-        
+
         return f"Subject: {subject}\n\n{body}"
+
+    def _build_multipart_email(self, request: dict[str, Any]) -> tuple[str, str, str]:
+        """Build multipart email (subject, plain_text, html_text)."""
+        subject = self._build_subject(request)
+        plain_text = self._build_body(request)
+        html_text = self._build_html_body(request)
+        return subject, plain_text, html_text
     
     def _build_subject(self, request: dict[str, Any]) -> str:
         """Build email subject."""
@@ -278,8 +321,53 @@ class EmailSender:
             f"Request ID: {request_id}",
             f"Sent at: {request.get('sent_at', datetime.now().isoformat())}",
         ])
-        
+
         return "\n".join(lines)
+
+    def _build_html_body(self, request: dict[str, Any]) -> str:
+        """Build HTML email body using template."""
+        template_context = {
+            "subject": self._build_subject(request),
+            "product_id": request.get("product_id", "unknown"),
+            "feature_id": request.get("feature_id", ""),
+            "request_id": request.get("decision_request_id", ""),
+            "question": request.get("question", ""),
+            "options": request.get("options", []),
+            "recommendation": request.get("recommendation", ""),
+            "defer_impact": request.get("defer_impact", ""),
+            "reply_hint": request.get("reply_format_hint", ""),
+            "next_action": request.get("recommended_next_action_after_reply", ""),
+            "sent_at": request.get("sent_at", datetime.now().isoformat()),
+            "reply_base_url": request.get("reply_base_url", "https://async-dev.example.com/reply"),
+        }
+
+        html = render_html_email("decision-request.html", template_context)
+        if not html:
+            html = self._build_body_as_html_fallback(request)
+
+        return html
+
+    def _build_body_as_html_fallback(self, request: dict[str, Any]) -> str:
+        """Fallback HTML if template rendering fails."""
+        options_html = ""
+        for opt in request.get("options", []):
+            opt_id = opt.get("id", "?")
+            label = opt.get("label", "")
+            desc = opt.get("description", "")
+            options_html += f'<li>[{opt_id}] <strong>{label}</strong> - {desc}</li>'
+
+        return f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <h1>⚠️ Decision Required</h1>
+            <p><strong>Project:</strong> {request.get('product_id', 'unknown')}</p>
+            <p><strong>Feature:</strong> {request.get('feature_id', '')}</p>
+            <h2>{request.get('question', '')}</h2>
+            <ul>{options_html}</ul>
+            <p><em>Recommendation: {request.get('recommendation', '')}</em></p>
+        </body>
+        </html>
+        """
     
     def send_status_report(
         self,

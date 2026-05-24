@@ -372,5 +372,178 @@ def test(
         console.print("[green]All notification systems operational[/green]")
 
 
+@app.command()
+def preview(
+    email_type: str = typer.Argument(..., help="Email type: decision, day-end, execution-failed, verification-failed"),
+    project: str = typer.Option(..., "--project", "-p", help="Project ID"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Preview email content without sending.
+
+    Example:
+        asyncdev notification preview decision --project my-app
+        asyncdev notification preview day-end --project my-app
+    """
+    from runtime.email_sender import render_html_email
+    from rich.syntax import Syntax
+
+    project_path = path / project
+
+    if not project_path.exists():
+        console.print(f"[red]Project not found: {project}[/red]")
+        raise typer.Exit(1)
+
+    if email_type == "decision":
+        context = {
+            "subject": "Decision Needed: Continue or Change Approach?",
+            "product_id": project,
+            "feature_id": "feature-001",
+            "request_id": "preview-001",
+            "question": "Should we continue with the current implementation or change approach?",
+            "options": [
+                {"id": "A", "label": "Continue", "description": "Keep current implementation"},
+                {"id": "B", "label": "Change", "description": "Switch to alternative approach"},
+                {"id": "DEFER", "label": "Defer", "description": "Decide later"},
+            ],
+            "recommendation": "Continue - progress is good",
+            "defer_impact": "Can proceed while waiting for decision",
+            "reply_hint": "DECISION A, B, or DEFER",
+            "next_action": "Continue implementation",
+            "sent_at": "2026-05-24T12:00:00",
+            "reply_base_url": "https://async-dev.example.com/reply",
+        }
+        template_name = "decision-request.html"
+
+    elif email_type == "day-end":
+        context = {
+            "date": "2026-05-24",
+            "product_id": project,
+            "feature_id": "feature-001",
+            "today_goal": "Complete Phase 1 implementation",
+            "completed": ["Built email templates", "Added HTML rendering", "Created execution failed alerts"],
+            "blocked": [],
+            "decisions": [
+                {
+                    "question": "Should we add HTML email templates?",
+                    "options": [
+                        {"id": "A", "label": "Yes"},
+                        {"id": "B", "label": "No"},
+                    ],
+                    "recommendation": "Yes - better UX",
+                }
+            ],
+            "tomorrow_plan": "Continue with Phase 2",
+            "doctor_status": "HEALTHY",
+            "recommended_action": "Proceed with current plan",
+            "artifact_links": [
+                {"name": "Execution Result", "url": "https://async-dev.example.com/execution/exec-001"},
+                {"name": "Review Pack", "url": "https://async-dev.example.com/review/rev-001"},
+            ],
+            "request_id": "preview-001",
+            "reply_base_url": "https://async-dev.example.com/reply",
+        }
+        template_name = "day-end-summary.html"
+
+    elif email_type == "execution-failed":
+        context = {
+            "project_id": project,
+            "feature_id": "feature-001",
+            "execution_id": "exec-001",
+            "error_summary": "Connection timeout after 30 seconds",
+            "what_was_attempted": "Fetching data from external API",
+            "duration": "45 minutes",
+            "impact": "Execution cannot complete without API data",
+            "failed_at": "2026-05-24T12:00:00",
+            "retry_url": "https://async-dev.example.com/retry/exec-001",
+            "view_details_url": "https://async-dev.example.com/execution/exec-001",
+        }
+        template_name = "execution-failed.html"
+
+    elif email_type == "verification-failed":
+        context = {
+            "project_id": project,
+            "feature_id": "feature-001",
+            "verification_id": "ver-001",
+            "failure_reason": "Element not found: #login-button",
+            "what_was_verified": "Login flow",
+            "scenarios_run": 5,
+            "scenarios_passed": 3,
+            "screenshot_urls": ["https://example.com/screenshot1.png"],
+            "failed_at": "2026-05-24T12:00:00",
+            "retry_url": "https://async-dev.example.com/verify/retry/ver-001",
+            "view_details_url": "https://async-dev.example.com/verify/ver-001",
+        }
+        template_name = "verification-failed.html"
+
+    else:
+        console.print(f"[red]Unknown email type: {email_type}[/red]")
+        console.print("[yellow]Available types: decision, day-end, execution-failed, verification-failed[/yellow]")
+        raise typer.Exit(1)
+
+    html_content = render_html_email(template_name, context)
+
+    if html_content:
+        console.print(Panel(
+            f"Email Type: {email_type}\nTemplate: {template_name}",
+            title="Email Preview",
+            border_style="blue"
+        ))
+        console.print("\n[dim]--- HTML Content (first 2000 chars) ---[/dim]\n")
+        syntax = Syntax(html_content[:2000], "html", theme="monokai")
+        console.print(syntax)
+        if len(html_content) > 2000:
+            console.print(f"\n[dim]... ({len(html_content) - 2000} more characters)[/dim]")
+    else:
+        console.print("[yellow]Template not found or rendering failed[/yellow]")
+        console.print(f"[dim]Tried to render: {template_name}[/dim]")
+
+
+@app.command()
+def templates_list(
+):
+    """List available email templates.
+
+    Example:
+        asyncdev notification templates-list
+    """
+    from pathlib import Path
+
+    templates_path = Path(__file__).parent.parent.parent / "templates" / "email"
+
+    console.print(Panel(
+        "Available Email Templates",
+        title="Email Templates",
+        border_style="blue"
+    ))
+
+    if not templates_path.exists():
+        console.print("[yellow]Templates directory not found[/yellow]")
+        raise typer.Exit(1)
+
+    import builtins
+    template_files = builtins.list(templates_path.glob("*.html"))
+    template_files = [t for t in template_files if not t.name.startswith("_")]
+
+    if not template_files:
+        console.print("[yellow]No templates found[/yellow]")
+    else:
+        table = Table(title="Templates", show_header=True)
+        table.add_column("Template", style="cyan")
+        table.add_column("Description", style="green")
+
+        descriptions = {
+            "decision-request.html": "Decision request with options",
+            "day-end-summary.html": "Daily review summary",
+            "execution-failed.html": "Execution failure alert",
+            "verification-failed.html": "Verification failure alert",
+        }
+
+        for tmpl in sorted(template_files):
+            desc = descriptions.get(tmpl.name, tmpl.name)
+            table.add_row(tmpl.name, desc)
+
+        console.print(table)
+
+
 if __name__ == "__main__":
     app()

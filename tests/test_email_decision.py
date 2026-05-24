@@ -434,6 +434,7 @@ class TestEmailSender:
     def test_send_mock(self, temp_dir):
         """send_decision_request should write mock file."""
         config = EmailConfig()
+        config.delivery_mode = "mock_file"
         config.mock_outbox_path = temp_dir / "outbox"
         sender = EmailSender(config)
         
@@ -455,7 +456,7 @@ class TestEmailSender:
         mock_file = Path(mock_path)
         assert mock_file.exists()
         
-        content = mock_file.read_text()
+        content = mock_file.read_text(encoding="utf-8")
         assert "Test question?" in content
         assert "DECISION A" in content
 
