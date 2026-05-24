@@ -253,3 +253,145 @@ def questions(
     questions_table.add_row("Current feature?", feature_id or "N/A")
     
     console.print(questions_table)
+
+
+@app.command()
+def diff(
+    project: str = typer.Option(None, "--project", help="Project ID"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Show diff between latest execution result and latest acceptance result."""
+    from runtime.evidence_rollup import LatestTruthResolver
+
+    if not project:
+        project = _auto_detect_project(path)
+        if not project:
+            console.print("[yellow]Specify --project[/yellow]")
+            raise typer.Exit(1)
+
+    project_path = path / project
+    if not project_path.exists():
+        console.print(f"[red]Project not found: {project}[/red]")
+        raise typer.Exit(1)
+
+    resolver = LatestTruthResolver(project_path)
+
+    exec_id, exec_path = resolver.get_latest_execution_result()
+    accept_id, accept_path = resolver.get_latest_acceptance_result()
+
+    console.print(Panel(
+        f"Project: {project}",
+        title="Evidence Diff",
+        border_style="blue"
+    ))
+
+    if not exec_path and not accept_path:
+        console.print("[yellow]No execution or acceptance results found[/yellow]")
+        raise typer.Exit(0)
+
+    console.print(f"\n[cyan]Execution Result:[/cyan] {exec_id or 'N/A'}")
+    console.print(f"[cyan]Acceptance Result:[/cyan] {accept_id or 'N/A'}")
+
+    from rich.syntax import Syntax
+
+    if exec_path and exec_path.exists():
+        console.print(f"\n[green]--- Execution Result ({exec_path.name})[/green]")
+        content = exec_path.read_text(encoding="utf-8")
+        syntax = Syntax(content, "yaml", theme="monokai", line_numbers=True)
+        console.print(syntax)
+
+    if accept_path and accept_path.exists():
+        console.print(f"\n[green]--- Acceptance Result ({accept_path.name})[/green]")
+        content = accept_path.read_text(encoding="utf-8")
+        syntax = Syntax(content, "yaml", theme="monokai", line_numbers=True)
+        console.print(syntax)
+
+
+@app.command()
+def validate(
+    project: str = typer.Option(None, "--project", help="Project ID"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Validate evidence artifacts for completeness and schema compliance."""
+    import yaml
+
+    if not project:
+        project = _auto_detect_project(path)
+        if not project:
+            console.print("[yellow]Specify --project[/yellow]")
+            raise typer.Exit(1)
+
+    project_path = path / project
+    if not project_path.exists():
+        console.print(f"[red]Project not found: {project}[/red]")
+        raise typer.Exit(1)
+
+    resolver = LatestTruthResolver(project_path)
+    issues = []
+    warnings = []
+
+    exec_id, exec_path = resolver.get_latest_execution_result()
+    accept_id, accept_path = resolver.get_latest_acceptance_result()
+
+    if exec_path and exec_path.exists():
+        try:
+            content = exec_path.read_text(encoding="utf-8")
+            if "```yaml" in content:
+                yaml_block = content.split("```yaml")[1].split("```")[0]
+                data = yaml.safe_load(yaml_block)
+            else:
+                data = yaml.safe_load(content)
+            if not isinstance(data, dict):
+                issues.append("execution-result: must be a mapping")
+            else:
+                required = ["execution_id", "status", "completed_items"]
+                for field in required:
+                    if field not in data:
+                        issues.append(f"execution-result: missing '{field}'")
+        except yaml.YAMLError as e:
+            issues.append(f"execution-result: YAML error - {e}")
+    else:
+        warnings.append("No execution result found")
+
+    if accept_path and accept_path.exists():
+        try:
+            content = accept_path.read_text(encoding="utf-8")
+            if "```yaml" in content:
+                yaml_block = content.split("```yaml")[1].split("```")[0]
+                data = yaml.safe_load(yaml_block)
+            else:
+                data = yaml.safe_load(content)
+            if not isinstance(data, dict):
+                issues.append("acceptance-result: must be a mapping")
+            else:
+                required = ["acceptance_id", "status"]
+                for field in required:
+                    if field not in data:
+                        issues.append(f"acceptance-result: missing '{field}'")
+        except yaml.YAMLError as e:
+            issues.append(f"acceptance-result: YAML error - {e}")
+    else:
+        warnings.append("No acceptance result found")
+
+    console.print(Panel(
+        f"Project: {project}",
+        title="Evidence Validation",
+        border_style="blue"
+    ))
+
+    if warnings:
+        table = Table(title="Warnings", show_header=False)
+        table.add_column("Warning", style="yellow")
+        for w in warnings:
+            table.add_row(w)
+        console.print(table)
+
+    if issues:
+        table = Table(title="Issues", show_header=False)
+        table.add_column("Issue", style="red")
+        for i in issues:
+            table.add_row(i)
+        console.print(table)
+        raise typer.Exit(1)
+    else:
+        console.print("[green]All evidence artifacts valid[/green]")

@@ -63,7 +63,7 @@ _asyncdev_completion() {
                 ;;
             evidence)
                 if [[ ${COMP_CWORD} -eq 2 ]]; then
-                    subcommands="summary latest generate questions"
+                    subcommands="summary latest generate questions diff validate"
                     COMPREPLY=($(compgen -W "${subcommands}" -- "${cur}"))
                 else
                     COMPREPLY=($(compgen -W "--project --feature --path --save --help" -- "${cur}"))
@@ -72,6 +72,22 @@ _asyncdev_completion() {
             home)
                 if [[ ${COMP_CWORD} -eq 2 ]]; then
                     subcommands="show status calm"
+                    COMPREPLY=($(compgen -W "${subcommands}" -- "${cur}"))
+                else
+                    COMPREPLY=($(compgen -W "--project --path --help" -- "${cur}"))
+                fi
+                ;;
+            doctor)
+                if [[ ${COMP_CWORD} -eq 2 ]]; then
+                    subcommands="show fix"
+                    COMPREPLY=($(compgen -W "${subcommands}" -- "${cur}"))
+                else
+                    COMPREPLY=($(compgen -W "--project --path --format --dry-run --help" -- "${cur}"))
+                fi
+                ;;
+            notification)
+                if [[ ${COMP_CWORD} -eq 2 ]]; then
+                    subcommands="list show pending stats retry clear-expired day-end-status test"
                     COMPREPLY=($(compgen -W "${subcommands}" -- "${cur}"))
                 else
                     COMPREPLY=($(compgen -W "--project --path --help" -- "${cur}"))

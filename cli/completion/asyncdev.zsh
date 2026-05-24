@@ -56,10 +56,16 @@ _asyncdev() {
     acceptance_cmds=('run:Run acceptance' 'status:Acceptance status' 'history:Acceptance history' 'result:Acceptance result' 'retry:Retry acceptance' 'recovery:Acceptance recovery' 'gate:Acceptance gate')
 
     local -a evidence_cmds
-    evidence_cmds=('summary:Evidence summary' 'latest:Latest evidence' 'generate:Generate evidence' 'questions:Evidence questions')
+    evidence_cmds=('summary:Evidence summary' 'latest:Latest evidence' 'generate:Generate evidence' 'questions:Evidence questions' 'diff:Diff execution vs acceptance' 'validate:Validate evidence artifacts')
 
     local -a home_cmds
     home_cmds=('show:Show home overview' 'status:Home status' 'calm:Check if calm')
+
+    local -a doctor_cmds
+    doctor_cmds=('show:Show diagnosis' 'fix:Fix workspace issues')
+
+    local -a notification_cmds
+    notification_cmds=('list:List notifications' 'show:Show notification' 'pending:Show pending' 'stats:Notification stats' 'retry:Retry failed' 'clear-expired:Clear expired' 'day-end-status:Day-end status' 'test:Test configuration')
 
     local -a project_opts
     project_opts=('--project:Filter by project ID' '--path:Projects root path' '--help:Show help')
@@ -100,6 +106,12 @@ _asyncdev() {
                 home)
                     _describe 'home command' home_cmds
                     ;;
+                doctor)
+                    _describe 'doctor command' doctor_cmds
+                    ;;
+                notification)
+                    _describe 'notification command' notification_cmds
+                    ;;
                 *)
                     _arguments "${project_opts[@]}"
                     ;;
@@ -119,10 +131,16 @@ _asyncdev() {
                 acceptance,run|acceptance,status|acceptance,history|acceptance,result|acceptance,retry|acceptance,recovery|acceptance,gate)
                     _arguments '--project:Project ID' '--execution:Execution ID' '--feature:Feature ID' '--policy:Policy mode:(${policy_modes})' '--dry-run:Preview only' '--path:Projects path'
                     ;;
-                evidence,summary|evidence,latest|evidence,generate|evidence,questions)
+                evidence,summary|evidence,latest|evidence,generate|evidence,questions|evidence,diff|evidence,validate)
                     _arguments "${project_opts[@]}" '--feature:Feature ID' '--save:Save to file'
                     ;;
                 home,show|home,status|home,calm)
+                    _arguments "${project_opts[@]}"
+                    ;;
+                doctor,show|doctor,fix)
+                    _arguments "${project_opts[@]}" '--format:Output format' '--dry-run:Dry run mode'
+                    ;;
+                notification,list|notification,show|notification,pending|notification,stats|notification,retry|notification,clear-expired|notification,day-end-status|notification,test)
                     _arguments "${project_opts[@]}"
                     ;;
             esac

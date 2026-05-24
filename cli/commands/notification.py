@@ -316,5 +316,61 @@ def day_end_status(
         console.print("[dim]Run 'asyncdev review-night generate' to trigger[/dim]")
 
 
+@app.command()
+def test(
+    project: str = typer.Option(..., help="Project ID"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Test notification configuration and connectivity.
+
+    Verifies:
+    - Project notification store is accessible
+    - Email channel is configured (via env vars)
+    - Notification queue is functional
+
+    Example:
+        asyncdev notification test --project my-app
+    """
+    project_path = path / project
+
+    if not project_path.exists():
+        console.print(f"[red]Project not found: {project}[/red]")
+        raise typer.Exit(1)
+
+    store = NotificationStore(project_path)
+    issues = []
+    warnings = []
+
+    try:
+        store.list_notifications()
+        console.print("[green]Notification store: OK[/green]")
+    except Exception as e:
+        issues.append(f"Notification store error: {e}")
+
+    import os
+    email_configured = all([
+        os.getenv("GMAIL_CLIENT_ID"),
+        os.getenv("GMAIL_CLIENT_SECRET"),
+        os.getenv("GMAIL_REFRESH_TOKEN"),
+    ])
+
+    if email_configured:
+        console.print("[green]Email channel: configured[/green]")
+    else:
+        warnings.append("Email channel: not configured (GMAIL_* env vars missing)")
+
+    if warnings:
+        for w in warnings:
+            console.print(f"[yellow]{w}[/yellow]")
+
+    if issues:
+        for i in issues:
+            console.print(f"[red]{i}[/red]")
+        raise typer.Exit(1)
+
+    if not warnings and not issues:
+        console.print("[green]All notification systems operational[/green]")
+
+
 if __name__ == "__main__":
     app()

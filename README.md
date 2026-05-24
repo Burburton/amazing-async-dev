@@ -271,6 +271,7 @@ python -m pytest tests/ -v
 | Recovery Console | Operator surface for recovery |
 | Decision Inbox | Operator surface for decisions |
 | Session Start | Blocking alert, mandatory check |
+| Verification Console | Operator surface for verification state |
 | Execution Observer | Supervision layer (Feature 067) |
 
 Run `pytest --collect-only` for current count.
@@ -296,6 +297,7 @@ All core features complete:
 | Recovery Console | Operator surface for execution recovery |
 | Decision Inbox | Operator surface for decision management |
 | Session Start | Mandatory blocking state check (Feature 065) |
+| Verification Console | Operator surface for verification state |
 | Acceptance Console | Operator surface for acceptance validation (Feature 077) |
 | Acceptance Recovery | Acceptance × Recovery Console integration (Feature 078) |
 | Evidence Summary | Rolled-up project/feature evidence view (Feature 079) |
@@ -386,6 +388,13 @@ asyncdev decision history [--project {id}] [--all] [--limit 10]
 asyncdev session-start check [--project {id}]
 asyncdev session-start poll --project {id}
 asyncdev session-start status
+
+# Verification Console
+asyncdev verification list [--project {id}]
+asyncdev verification show --execution {id}
+asyncdev verification classify --project {id} [--feature {id}]
+asyncdev verification gate --project {id}
+asyncdev verification retry --project {id}
 
 # Acceptance Console (Feature 077)
 asyncdev acceptance run --project {id} [--execution {id}] [--policy-mode {strict|relaxed}]

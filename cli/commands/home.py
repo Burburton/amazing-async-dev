@@ -28,7 +28,7 @@ def show(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Show operator home overview - unified platform status."""
-    
+
     if project:
         project_path = path / project
         if not project_path.exists():
@@ -37,6 +37,7 @@ def show(
         overview = build_operator_home_overview(project_path.parent)
     else:
         overview = build_operator_home_overview(path)
+        project = None
     
     console.print(Panel(
         f"Projects: {overview.total_projects} | Features: {overview.total_features}\n"
@@ -152,10 +153,13 @@ def show(
             )
         
         console.print(runs_table)
-    
+
     console.print("\n[bold cyan]Quick Links[/bold cyan]")
     for link in overview.quick_links:
-        console.print(f"  [cyan]{link.label}[/cyan]: {link.command}")
+        command = link.command
+        if project:
+            command = command.replace("{id}", project)
+        console.print(f"  [cyan]{link.label}[/cyan]: {command}")
     
     console.print(f"\n[dim]Updated: {overview.updated_at[:19]}[/dim]")
 
