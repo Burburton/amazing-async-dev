@@ -1,6 +1,31 @@
 {% extends "_base.html" %}
 
 {% block content %}
+<div class="action-summary">
+    <div class="action-summary-inner">
+        <div class="action-meta">
+            <span class="severity severity-{{ severity|default('medium') }}">{{ severity|default('medium')|upper }}</span>
+            <span class="separator">|</span>
+            <span class="project">{{ product_id }}</span>
+            <span class="separator">|</span>
+            <span class="time-estimate">{{ time_estimate|default('~2min') }}</span>
+        </div>
+        <div class="action-question">
+            {{ question }}
+        </div>
+        {% if recommendation %}
+        <div class="recommendation-hint">
+            💡 AI Recommends: <strong>{{ recommendation }}</strong>
+        </div>
+        {% endif %}
+        <div class="action-buttons">
+            {% for option in options[:3] %}
+            <a href="{{ reply_base_url }}?decision={{ option.id }}&request={{ request_id }}" class="btn btn-{{ loop.index0|default(0) == 0 and 'primary' or 'secondary' }}">{{ option.label }}</a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
 <div class="header">
     <h1>⚠️ Decision Required</h1>
 </div>
@@ -12,23 +37,23 @@
     <p><strong>Sent:</strong> {{ sent_at }}</p>
 </div>
 
-<div class="alert alert-warning">
-    <h2 style="margin-top: 0;">{{ question }}</h2>
+<div class="section">
+    <div class="section-title">Details</div>
+    <p>{{ question }}</p>
 </div>
 
+{% if options %}
 <div class="section">
-    <div class="section-title">Options</div>
+    <div class="section-title">All Options</div>
     {% for option in options %}
-    <div class="option">
-        <a href="{{ reply_base_url }}?decision={{ option.id }}&request={{ request_id }}" class="btn btn-primary">{{ option.label }}</a>
+    <div class="option-card">
+        <div class="option-label">{{ loop.index }}. <strong>{{ option.label }}</strong></div>
+        {% if option.description %}
+        <div class="option-desc">{{ option.description }}</div>
+        {% endif %}
+        <a href="{{ reply_base_url }}?decision={{ option.id }}&request={{ request_id }}" class="btn btn-small">Choose</a>
     </div>
     {% endfor %}
-</div>
-
-{% if recommendation %}
-<div class="recommendation">
-    <h3>💡 Recommendation</h3>
-    <p>{{ recommendation }}</p>
 </div>
 {% endif %}
 
@@ -53,5 +78,6 @@
 
 <div class="footer">
     <p>Request ID: {{ request_id }}</p>
+    <p><a href="{{ reply_base_url }}">Manage notification preferences</a></p>
 </div>
 {% endblock %}

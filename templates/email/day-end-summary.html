@@ -1,22 +1,28 @@
 {% extends "_base.html" %}
 
 {% block content %}
-<div class="header">
-    <h1>📋 Daily Review Summary</h1>
+<div class="action-summary" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+    <div class="action-summary-inner">
+        <div class="action-meta">
+            <span>{{ date|default('Today') }}</span>
+            <span class="separator">|</span>
+            <span>{{ project_id }}</span>
+            <span class="separator">|</span>
+            <span>~5min review</span>
+        </div>
+        <div class="action-question">
+            📋 Daily Review Summary
+        </div>
+        {% if completed %}
+        <div style="font-size: 14px; margin-bottom: 10px;">
+            ✅ {{ completed|length }} completed{% if decisions %} | ⚠️ {{ decisions|length }} decisions{% endif %}{% if blocked %} | 🚫 {{ blocked|length }} blocked{% endif %}
+        </div>
+        {% endif %}
+        <div class="action-buttons">
+            <a href="{{ reply_base_url|default('#') }}" class="btn btn-primary">Review Now</a>
+        </div>
+    </div>
 </div>
-
-<div class="meta">
-    <p><strong>Date:</strong> {{ date }}</p>
-    <p><strong>Project:</strong> {{ product_id }}</p>
-    <p><strong>Feature:</strong> {{ feature_id }}</p>
-</div>
-
-{% if today_goal %}
-<div class="section">
-    <div class="section-title">Today's Goal</div>
-    <p>{{ today_goal }}</p>
-</div>
-{% endif %}
 
 {% if completed %}
 <div class="section">

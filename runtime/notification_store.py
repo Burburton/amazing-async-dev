@@ -470,5 +470,53 @@ def create_day_end_notification(
             str(project_path / "reviews" / f"{date}-review.md"),
         ],
     )
-    
+
     return event
+
+
+class EmailPreferences:
+    """Email notification preferences per project.
+
+    File: .runtime/email-preferences.json
+    """
+
+    DEFAULT_PATH = ".runtime/email-preferences.json"
+
+    DEFAULTS = {
+        "decision_requests": True,
+        "day_end_summary": True,
+        "execution_failed": True,
+        "verification_failed": True,
+        "severity_threshold": "low",
+        "reply_base_url": "https://async-dev.example.com/reply",
+    }
+
+    def __init__(self, project_path: Path) -> None:
+        self.project_path = project_path
+        self.prefs_path = project_path / self.DEFAULT_PATH
+
+    def load(self) -> dict[str, Any]:
+        if not self.prefs_path.exists():
+            return self.DEFAULTS.copy()
+        try:
+            return json.loads(self.prefs_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return self.DEFAULTS.copy()
+
+    def save(self, prefs: dict[str, Any]) -> None:
+        self.prefs_path.parent.mkdir(parents=True, exist_ok=True)
+        self.prefs_path.write_text(json.dumps(prefs, indent=2), encoding="utf-8")
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.load().get(key, default)
+
+    def set(self, key: str, value: Any) -> None:
+        prefs = self.load()
+        prefs[key] = value
+        self.save(prefs)
+
+    def should_notify(self, severity: str) -> bool:
+        thresholds = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+        pref_threshold = thresholds.get(self.get("severity_threshold", "low"), 3)
+        notif_threshold = thresholds.get(severity.lower(), 2)
+        return notif_threshold <= pref_threshold

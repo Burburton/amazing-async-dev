@@ -190,6 +190,116 @@
             font-size: 12px;
             letter-spacing: 0.5px;
         }
+        /* Action Summary Box - NEW */
+        .action-summary {
+            background: linear-gradient(135deg, #1a1a2e 0%, #2d2d44 100%);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: white;
+        }
+        .action-summary-inner {
+            text-align: center;
+        }
+        .action-meta {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        .action-meta .separator {
+            margin: 0 8px;
+        }
+        .action-meta .severity-critical {
+            color: #f87171;
+            font-weight: 700;
+        }
+        .action-meta .severity-high {
+            color: #fbbf24;
+            font-weight: 700;
+        }
+        .action-meta .severity-medium {
+            color: #60a5fa;
+            font-weight: 700;
+        }
+        .action-meta .severity-low {
+            color: #a3e635;
+            font-weight: 700;
+        }
+        .action-question {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: white;
+        }
+        .recommendation-hint {
+            font-size: 14px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+        .action-buttons {
+            margin-top: 15px;
+        }
+        /* Mobile-first buttons */
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            margin: 5px;
+            font-size: 14px;
+            min-height: 44px;
+            line-height: 1.4;
+        }
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 13px;
+            min-height: 36px;
+        }
+        /* Option cards */
+        .option-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .option-label {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .option-desc {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        /* Mobile responsive */
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
+            .btn {
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+                text-align: center;
+                margin: 8px 0;
+            }
+            .action-buttons .btn {
+                display: block;
+                width: 100%;
+            }
+            .action-question {
+                font-size: 16px;
+            }
+        }
     </style>
 </head>
 <body>

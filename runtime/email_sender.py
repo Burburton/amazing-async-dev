@@ -262,12 +262,32 @@ class EmailSender:
         return subject, plain_text, html_text
     
     def _build_subject(self, request: dict[str, Any]) -> str:
-        """Build email subject."""
+        """Build email subject with urgency, project, and time estimate."""
         product_id = request.get("product_id", "unknown")
         feature_id = request.get("feature_id", "")
         request_id = request.get("decision_request_id", "")
-        
-        return f"{self.config.subject_prefix} Decision needed: {product_id} / {feature_id} [{request_id}]"
+        question = request.get("question", "")
+        severity = request.get("severity", "medium")
+        time_estimate = request.get("time_estimate", "~2min")
+
+        severity_icons = {
+            "critical": "CRITICAL",
+            "high": "Decision",
+            "medium": "Review",
+            "low": "Update",
+            "info": "Info",
+        }
+
+        severity_text = severity_icons.get(severity.lower(), "Decision")
+
+        if question and len(question) > 40:
+            question_short = question[:37] + "..."
+        elif question:
+            question_short = question
+        else:
+            question_short = "Decision needed"
+
+        return f"{self.config.subject_prefix} {severity_text}: {question_short} | {product_id} | {time_estimate}"
     
     def _build_body(self, request: dict[str, Any]) -> str:
         """Build email body."""
@@ -339,6 +359,8 @@ class EmailSender:
             "next_action": request.get("recommended_next_action_after_reply", ""),
             "sent_at": request.get("sent_at", datetime.now().isoformat()),
             "reply_base_url": request.get("reply_base_url", "https://async-dev.example.com/reply"),
+            "severity": request.get("severity", "medium"),
+            "time_estimate": request.get("time_estimate", "~2min"),
         }
 
         html = render_html_email("decision-request.html", template_context)

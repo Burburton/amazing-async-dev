@@ -481,20 +481,24 @@ class TestEmailSender:
         assert success == True
 
     def test_build_subject(self, temp_dir):
-        """_build_subject should format correctly."""
+        """_build_subject should format correctly with new UX format."""
         config = EmailConfig()
         sender = EmailSender(config)
-        
+
         request = {
             "product_id": "my-app",
             "feature_id": "feature-001",
             "decision_request_id": "dr-001",
+            "question": "What format should I use for the config file?",
+            "severity": "high",
+            "time_estimate": "~3min",
         }
-        
+
         subject = sender._build_subject(request)
         assert "[async-dev]" in subject
         assert "my-app" in subject
-        assert "dr-001" in subject
+        assert "Decision" in subject
+        assert "~3min" in subject
 
     def test_build_body(self, temp_dir):
         """_build_body should contain all fields."""

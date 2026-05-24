@@ -545,5 +545,77 @@ def templates_list(
         console.print(table)
 
 
+@app.command()
+def preferences_show(
+    project: str = typer.Option(..., help="Project ID"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Show email notification preferences for a project.
+
+    Example:
+        asyncdev notification preferences-show --project my-app
+    """
+    from runtime.notification_store import EmailPreferences
+
+    project_path = path / project
+    prefs = EmailPreferences(project_path)
+    data = prefs.load()
+
+    table = Table(title=f"Email Preferences: {project}")
+    table.add_column("Setting", style="cyan")
+    table.add_column("Value", style="green")
+
+    for key, value in data.items():
+        table.add_row(key, str(value))
+
+    console.print(table)
+
+
+@app.command()
+def preferences_set(
+    project: str = typer.Option(..., help="Project ID"),
+    key: str = typer.Option(..., help="Preference key"),
+    value: str = typer.Option(..., help="New value"),
+    path: Path = typer.Option(Path("projects"), help="Projects root path"),
+):
+    """Set an email notification preference.
+
+    Available keys:
+        decision_requests: Enable decision request emails (true/false)
+        day_end_summary: Enable day-end summary emails (true/false)
+        execution_failed: Enable execution failed emails (true/false)
+        verification_failed: Enable verification failed emails (true/false)
+        severity_threshold: Minimum severity to notify (critical/high/medium/low/info)
+        reply_base_url: URL for email reply actions
+
+    Examples:
+        asyncdev notification preferences-set --project my-app --key decision_requests --value false
+        asyncdev notification preferences-set --project my-app --key severity_threshold --value high
+    """
+    from runtime.notification_store import EmailPreferences
+
+    project_path = path / project
+    prefs = EmailPreferences(project_path)
+
+    if key == "severity_threshold":
+        valid = ["critical", "high", "medium", "low", "info"]
+        if value not in valid:
+            console.print(f"[red]Invalid severity: {value}[/red]")
+            console.print(f"[yellow]Valid: {valid}[/yellow]")
+            raise typer.Exit(1)
+        prefs.set(key, value)
+    elif key in ["decision_requests", "day_end_summary", "execution_failed", "verification_failed"]:
+        parsed = value.lower() in ("true", "1", "yes", "on")
+        prefs.set(key, parsed)
+    elif key == "reply_base_url":
+        prefs.set(key, value)
+    else:
+        console.print(f"[red]Unknown preference: {key}[/red]")
+        console.print(f"[yellow]Valid keys: decision_requests, day_end_summary, execution_failed, verification_failed, severity_threshold, reply_base_url[/yellow]")
+        raise typer.Exit(1)
+
+    console.print(f"[green]Updated {key} = {value}[/green]")
+
+
 if __name__ == "__main__":
     app()
