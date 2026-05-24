@@ -184,21 +184,22 @@ class EmailSender:
         """SMTP send with username/password auth."""
         if not self.config.is_smtp_configured():
             return False, None
-        
+
         to_address = self.config.to_address
         if not to_address:
             to_address = request.get("email_to", "")
-        
-        subject = self._build_subject(request)
-        body = self._build_body(request)
-        
-        msg = MIMEMultipart()
+
+        subject, plain_text, html_text = self._build_multipart_email(request)
+
+        msg = MIMEMultipart("alternative")
         msg["From"] = self.config.from_address
         msg["To"] = to_address
         msg["Subject"] = subject
-        
-        msg.attach(MIMEText(body, "plain"))
-        
+
+        msg.attach(MIMEText(plain_text, "plain"))
+        if html_text:
+            msg.attach(MIMEText(html_text, "html"))
+
         try:
             with smtplib.SMTP(self.config.smtp_host, self.config.smtp_port, timeout=30) as server:
                 if self.config.smtp_use_tls:
@@ -212,32 +213,33 @@ class EmailSender:
     def _send_smtp_oauth2(self, request: dict[str, Any]) -> tuple[bool, None]:
         """SMTP send with Gmail XOAUTH2."""
         from runtime.gmail_oauth2 import GmailOAuth2Config
-        
+
         oauth2_config = GmailOAuth2Config(self.config.oauth2_token_path)
-        
+
         if not oauth2_config.is_configured():
             return False, None
-        
+
         auth_string = oauth2_config.get_auth_string()
         email = oauth2_config.get_email()
-        
+
         if not auth_string or not email:
             return False, None
-        
+
         to_address = self.config.to_address
         if not to_address:
             to_address = email
-        
-        subject = self._build_subject(request)
-        body = self._build_body(request)
-        
-        msg = MIMEMultipart()
+
+        subject, plain_text, html_text = self._build_multipart_email(request)
+
+        msg = MIMEMultipart("alternative")
         msg["From"] = email
         msg["To"] = to_address
         msg["Subject"] = subject
-        
-        msg.attach(MIMEText(body, "plain"))
-        
+
+        msg.attach(MIMEText(plain_text, "plain"))
+        if html_text:
+            msg.attach(MIMEText(html_text, "html"))
+
         try:
             with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
                 server.starttls()
