@@ -242,16 +242,46 @@ def send_day_end_email(
     
     subject = build_day_end_email_subject(review_pack, config)
     body = build_day_end_email_body(review_pack)
-    
+
+    decisions = review_pack.get("decisions_needed", [])
+    parsed_options = []
+    recommendation = ""
+
+    for i, decision in enumerate(decisions):
+        decision_text = decision.get("decision", "")
+        options = decision.get("options", [])
+        rec = decision.get("recommendation", "")
+
+        for j, opt in enumerate(options):
+            if isinstance(opt, str):
+                parsed_options.append({
+                    "id": chr(65 + j),
+                    "label": opt,
+                    "description": ""
+                })
+            elif isinstance(opt, dict):
+                parsed_options.append(opt)
+
+        if rec and not recommendation:
+            recommendation = rec
+
+    defer_impact = ""
+    for decision in decisions:
+        if decision.get("defer_impact"):
+            defer_impact = decision.get("defer_impact", "")
+            break
+
     email_data = {
         "decision_request_id": notification.event_id,
         "product_id": notification.product_id,
         "feature_id": notification.feature_id,
         "question": "Daily review summary",
-        "options": [],
-        "recommendation": "",
+        "options": parsed_options if parsed_options else [],
+        "recommendation": recommendation,
+        "defer_impact": defer_impact,
+        "reply_format_hint": "DECISION A, DECISION B, or DEFER",
     }
-    
+
     success, message_id = sender.send_decision_request(email_data)
     
     if success:
