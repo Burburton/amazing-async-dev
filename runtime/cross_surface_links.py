@@ -50,7 +50,7 @@ def get_recovery_to_decision_link(
     """Link from Recovery to Decision Inbox when blocked by pending decision."""
     if not decision_request_id:
         return None
-    
+
     return CrossSurfaceLink(
         source_type=SurfaceType.RECOVERY,
         source_id=execution_id,
@@ -87,7 +87,7 @@ def get_decision_to_recovery_link(
     """Link from Decision to Recovery when decision unblocks an execution."""
     if not unblocked_execution_id:
         return None
-    
+
     return CrossSurfaceLink(
         source_type=SurfaceType.DECISION,
         source_id=decision_request_id,
@@ -140,7 +140,7 @@ def get_observer_to_decision_link(
     """Link from Observer to Decision when findings require human decision."""
     if not decision_request_id:
         return None
-    
+
     return CrossSurfaceLink(
         source_type=SurfaceType.OBSERVER,
         source_id=finding_type,
@@ -155,11 +155,11 @@ def format_cross_link(links: list[CrossSurfaceLink]) -> list[str]:
     """Format cross-surface links for display."""
     if not links:
         return []
-    
+
     formatted = []
     for link in links:
         formatted.append(
             f"[cyan]{link.target_type.value}[/cyan]: {link.link_reason} → {link.suggested_action}"
         )
-    
+
     return formatted

@@ -3,7 +3,6 @@
 Provides utilities for building links to async-dev artifacts.
 """
 
-from pathlib import Path
 from typing import Any
 
 

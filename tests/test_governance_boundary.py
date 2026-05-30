@@ -3,17 +3,18 @@
 Feature 039: Artifact ownership and storage boundary governance.
 """
 
-import pytest
-from pathlib import Path
-import yaml
-import tempfile
 import shutil
+import tempfile
+from pathlib import Path
+
+import pytest
+import yaml
 
 from runtime.state_store import (
-    load_project_link,
     get_ownership_mode,
-    is_managed_external,
     get_product_repo_path,
+    is_managed_external,
+    load_project_link,
 )
 
 
@@ -41,11 +42,11 @@ class TestLoadProjectLink:
             "ownership_mode": "managed_external",
             "status": "active",
         }
-        
+
         link_path = temp_project_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link, f, default_flow_style=False)
-        
+
         result = load_project_link(temp_project_dir)
         assert result is not None
         assert result["product_id"] == "test-product"
@@ -55,7 +56,7 @@ class TestLoadProjectLink:
         """load_project_link should handle empty YAML file."""
         link_path = temp_project_dir / "project-link.yaml"
         link_path.write_text("")
-        
+
         result = load_project_link(temp_project_dir)
         assert result is None  # yaml.safe_load returns None for empty file
 
@@ -74,11 +75,11 @@ class TestGetOwnershipMode:
             "product_id": "test-product",
             "ownership_mode": "self_hosted",
         }
-        
+
         link_path = temp_project_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link, f, default_flow_style=False)
-        
+
         result = get_ownership_mode(temp_project_dir)
         assert result == "self_hosted"
 
@@ -89,11 +90,11 @@ class TestGetOwnershipMode:
             "ownership_mode": "managed_external",
             "repo_url": "https://github.com/user/test-product",
         }
-        
+
         link_path = temp_project_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link, f, default_flow_style=False)
-        
+
         result = get_ownership_mode(temp_project_dir)
         assert result == "managed_external"
 
@@ -103,11 +104,11 @@ class TestGetOwnershipMode:
             "product_id": "test-product",
             # ownership_mode key intentionally missing
         }
-        
+
         link_path = temp_project_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link, f, default_flow_style=False)
-        
+
         result = get_ownership_mode(temp_project_dir)
         assert result == "self_hosted"
 
@@ -121,11 +122,11 @@ class TestIsManagedExternal:
             "product_id": "test-product",
             "ownership_mode": "self_hosted",
         }
-        
+
         link_path = temp_project_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link, f, default_flow_style=False)
-        
+
         result = is_managed_external(temp_project_dir)
         assert result is False
 
@@ -141,11 +142,11 @@ class TestIsManagedExternal:
             "ownership_mode": "managed_external",
             "repo_url": "https://github.com/user/test-product",
         }
-        
+
         link_path = temp_project_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link, f, default_flow_style=False)
-        
+
         result = is_managed_external(temp_project_dir)
         assert result is True
 
@@ -160,11 +161,11 @@ class TestGetProductRepoPath:
             "ownership_mode": "self_hosted",
             "repo_local_path": "/some/path",
         }
-        
+
         link_path = temp_project_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link, f, default_flow_style=False)
-        
+
         result = get_product_repo_path(temp_project_dir)
         assert result is None
 
@@ -181,11 +182,11 @@ class TestGetProductRepoPath:
             "repo_url": "https://github.com/user/test-product",
             # repo_local_path intentionally missing
         }
-        
+
         link_path = temp_project_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link, f, default_flow_style=False)
-        
+
         result = get_product_repo_path(temp_project_dir)
         assert result is None
 
@@ -197,11 +198,11 @@ class TestGetProductRepoPath:
             "repo_url": "https://github.com/user/test-product",
             "repo_local_path": "/local/repos/test-product",
         }
-        
+
         link_path = temp_project_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link, f, default_flow_style=False)
-        
+
         result = get_product_repo_path(temp_project_dir)
         assert result is not None
         assert result == Path("/local/repos/test-product")
@@ -222,11 +223,11 @@ class TestGovernanceBoundaryIntegration:
             "status": "active",
             "created_at": "2025-01-01T00:00:00",
         }
-        
+
         link_path = temp_project_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link, f, default_flow_style=False)
-        
+
         # Verify all functions work together
         assert load_project_link(temp_project_dir) is not None
         assert get_ownership_mode(temp_project_dir) == "managed_external"
@@ -238,7 +239,7 @@ class TestGovernanceBoundaryIntegration:
     def test_full_workflow_self_hosted(self, temp_project_dir):
         """Test full workflow for self_hosted mode."""
         # No project-link.yaml created
-        
+
         # Verify all functions work together
         assert load_project_link(temp_project_dir) is None
         assert get_ownership_mode(temp_project_dir) == "self_hosted"

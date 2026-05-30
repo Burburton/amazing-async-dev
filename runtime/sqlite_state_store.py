@@ -1,6 +1,5 @@
 """SQLite-backed state store for structured persistence."""
 
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 

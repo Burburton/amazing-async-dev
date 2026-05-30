@@ -14,7 +14,7 @@ from typing import Any
 
 class CloseoutState(str, Enum):
     """Closeout lifecycle states for external execution (Feature 061 section 6.4).
-    
+
     States clearly separate:
     - external execution lifecycle (triggered -> pending -> result_detected)
     - verification lifecycle (required -> running -> completed)
@@ -24,21 +24,21 @@ class CloseoutState(str, Enum):
     EXTERNAL_EXECUTION_TRIGGERED = "external_execution_triggered"
     EXTERNAL_EXECUTION_PENDING = "external_execution_pending"
     EXTERNAL_EXECUTION_RESULT_DETECTED = "external_execution_result_detected"
-    
+
     # Verification lifecycle
     POST_EXTERNAL_VERIFICATION_REQUIRED = "post_external_verification_required"
     POST_EXTERNAL_VERIFICATION_RUNNING = "post_external_verification_running"
     POST_EXTERNAL_VERIFICATION_COMPLETED = "post_external_verification_completed"
-    
+
     # Stall detection
     EXTERNAL_EXECUTION_STALLED = "external_execution_stalled"
-    
+
     # Terminal states
     CLOSEOUT_TIMEOUT = "closeout_timeout"
     CLOSEOUT_COMPLETED_SUCCESS = "closeout_completed_success"
     CLOSEOUT_COMPLETED_FAILURE = "closeout_completed_failure"
     CLOSEOUT_RECOVERY_REQUIRED = "closeout_recovery_required"
-    
+
     @classmethod
     def terminal_states(cls) -> list[CloseoutState]:
         """Return states that are valid terminal states for closeout."""
@@ -48,16 +48,16 @@ class CloseoutState(str, Enum):
             cls.CLOSEOUT_TIMEOUT,
             cls.CLOSEOUT_RECOVERY_REQUIRED,
         ]
-    
+
     @classmethod
     def success_terminal_states(cls) -> list[CloseoutState]:
         """Return terminal states that indicate successful completion."""
         return [cls.CLOSEOUT_COMPLETED_SUCCESS]
-    
+
     def is_terminal(self) -> bool:
         """Check if this state is terminal."""
         return self in CloseoutState.terminal_states()
-    
+
     def is_success(self) -> bool:
         """Check if this terminal state indicates success."""
         return self in CloseoutState.success_terminal_states()
@@ -65,7 +65,7 @@ class CloseoutState(str, Enum):
 
 class CloseoutTerminalClassification(str, Enum):
     """Final classification of external closeout outcome.
-    
+
     Used for ExecutionResult.status and success progression gating.
     """
     SUCCESS = "success"
@@ -74,7 +74,7 @@ class CloseoutTerminalClassification(str, Enum):
     CLOSEOUT_TIMEOUT = "closeout_timeout"
     STALLED = "stalled"
     RECOVERY_REQUIRED = "recovery_required"
-    
+
     def allows_success_progression(self) -> bool:
         """Check if this classification allows execution success progression."""
         return self == CloseoutTerminalClassification.SUCCESS
@@ -83,7 +83,7 @@ class CloseoutTerminalClassification(str, Enum):
 @dataclass
 class CloseoutResult:
     """Result of external execution closeout orchestration.
-    
+
     Captures the complete closeout lifecycle from trigger to terminal state,
     suitable for ExecutionResult closeout fields.
     """
@@ -103,7 +103,7 @@ class CloseoutResult:
     recovery_reason: str | None = None
     stall_detected: bool = False
     closeout_error: str | None = None
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict for ExecutionResult closeout fields."""
         return {
@@ -124,17 +124,17 @@ class CloseoutResult:
             "stall_detected": self.stall_detected,
             "closeout_error": self.closeout_error,
         }
-    
+
     def is_complete(self) -> bool:
         """Check if closeout reached a valid terminal state."""
         return self.closeout_state.is_terminal()
-    
+
     def allows_success_progression(self) -> bool:
         """Check if closeout allows execution success progression."""
         if not self.is_complete():
             return False
         return self.terminal_classification is not None and self.terminal_classification.allows_success_progression()
-    
+
     def get_gate_status(self) -> str:
         """Get completion gate status: 'allowed' or 'blocked'."""
         return "allowed" if self.allows_success_progression() else "blocked"

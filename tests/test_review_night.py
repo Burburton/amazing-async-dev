@@ -1,11 +1,11 @@
 """Tests for asyncdev review-night command."""
 
+
 import pytest
-from pathlib import Path
 from typer.testing import CliRunner
+
 from cli.commands.review_night import app
 from runtime.state_store import StateStore
-
 
 runner = CliRunner()
 
@@ -14,20 +14,20 @@ runner = CliRunner()
 def setup_with_execution_result(temp_dir):
     """Create product, runstate, and execution result for testing."""
     from cli.commands.new_product import app as new_product_app
-    
+
     runner.invoke(new_product_app, [
         "create",
         "--product-id", "test-product",
         "--name", "Test Product",
         "--path", str(temp_dir),
     ])
-    
+
     store = StateStore(temp_dir / "test-product")
     runstate = store.load_runstate()
     runstate["task_queue"] = ["Task 1"]
     runstate["active_task"] = "Task 1"
     store.save_runstate(runstate)
-    
+
     execution_result = {
         "execution_id": "exec-20240101-001",
         "status": "success",
@@ -41,7 +41,7 @@ def setup_with_execution_result(temp_dir):
         "metrics": {"files_read": 5, "files_written": 1},
     }
     store.save_execution_result(execution_result)
-    
+
     yield temp_dir / "test-product"
 
 
@@ -269,12 +269,12 @@ class TestEnrichedReviewPack:
             "--name", "Blocked Product",
             "--path", str(temp_dir),
         ])
-        
+
         store = StateStore(temp_dir / "blocked-product")
         runstate = store.load_runstate()
         runstate["decisions_needed"] = [{"decision": "test", "options": ["A", "B"]}]
         store.save_runstate(runstate)
-        
+
         execution_result = {
             "execution_id": "exec-001",
             "status": "blocked",
@@ -283,14 +283,14 @@ class TestEnrichedReviewPack:
             "recommended_next_step": "Resolve blocker",
         }
         store.save_execution_result(execution_result)
-        
+
         result = runner.invoke(app, [
             "generate",
             "--project", "blocked-product",
             "--execution-id", "exec-001",
             "--path", str(temp_dir),
         ])
-        
+
         assert result.exit_code == 0
         assert "BLOCKED" in result.output or "blocked" in result.output.lower()
 
@@ -303,9 +303,9 @@ class TestEnrichedReviewPack:
             "--name", "Attention Product",
             "--path", str(temp_dir),
         ])
-        
+
         store = StateStore(temp_dir / "attention-product")
-        
+
         (store.execution_results_path).mkdir(exist_ok=True)
         (store.execution_results_path / "exec-fail.md").write_text("""---
 ```yaml
@@ -317,7 +317,7 @@ issues_found:
 ```
 ---
 """)
-        
+
         execution_result = {
             "execution_id": "exec-fail",
             "status": "failed",
@@ -326,14 +326,14 @@ issues_found:
             "recommended_next_step": "Fix verification",
         }
         store.save_execution_result(execution_result)
-        
+
         result = runner.invoke(app, [
             "generate",
             "--project", "attention-product",
             "--execution-id", "exec-fail",
             "--path", str(temp_dir),
         ])
-        
+
         assert result.exit_code == 0
 
     def test_show_includes_doctor_assessment(self, setup_with_execution_result):
@@ -376,19 +376,19 @@ class TestEnrichedReviewPackBuilder:
 
     def test_build_daily_review_pack_with_project_path(self, temp_dir):
         """build_daily_review_pack should include doctor_assessment when project_path provided."""
-        from runtime.review_pack_builder import build_daily_review_pack
         from cli.commands.new_product import app as new_product_app
+        from runtime.review_pack_builder import build_daily_review_pack
         from runtime.state_store import StateStore
-        
+
         runner.invoke(new_product_app, [
             "create",
             "--product-id", "builder-test",
             "--name", "Builder Test",
             "--path", str(temp_dir),
         ])
-        
+
         store = StateStore(temp_dir / "builder-test")
-        
+
         execution_result = {
             "execution_id": "exec-001",
             "status": "success",
@@ -396,44 +396,43 @@ class TestEnrichedReviewPackBuilder:
             "recommended_next_step": "Continue",
         }
         store.save_execution_result(execution_result)
-        
+
         runstate = store.load_runstate()
-        
+
         review_pack = build_daily_review_pack(
             execution_result,
             runstate,
             project_path=temp_dir / "builder-test"
         )
-        
+
         assert "doctor_assessment" in review_pack
         assert review_pack["doctor_assessment"].get("doctor_status") is not None
 
     def test_build_daily_review_pack_without_project_path(self, temp_dir):
         """build_daily_review_pack should work without project_path (backward compat)."""
         from runtime.review_pack_builder import build_daily_review_pack
-        
+
         execution_result = {
             "execution_id": "exec-001",
             "status": "success",
             "completed_items": ["Test"],
             "recommended_next_step": "Next",
         }
-        
+
         runstate = {"project_id": "test", "feature_id": "feature-001"}
-        
+
         review_pack = build_daily_review_pack(execution_result, runstate)
-        
+
         assert "doctor_assessment" not in review_pack
         assert "date" in review_pack
 
     def test_doctor_assessment_includes_recovery_for_attention_needed(self, temp_dir):
         """doctor_assessment should include recovery_summary for ATTENTION_NEEDED."""
-        from runtime.review_pack_builder import build_daily_review_pack, _build_doctor_assessment
-        from pathlib import Path
-        
+        from runtime.review_pack_builder import _build_doctor_assessment
+
         project_path = temp_dir / "recovery-test"
         project_path.mkdir()
-        
+
         (project_path / "execution-results").mkdir()
         (project_path / "execution-results" / "exec-fail.md").write_text("""---
 ```yaml
@@ -445,7 +444,7 @@ issues_found:
 ```
 ---
 """)
-        
+
         (project_path / "runstate.md").write_text("""---
 ```yaml
 project_id: recovery-test
@@ -455,11 +454,11 @@ decisions_needed: []
 ```
 ---
 """)
-        
+
         (project_path / "product-brief.yaml").write_text("product_id: recovery-test\nname: Recovery Test\n")
-        
+
         assessment = _build_doctor_assessment(project_path)
-        
+
         assert assessment is not None
         assert assessment.get("doctor_status") == "ATTENTION_NEEDED"
         assert "recovery_summary" in assessment
@@ -467,11 +466,10 @@ decisions_needed: []
     def test_doctor_assessment_includes_feedback_handoff(self, temp_dir):
         """doctor_assessment should include feedback_handoff when applicable."""
         from runtime.review_pack_builder import _build_doctor_assessment
-        from pathlib import Path
-        
+
         project_path = temp_dir / "feedback-test"
         project_path.mkdir()
-        
+
         (project_path / "execution-results").mkdir()
         (project_path / "execution-results" / "exec-fail.md").write_text("""---
 ```yaml
@@ -481,7 +479,7 @@ completed_items: []
 ```
 ---
 """)
-        
+
         (project_path / "runstate.md").write_text("""---
 ```yaml
 project_id: feedback-test
@@ -491,11 +489,11 @@ decisions_needed: []
 ```
 ---
 """)
-        
+
         (project_path / "product-brief.yaml").write_text("product_id: feedback-test\nname: Feedback Test\n")
-        
+
         assessment = _build_doctor_assessment(project_path)
-        
+
         assert assessment is not None
         assert "feedback_handoff" in assessment
         assert assessment["feedback_handoff"].get("suggestion") is not None

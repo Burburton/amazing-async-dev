@@ -18,12 +18,11 @@ from typing import Any
 
 from runtime.acceptance_console import get_acceptance_summary
 from runtime.acceptance_runner import AcceptanceTerminalState, load_acceptance_result
-from runtime.acceptance_pack_builder import load_acceptance_pack
 
 
 class CompletionGateResult(str, Enum):
     """Results of completion gate check."""
-    
+
     ALLOWED = "allowed"
     BLOCKED_ACCEPTANCE_REQUIRED = "blocked_acceptance_required"
     BLOCKED_ACCEPTANCE_FAILED = "blocked_acceptance_failed"
@@ -34,7 +33,7 @@ class CompletionGateResult(str, Enum):
 
 class AcceptancePolicyMode(str, Enum):
     """Policy modes for acceptance gating."""
-    
+
     STRICT = "strict"
     RELAXED = "relaxed"
     OPTIONAL = "optional"
@@ -44,22 +43,22 @@ class AcceptancePolicyMode(str, Enum):
 @dataclass
 class CompletionGateCheck:
     """Result of completion gate validation (Feature 075)."""
-    
+
     result: CompletionGateResult
     feature_id: str
-    
+
     acceptance_status: str = ""
     acceptance_result_id: str | None = None
     terminal_state: str | None = None
-    
+
     blocking_reason: str = ""
     bypass_allowed: bool = False
     bypass_reason: str | None = None
-    
+
     required_acceptance: bool = True
-    
+
     checked_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "result": self.result.value,
@@ -73,13 +72,13 @@ class CompletionGateCheck:
             "required_acceptance": self.required_acceptance,
             "checked_at": self.checked_at,
         }
-    
+
     def is_allowed(self) -> bool:
         return self.result in [
             CompletionGateResult.ALLOWED,
             CompletionGateResult.BYPASS_ALLOWED,
         ]
-    
+
     def requires_acceptance(self) -> bool:
         return self.result in [
             CompletionGateResult.BLOCKED_ACCEPTANCE_REQUIRED,
@@ -100,19 +99,19 @@ def _get_failed_criteria_summary(project_path: Path, acceptance_result_id: str |
     """Get summary of failed criteria from acceptance result."""
     if not acceptance_result_id:
         return ""
-    
+
     result = load_acceptance_result(project_path, acceptance_result_id)
     if not result:
         return ""
-    
+
     failed_criteria = result.failed_criteria
-    
+
     if not failed_criteria:
         return ""
-    
+
     if len(failed_criteria) <= 3:
         return ", ".join(failed_criteria)
-    
+
     return f"{', '.join(failed_criteria[:3])} (+{len(failed_criteria) - 3} more)"
 
 
@@ -125,12 +124,12 @@ def check_completion_gate(
 ) -> CompletionGateCheck:
     """Check if feature can be marked complete (Feature 075)."""
     acceptance_summary = get_acceptance_summary(project_path, feature_id)
-    
+
     acceptance_status = acceptance_summary.get("status", "no_acceptance")
     acceptance_result_id = acceptance_summary.get("latest_result_id")
     terminal_state = acceptance_summary.get("latest_terminal_state")
     pending_recovery = acceptance_summary.get("pending_recovery_items", 0)
-    
+
     if policy_mode == AcceptancePolicyMode.OPTIONAL:
         return CompletionGateCheck(
             result=CompletionGateResult.ALLOWED,
@@ -140,7 +139,7 @@ def check_completion_gate(
             terminal_state=terminal_state,
             required_acceptance=False,
         )
-    
+
     if policy_mode == AcceptancePolicyMode.RELAXED:
         if acceptance_status in ["accepted", "conditional", "no_acceptance"]:
             return CompletionGateCheck(
@@ -148,7 +147,7 @@ def check_completion_gate(
                 feature_id=feature_id,
                 acceptance_status=acceptance_status,
             )
-    
+
     if bypass_requested and policy_mode == AcceptancePolicyMode.BYPASS_ALLOWED:
         if bypass_reason in BYPASS_SCENARIOS:
             return CompletionGateCheck(
@@ -158,7 +157,7 @@ def check_completion_gate(
                 bypass_allowed=True,
                 bypass_reason=bypass_reason,
             )
-    
+
     if acceptance_status == "no_acceptance":
         return CompletionGateCheck(
             result=CompletionGateResult.BLOCKED_ACCEPTANCE_REQUIRED,
@@ -167,16 +166,16 @@ def check_completion_gate(
             blocking_reason="No acceptance validation performed. Run acceptance before completion.",
             required_acceptance=True,
         )
-    
+
     if acceptance_status == "rejected":
         failed_criteria_summary = _get_failed_criteria_summary(project_path, acceptance_result_id)
-        
+
         blocking_reason = "Acceptance rejected."
         if failed_criteria_summary:
             blocking_reason += f" Failed criteria: {failed_criteria_summary}"
         else:
             blocking_reason += " Address recovery items before completion."
-        
+
         return CompletionGateCheck(
             result=CompletionGateResult.BLOCKED_ACCEPTANCE_FAILED,
             feature_id=feature_id,
@@ -186,7 +185,7 @@ def check_completion_gate(
             blocking_reason=blocking_reason,
             required_acceptance=True,
         )
-    
+
     if acceptance_status == "manual_review":
         return CompletionGateCheck(
             result=CompletionGateResult.BLOCKED_ACCEPTANCE_PENDING,
@@ -195,7 +194,7 @@ def check_completion_gate(
             blocking_reason="Acceptance pending manual review. Complete review before completion.",
             required_acceptance=True,
         )
-    
+
     if acceptance_status == "escalated":
         return CompletionGateCheck(
             result=CompletionGateResult.BLOCKED_ACCEPTANCE_PENDING,
@@ -204,7 +203,7 @@ def check_completion_gate(
             blocking_reason="Acceptance escalated. Resolve escalation before completion.",
             required_acceptance=True,
         )
-    
+
     if pending_recovery > 0 and acceptance_status in ["rejected", "conditional"]:
         return CompletionGateCheck(
             result=CompletionGateResult.BLOCKED_RECOVERY_ITEMS,
@@ -213,7 +212,7 @@ def check_completion_gate(
             blocking_reason=f"{pending_recovery} pending recovery items. Resolve before completion.",
             required_acceptance=True,
         )
-    
+
     if acceptance_status in ["accepted", "conditional"]:
         return CompletionGateCheck(
             result=CompletionGateResult.ALLOWED,
@@ -222,7 +221,7 @@ def check_completion_gate(
             acceptance_result_id=acceptance_result_id,
             terminal_state=terminal_state,
         )
-    
+
     return CompletionGateCheck(
         result=CompletionGateResult.BLOCKED_ACCEPTANCE_REQUIRED,
         feature_id=feature_id,
@@ -237,7 +236,7 @@ def validate_acceptance_for_completion(
 ) -> tuple[bool, str]:
     """Validate acceptance state for completion (convenience function)."""
     gate_check = check_completion_gate(project_path, feature_id)
-    
+
     return (
         gate_check.is_allowed(),
         gate_check.blocking_reason if not gate_check.is_allowed() else "Ready for completion",
@@ -251,7 +250,7 @@ def get_acceptance_gate_summary(
     """Get summary of acceptance gate status."""
     gate_check = check_completion_gate(project_path, feature_id)
     acceptance_summary = get_acceptance_summary(project_path, feature_id)
-    
+
     return {
         "feature_id": feature_id,
         "completion_allowed": gate_check.is_allowed(),
@@ -268,10 +267,10 @@ def is_valid_terminal_state_for_completion(
 ) -> bool:
     """Check if terminal state allows completion."""
     valid_states = ["accepted", "conditional"]
-    
+
     if isinstance(terminal_state, AcceptanceTerminalState):
         return terminal_state.value in valid_states
-    
+
     return terminal_state in valid_states
 
 
@@ -281,27 +280,27 @@ def get_feature_completion_requirements(
 ) -> list[str]:
     """Get list of requirements for feature completion."""
     gate_check = check_completion_gate(project_path, feature_id)
-    
+
     requirements: list[str] = []
-    
+
     if gate_check.is_allowed():
         return requirements
-    
+
     if gate_check.required_acceptance:
         requirements.append("Acceptance validation required")
-    
+
     if gate_check.result == CompletionGateResult.BLOCKED_ACCEPTANCE_REQUIRED:
         requirements.append("Run acceptance validation")
         requirements.append("Acceptance must pass or be conditional")
-    
+
     if gate_check.result == CompletionGateResult.BLOCKED_ACCEPTANCE_FAILED:
         requirements.append("Address recovery items")
         requirements.append("Re-run acceptance after fixes")
-    
+
     if gate_check.result == CompletionGateResult.BLOCKED_ACCEPTANCE_PENDING:
         requirements.append("Complete manual review or resolve escalation")
-    
+
     if gate_check.result == CompletionGateResult.BLOCKED_RECOVERY_ITEMS:
         requirements.append("Resolve pending recovery items")
-    
+
     return requirements

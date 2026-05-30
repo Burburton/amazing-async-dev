@@ -4,27 +4,26 @@ import tempfile
 from pathlib import Path
 
 import pytest
-import yaml
 
 from runtime.acceptance_readiness import (
     AcceptanceReadiness,
-    AcceptanceTriggerPolicyMode,
     AcceptanceReadinessResult,
+    AcceptanceTriggerPolicyMode,
     PrerequisiteCheck,
     check_acceptance_readiness,
-    check_prerequisite_execution_complete,
     check_prerequisite_closeout_success,
-    check_prerequisite_verification_pass,
+    check_prerequisite_execution_complete,
+    check_prerequisite_feature_spec_has_criteria,
     check_prerequisite_no_blockers,
     check_prerequisite_no_pending_decisions,
-    check_prerequisite_feature_spec_has_criteria,
+    check_prerequisite_verification_pass,
     is_acceptance_triggerable,
     should_auto_trigger_acceptance,
 )
 
 
 class TestAcceptanceReadinessStates:
-    
+
     def test_all_states_defined(self):
         assert AcceptanceReadiness.READY.value == "ready"
         assert AcceptanceReadiness.NOT_READY.value == "not_ready"
@@ -37,7 +36,7 @@ class TestAcceptanceReadinessStates:
 
 
 class TestPolicyModes:
-    
+
     def test_all_modes_defined(self):
         assert AcceptanceTriggerPolicyMode.ALWAYS_TRIGGER.value == "always_trigger"
         assert AcceptanceTriggerPolicyMode.FEATURE_COMPLETION_ONLY.value == "feature_completion_only"
@@ -48,7 +47,7 @@ class TestPolicyModes:
 
 
 class TestPrerequisiteChecks:
-    
+
     def test_execution_complete_success(self):
         result = check_prerequisite_execution_complete({"status": "success"})
         assert result.satisfied
@@ -131,15 +130,15 @@ class TestPrerequisiteChecks:
 
 
 class TestCheckAcceptanceReadiness:
-    
+
     @pytest.fixture
     def ready_project(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            
+
             execution_results_dir = project_path / "execution-results"
             execution_results_dir.mkdir()
-            
+
             execution_result_path = execution_results_dir / "exec-test-001.md"
             execution_result_path.write_text("""# ExecutionResult
 
@@ -155,10 +154,10 @@ browser_verification:
   failed: 0
 ```
 """)
-            
+
             features_dir = project_path / "docs" / "features" / "feat-001"
             features_dir.mkdir(parents=True)
-            
+
             feature_spec_path = features_dir / "feature-spec.md"
             feature_spec_path.write_text("""# FeatureSpec
 
@@ -169,10 +168,10 @@ acceptance_criteria:
   - AC-001: Works correctly
 ```
 """)
-            
+
             runstate_dir = project_path / "state"
             runstate_dir.mkdir()
-            
+
             from runtime.state_store import StateStore
             store = StateStore(project_path)
             store.save_runstate({
@@ -180,17 +179,17 @@ acceptance_criteria:
                 "decisions_needed": [],
                 "feature_id": "feat-001",
             })
-            
+
             yield project_path
 
     @pytest.fixture
     def blocked_project(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            
+
             execution_results_dir = project_path / "execution-results"
             execution_results_dir.mkdir()
-            
+
             execution_result_path = execution_results_dir / "exec-test-002.md"
             execution_result_path.write_text("""# ExecutionResult
 
@@ -201,17 +200,17 @@ closeout_terminal_state: success
 orchestration_terminal_state: success
 ```
 """)
-            
+
             yield project_path
 
     @pytest.fixture
     def no_criteria_project(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            
+
             execution_results_dir = project_path / "execution-results"
             execution_results_dir.mkdir()
-            
+
             execution_result_path = execution_results_dir / "exec-test-003.md"
             execution_result_path.write_text("""# ExecutionResult
 
@@ -222,10 +221,10 @@ closeout_terminal_state: success
 orchestration_terminal_state: success
 ```
 """)
-            
+
             features_dir = project_path / "docs" / "features" / "feat-002"
             features_dir.mkdir(parents=True)
-            
+
             feature_spec_path = features_dir / "feature-spec.md"
             feature_spec_path.write_text("""# FeatureSpec
 
@@ -235,7 +234,7 @@ name: No Criteria Feature
 acceptance_criteria: []
 ```
 """)
-            
+
             yield project_path
 
     def test_all_prerequisites_satisfied(self, ready_project):
@@ -245,27 +244,27 @@ acceptance_criteria: []
 
     def test_blocked_state_detected(self, blocked_project):
         from runtime.state_store import StateStore
-        
+
         store = StateStore(blocked_project)
         store.save_runstate({
             "blocked_items": ["blocker-1"],
             "decisions_needed": [],
             "feature_id": "feat-001",
         })
-        
+
         result = check_acceptance_readiness(blocked_project, "exec-test-002")
         assert result.readiness == AcceptanceReadiness.BLOCKED
 
     def test_no_criteria_detected(self, no_criteria_project):
         from runtime.state_store import StateStore
-        
+
         store = StateStore(no_criteria_project)
         store.save_runstate({
             "blocked_items": [],
             "decisions_needed": [],
             "feature_id": "feat-002",
         })
-        
+
         result = check_acceptance_readiness(no_criteria_project, "exec-test-003")
         assert result.readiness == AcceptanceReadiness.NO_CRITERIA
 
@@ -288,7 +287,7 @@ acceptance_criteria: []
 
     def test_prerequisites_recorded(self, ready_project):
         result = check_acceptance_readiness(ready_project, "exec-test-001")
-        
+
         expected_prerequisites = [
             "execution_complete",
             "closeout_success",
@@ -297,20 +296,20 @@ acceptance_criteria: []
             "no_pending_decisions",
             "feature_spec_has_criteria",
         ]
-        
+
         checked_names = [p.name for p in result.prerequisites_checked]
         for prereq in expected_prerequisites:
             assert prereq in checked_names
 
     def test_blocking_reasons_recorded(self, blocked_project):
         from runtime.state_store import StateStore
-        
+
         store = StateStore(blocked_project)
         store.save_runstate({
             "blocked_items": ["blocker-1"],
             "decisions_needed": [],
         })
-        
+
         result = check_acceptance_readiness(blocked_project, "exec-test-002")
         assert len(result.blocking_reasons) > 0
 
@@ -320,26 +319,26 @@ acceptance_criteria: []
 
     def test_trigger_not_allowed_when_blocked(self, blocked_project):
         from runtime.state_store import StateStore
-        
+
         store = StateStore(blocked_project)
         store.save_runstate({
             "blocked_items": ["blocker-1"],
         })
-        
+
         result = check_acceptance_readiness(blocked_project, "exec-test-002")
         assert not result.trigger_allowed
 
 
 class TestConvenienceFunctions:
-    
+
     @pytest.fixture
     def ready_project(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            
+
             execution_results_dir = project_path / "execution-results"
             execution_results_dir.mkdir()
-            
+
             execution_result_path = execution_results_dir / "exec-conv-001.md"
             execution_result_path.write_text("""# ExecutionResult
 
@@ -350,10 +349,10 @@ closeout_terminal_state: success
 orchestration_terminal_state: success
 ```
 """)
-            
+
             features_dir = project_path / "docs" / "features" / "feat-001"
             features_dir.mkdir(parents=True)
-            
+
             feature_spec_path = features_dir / "feature-spec.md"
             feature_spec_path.write_text("""# FeatureSpec
 
@@ -363,7 +362,7 @@ acceptance_criteria:
   - AC-001
 ```
 """)
-            
+
             from runtime.state_store import StateStore
             store = StateStore(project_path)
             store.save_runstate({
@@ -371,7 +370,7 @@ acceptance_criteria:
                 "decisions_needed": [],
                 "feature_id": "feat-001",
             })
-            
+
             yield project_path
 
     def test_is_acceptance_triggerable(self, ready_project):
@@ -396,7 +395,7 @@ acceptance_criteria:
 
 
 class TestAcceptanceReadinessResult:
-    
+
     def test_to_dict(self):
         result = AcceptanceReadinessResult(
             readiness=AcceptanceReadiness.READY,
@@ -414,9 +413,9 @@ class TestAcceptanceReadinessResult:
             policy_mode=AcceptanceTriggerPolicyMode.FEATURE_COMPLETION_ONLY,
             policy_decision="Test decision",
         )
-        
+
         d = result.to_dict()
-        
+
         assert d["readiness"] == "ready"
         assert d["execution_result_id"] == "exec-test"
         assert d["trigger_allowed"] is True
@@ -428,7 +427,7 @@ class TestAcceptanceReadinessResult:
             trigger_allowed=True,
         )
         assert ready_result.is_triggerable()
-        
+
         blocked_result = AcceptanceReadinessResult(
             readiness=AcceptanceReadiness.BLOCKED,
             execution_result_id="exec-test",

@@ -3,11 +3,10 @@
 Links: outbound request/report → inbound reply → parsed decision → applied action.
 """
 
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-import json
-
 
 CHAIN_TYPES = ["decision_request_chain", "status_report_chain"]
 

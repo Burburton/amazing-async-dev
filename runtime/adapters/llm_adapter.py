@@ -10,8 +10,8 @@ from openai import OpenAI
 from runtime.api_failure_types import (
     APIFailureClassification,
     classify_api_error,
-    is_retryable,
     get_recovery_hint,
+    is_retryable,
 )
 
 

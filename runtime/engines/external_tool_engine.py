@@ -10,12 +10,12 @@ Feature 060: Post-external verification now system-owned via resume-next-day.
 When verification_type requires browser verification, outputs mandatory Playwright invocation instructions.
 """
 
-import yaml
 from pathlib import Path
 from typing import Any
 
-from runtime.engines.base import ExecutionEngine
+import yaml
 
+from runtime.engines.base import ExecutionEngine
 
 # Feature 038: Verification types that require browser-level verification
 BROWSER_VERIFICATION_TYPES = [
@@ -241,7 +241,7 @@ class ExternalToolEngine(ExecutionEngine):
         recipe_instruction = pack.get("frontend_verification_recipe", {})
         use_recipe = recipe_instruction.get("use_recipe", True)
         project_id = pack.get("project_id", "")
-        
+
         lines = [
             "",
             "---",
@@ -253,13 +253,13 @@ class ExternalToolEngine(ExecutionEngine):
             "**This task requires browser-level verification.**",
             "",
         ]
-        
+
         if use_recipe:
             invocation_cmd = recipe_instruction.get(
                 "invocation_command",
                 f"asyncdev frontend-verify-run --project {project_id}"
             )
-            
+
             lines.extend([
                 "### PREFERRED METHOD: Controlled Recipe (Feature 062)",
                 "",
@@ -267,9 +267,9 @@ class ExternalToolEngine(ExecutionEngine):
                 "",
                 "**Use the controlled frontend verification recipe instead:**",
                 "",
-                f"```bash",
+                "```bash",
                 f"{invocation_cmd}",
-                f"```",
+                "```",
                 "",
                 "This recipe guarantees:",
                 "- Dev server startup is controlled (not foreground-blocking)",
@@ -288,7 +288,7 @@ class ExternalToolEngine(ExecutionEngine):
                 "**STOPPING AT 'server ready' IS FORBIDDEN.**",
                 "",
             ])
-        
+
         lines.extend([
             "### Verification Stages (if not using recipe)",
             "1. Build/setup → Complete build steps",
@@ -322,7 +322,7 @@ class ExternalToolEngine(ExecutionEngine):
             "",
             "**If browser verification cannot run, you MUST still record evidence in browser_verification field.**",
         ])
-        
+
         return lines
 
     def _build_instructions(self, pack: dict[str, Any], md_path: Path) -> str:

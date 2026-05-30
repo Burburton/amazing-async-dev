@@ -3,12 +3,13 @@
 Feature 058: Webhook Auto-Polling & Decision Continuation.
 """
 
+from datetime import datetime
+from pathlib import Path
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from pathlib import Path
-from datetime import datetime
 
 app = typer.Typer(help="Listen for webhook decision replies")
 console = Console()
@@ -35,7 +36,7 @@ def start(
         asyncdev listen start --interval 30
     """
     from runtime.state_store import StateStore
-    from runtime.webhook_poller import listen_for_decisions, format_poll_result, PollingStatus
+    from runtime.webhook_poller import listen_for_decisions
 
     if project:
         project_path = path / project
@@ -82,7 +83,7 @@ def once(
         asyncdev listen once --json
     """
     from runtime.state_store import StateStore
-    from runtime.webhook_poller import listen_for_decisions, format_poll_result, PollingStatus
+    from runtime.webhook_poller import PollingStatus, listen_for_decisions
 
     if project:
         project_path = path / project
@@ -157,9 +158,9 @@ def status(
         asyncdev listen status
         asyncdev listen status --project my-product
     """
-    from runtime.state_store import StateStore
-    from runtime.webhook_poller import get_polling_config, PollingConfig
     from runtime.resend_provider import load_resend_config
+    from runtime.state_store import StateStore
+    from runtime.webhook_poller import get_polling_config
 
     if project:
         project_path = path / project

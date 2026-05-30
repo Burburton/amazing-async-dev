@@ -15,18 +15,17 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-import yaml
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from cli.utils.output_formatter import print_next_step, print_success_panel
+from cli.utils.path_formatter import get_relative_path
 from runtime.archive_pack_builder import (
     build_backfill_archive_pack,
     check_backfill_eligibility,
     save_archive_pack,
 )
-from cli.utils.output_formatter import print_next_step, print_success_panel
-from cli.utils.path_formatter import get_relative_path
 
 app = typer.Typer(help="Backfill historical features into archive system")
 console = Console()
@@ -269,7 +268,7 @@ def batch(
     console.print(Panel(f"Batch Backfill: {project}", title="Feature 018", border_style="yellow"))
 
     features_path = project_path / "features"
-    archive_path = project_path / "archive"
+    project_path / "archive"
 
     if not features_path.exists():
         console.print("[yellow]No features directory[/yellow]")
@@ -366,7 +365,7 @@ def batch(
 
     console.print(results_table)
 
-    console.print(f"\n[bold]Summary:[/bold]")
+    console.print("\n[bold]Summary:[/bold]")
     console.print(f"  [green]Success: {success_count}[/green]")
     console.print(f"  [red]Failed: {failed_count}[/red]")
 

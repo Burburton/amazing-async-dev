@@ -10,43 +10,43 @@ import yaml
 @dataclass
 class DoctorDiagnosis:
     """Workspace diagnosis result."""
-    
+
     doctor_status: str = "UNKNOWN"
     health_status: str = "unknown"
-    
+
     initialization_mode: str = "unknown"
     provider_linkage: dict[str, Any] = field(default_factory=dict)
-    
+
     product_id: str = ""
     feature_id: str = ""
     current_phase: str = ""
-    
+
     verification_status: str = "not_run"
     pending_decisions: int = 0
     blocked_items_count: int = 0
-    
+
     recommended_action: str = ""
     suggested_command: str = ""
     rationale: str = ""
     warnings: list[str] = field(default_factory=list)
-    
+
     # Recovery playbook fields (Feature 030)
     likely_cause: str = ""
     what_to_check: list[str] = field(default_factory=list)
     recovery_steps: list[str] = field(default_factory=list)
     fallback_next_step: str = ""
-    
+
     # Feedback handoff fields (Feature 031)
     feedback_suggestion: str = ""
     feedback_reason: str = ""
     suggested_feedback_command: str = ""
-    
+
     # Feedback draft fields (Feature 032)
     feedback_draft_summary: str = ""
     feedback_draft_fields: dict[str, Any] = field(default_factory=dict)
-    
+
     workspace_path: str = ""
-    
+
     config_safety_status: str = "not_checked"
     config_safety_issues: int = 0
     tracked_sensitive_files: list[str] = field(default_factory=list)
@@ -56,18 +56,18 @@ def diagnose_workspace(project_path: Path) -> DoctorDiagnosis:
     """Generate workspace diagnosis with health classification."""
     diagnosis = DoctorDiagnosis()
     diagnosis.workspace_path = str(project_path)
-    
+
     if not project_path.exists():
         diagnosis.doctor_status = "UNKNOWN"
         diagnosis.recommended_action = "Initialize workspace first."
         diagnosis.suggested_command = "asyncdev init create"
         diagnosis.rationale = "Project directory does not exist."
         return diagnosis
-    
+
     from runtime.workspace_snapshot import generate_workspace_snapshot
-    
+
     snapshot = generate_workspace_snapshot(project_path)
-    
+
     diagnosis.initialization_mode = snapshot.initialization_mode
     diagnosis.provider_linkage = snapshot.provider_linkage
     diagnosis.product_id = snapshot.product_id
@@ -75,49 +75,49 @@ def diagnose_workspace(project_path: Path) -> DoctorDiagnosis:
     diagnosis.current_phase = snapshot.current_phase
     diagnosis.verification_status = snapshot.verification_status
     diagnosis.pending_decisions = snapshot.pending_decisions
-    
+
     runstate = _load_runstate(project_path)
     blocked_items = runstate.get("blocked_items", [])
     diagnosis.blocked_items_count = len(blocked_items) if blocked_items else 0
-    
+
     _apply_rules(diagnosis, snapshot)
     _apply_recovery_playbooks(diagnosis, snapshot)
     _select_feedback_handoff(diagnosis, snapshot)
     _check_config_safety(diagnosis)
-    
+
     return diagnosis
 
 
 def _load_runstate(project_path: Path) -> dict:
     """Load runstate data from runstate.md."""
     runstate_path = project_path / "runstate.md"
-    
+
     if not runstate_path.exists():
         return {}
-    
+
     with open(runstate_path, encoding="utf-8") as f:
         content = f.read()
-    
+
     yaml_block_start = content.find("```yaml")
     yaml_block_end = content.find("```", yaml_block_start + 7)
-    
+
     if yaml_block_start == -1 or yaml_block_end == -1:
         return {}
-    
+
     yaml_content = content[yaml_block_start + 7:yaml_block_end].strip()
     return yaml.safe_load(yaml_content) or {}
 
 
 def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
     """Apply recommendation rules in priority order."""
-    
+
     if not snapshot.product_id or snapshot.current_phase in ["unknown", "none", ""]:
         diagnosis.doctor_status = "UNKNOWN"
         diagnosis.recommended_action = "Initialize workspace first."
         diagnosis.suggested_command = "asyncdev init create"
         diagnosis.rationale = "Insufficient workspace metadata."
         return
-    
+
     if snapshot.pending_decisions > 0:
         diagnosis.doctor_status = "BLOCKED"
         diagnosis.health_status = "blocked"
@@ -126,7 +126,7 @@ def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
         diagnosis.rationale = f"Human decision required ({snapshot.pending_decisions} pending)."
         diagnosis.warnings = ["Do not continue until decisions are resolved."]
         return
-    
+
     if snapshot.current_phase == "blocked":
         diagnosis.doctor_status = "BLOCKED"
         diagnosis.health_status = "blocked"
@@ -135,12 +135,12 @@ def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
         diagnosis.rationale = "Workspace is explicitly blocked."
         diagnosis.warnings = ["Do not continue until blockers are resolved."]
         return
-    
+
     if snapshot.verification_status == "failed":
         diagnosis.doctor_status = "ATTENTION_NEEDED"
         diagnosis.health_status = "warning"
         diagnosis.recommended_action = "Re-check initialization or re-run verification."
-        
+
         if snapshot.initialization_mode == "starter-pack":
             diagnosis.suggested_command = "Check starter-pack.yaml for contract_version and asyncdev_compatibility"
             diagnosis.rationale = "Starter-pack initialization verification failed. Check provider/input compatibility."
@@ -150,7 +150,7 @@ def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
             diagnosis.rationale = "Direct mode initialization verification failed. Check manual setup."
             diagnosis.warnings = ["Do not proceed until verification succeeds."]
         return
-    
+
     if snapshot.current_phase == "completed":
         diagnosis.doctor_status = "COMPLETED_PENDING_CLOSEOUT"
         diagnosis.health_status = "healthy"
@@ -158,7 +158,7 @@ def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
         diagnosis.suggested_command = f"asyncdev archive-feature create --project {snapshot.product_id} --feature {snapshot.feature_id}"
         diagnosis.rationale = "Feature work complete but not archived."
         return
-    
+
     if snapshot.current_phase == "archived":
         diagnosis.doctor_status = "COMPLETED_PENDING_CLOSEOUT"
         diagnosis.health_status = "healthy"
@@ -166,7 +166,7 @@ def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
         diagnosis.suggested_command = f"asyncdev new-feature create --project {snapshot.product_id} --feature feature-new --name 'New Feature'"
         diagnosis.rationale = "Previous feature archived. Ready to start new work."
         return
-    
+
     if not snapshot.feature_id:
         diagnosis.doctor_status = "ATTENTION_NEEDED"
         diagnosis.health_status = "warning"
@@ -174,10 +174,10 @@ def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
         diagnosis.suggested_command = f"asyncdev new-feature create --project {snapshot.product_id} --feature feature-001 --name 'First Feature'"
         diagnosis.rationale = "Product exists but no active feature selected."
         return
-    
+
     diagnosis.doctor_status = "HEALTHY"
     diagnosis.health_status = "healthy"
-    
+
     if snapshot.current_phase == "planning":
         diagnosis.recommended_action = "Plan a bounded task for execution."
         diagnosis.suggested_command = f"asyncdev plan-day create --project {snapshot.product_id} --feature {snapshot.feature_id} --task 'Your task'"
@@ -198,7 +198,7 @@ def _apply_rules(diagnosis: DoctorDiagnosis, snapshot) -> None:
 
 def _apply_recovery_playbooks(diagnosis: DoctorDiagnosis, snapshot) -> None:
     """Apply recovery playbooks for problematic scenarios."""
-    
+
     if diagnosis.pending_decisions > 0:
         diagnosis.likely_cause = "Workflow cannot safely continue until human decision is resolved."
         diagnosis.what_to_check = [
@@ -213,7 +213,7 @@ def _apply_recovery_playbooks(diagnosis: DoctorDiagnosis, snapshot) -> None:
         ]
         diagnosis.fallback_next_step = "Review latest nightly pack or unblock instructions"
         return
-    
+
     if diagnosis.current_phase == "blocked":
         diagnosis.likely_cause = "Execution explicitly blocked by external dependency or condition."
         diagnosis.what_to_check = [
@@ -228,7 +228,7 @@ def _apply_recovery_playbooks(diagnosis: DoctorDiagnosis, snapshot) -> None:
         ]
         diagnosis.fallback_next_step = "Check execution results for blocker details"
         return
-    
+
     if diagnosis.doctor_status == "ATTENTION_NEEDED" and diagnosis.verification_status == "not_run":
         diagnosis.likely_cause = "Initialization or integration state has not been validated."
         diagnosis.what_to_check = [
@@ -243,7 +243,7 @@ def _apply_recovery_playbooks(diagnosis: DoctorDiagnosis, snapshot) -> None:
         ]
         diagnosis.fallback_next_step = "Inspect workspace snapshot and initialization inputs"
         return
-    
+
     if diagnosis.doctor_status == "ATTENTION_NEEDED" and diagnosis.verification_status == "failed":
         diagnosis.likely_cause = "Contract mismatch, missing artifact, invalid initialization, or configuration drift."
         diagnosis.what_to_check = [
@@ -258,7 +258,7 @@ def _apply_recovery_playbooks(diagnosis: DoctorDiagnosis, snapshot) -> None:
         ]
         diagnosis.fallback_next_step = "Compare current workspace state with expected example or docs"
         return
-    
+
     if diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT":
         diagnosis.likely_cause = "Execution is done but closure artifacts are incomplete."
         diagnosis.what_to_check = [
@@ -273,7 +273,7 @@ def _apply_recovery_playbooks(diagnosis: DoctorDiagnosis, snapshot) -> None:
         ]
         diagnosis.fallback_next_step = "Inspect review and completion command docs"
         return
-    
+
     if diagnosis.doctor_status == "UNKNOWN":
         diagnosis.likely_cause = "Required state files or runtime signals are missing or cannot be interpreted."
         diagnosis.what_to_check = [
@@ -291,7 +291,7 @@ def _apply_recovery_playbooks(diagnosis: DoctorDiagnosis, snapshot) -> None:
 
 def _build_feedback_draft(diagnosis: DoctorDiagnosis) -> tuple[str, dict[str, Any]]:
     """Build lightweight feedback draft from doctor context."""
-    
+
     draft_fields: dict[str, Any] = {
         "source": "doctor",
         "doctor_status": diagnosis.doctor_status,
@@ -299,7 +299,7 @@ def _build_feedback_draft(diagnosis: DoctorDiagnosis) -> tuple[str, dict[str, An
         "current_phase": diagnosis.current_phase,
         "verification_status": diagnosis.verification_status,
     }
-    
+
     if diagnosis.product_id:
         draft_fields["product_id"] = diagnosis.product_id
     if diagnosis.feature_id:
@@ -308,7 +308,7 @@ def _build_feedback_draft(diagnosis: DoctorDiagnosis) -> tuple[str, dict[str, An
         draft_fields["likely_cause"] = diagnosis.likely_cause
     if diagnosis.initialization_mode:
         draft_fields["initialization_mode"] = diagnosis.initialization_mode
-    
+
     if diagnosis.doctor_status == "ATTENTION_NEEDED" and diagnosis.verification_status == "failed":
         draft_fields["suggested_category"] = "execution_pack"
         draft_fields["suggested_tags"] = ["verification", "contract-mismatch", "tooling-friction"]
@@ -319,34 +319,34 @@ def _build_feedback_draft(diagnosis: DoctorDiagnosis) -> tuple[str, dict[str, An
         summary = "Unknown workspace state - missing artifacts or initialization gaps"
     else:
         summary = f"Doctor identified {diagnosis.doctor_status} status requiring attention"
-    
+
     return summary, draft_fields
 
 
 def _select_feedback_handoff(diagnosis: DoctorDiagnosis, snapshot) -> None:
     """Select feedback handoff suggestion for systemic friction scenarios."""
-    
+
     if diagnosis.doctor_status == "ATTENTION_NEEDED" and diagnosis.verification_status == "failed":
         diagnosis.feedback_suggestion = "This may be worth capturing as workflow feedback."
         diagnosis.feedback_reason = "Verification failure often indicates contract mismatch, tooling friction, or documentation gaps."
-        
+
         summary, draft_fields = _build_feedback_draft(diagnosis)
         diagnosis.feedback_draft_summary = summary
         diagnosis.feedback_draft_fields = draft_fields
-        
+
         escaped_summary = summary.replace('"', "'")
         tags_str = ",".join(draft_fields.get("suggested_tags", []))
         diagnosis.suggested_feedback_command = f'asyncdev feedback record --scope product --project {diagnosis.product_id} --description "{escaped_summary}" --tags {tags_str}'
         return
-    
+
     if diagnosis.doctor_status == "UNKNOWN":
         diagnosis.feedback_suggestion = "This may be worth capturing as workflow feedback."
         diagnosis.feedback_reason = "Unknown workspace state often indicates missing state, artifact corruption, or initialization gaps."
-        
+
         summary, draft_fields = _build_feedback_draft(diagnosis)
         diagnosis.feedback_draft_summary = summary
         diagnosis.feedback_draft_fields = draft_fields
-        
+
         escaped_summary = summary.replace('"', "'")
         tags_str = ",".join(draft_fields.get("suggested_tags", []))
         diagnosis.suggested_feedback_command = f'asyncdev feedback record --scope system --description "{escaped_summary}" --tags {tags_str}'
@@ -360,14 +360,14 @@ def format_diagnosis_markdown(diagnosis: DoctorDiagnosis) -> str:
         "",
         f"**Initialization**: {diagnosis.initialization_mode}",
     ]
-    
+
     if diagnosis.initialization_mode == "starter-pack" and diagnosis.provider_linkage.get("detected"):
         if diagnosis.provider_linkage.get("product_type"):
             lines.append(f"  Provider Context: {diagnosis.provider_linkage.get('product_type')}")
         hints = diagnosis.provider_linkage.get("workflow_hints", {})
         if hints.get("policy_mode"):
             lines.append(f"  Policy Mode: {hints.get('policy_mode')}")
-    
+
     lines.extend([
         "",
         "## Execution State",
@@ -389,12 +389,12 @@ def format_diagnosis_markdown(diagnosis: DoctorDiagnosis) -> str:
         "## Why",
         f"{diagnosis.rationale}",
     ])
-    
+
     if diagnosis.warnings:
         lines.extend(["", "## Warnings"])
         for warning in diagnosis.warnings:
             lines.append(f"- {warning}")
-    
+
     if diagnosis.config_safety_status != "not_checked":
         safety_status = "[OK] Safe" if diagnosis.config_safety_status == "safe" else "[WARN] Issues"
         lines.extend([
@@ -407,7 +407,7 @@ def format_diagnosis_markdown(diagnosis: DoctorDiagnosis) -> str:
             lines.append("- Tracked sensitive files:")
             for f in diagnosis.tracked_sensitive_files:
                 lines.append(f"  - {f}")
-    
+
     if diagnosis.likely_cause:
         lines.extend([
             "",
@@ -419,17 +419,17 @@ def format_diagnosis_markdown(diagnosis: DoctorDiagnosis) -> str:
         ])
         for item in diagnosis.what_to_check:
             lines.append(f"- {item}")
-        
+
         lines.extend(["", "**Recovery Steps**:"])
         for i, step in enumerate(diagnosis.recovery_steps, 1):
             lines.append(f"{i}. {step}")
-        
+
         if diagnosis.fallback_next_step:
             lines.extend([
                 "",
                 f"**If This Fails, Try Next**: {diagnosis.fallback_next_step}"
             ])
-    
+
     if diagnosis.feedback_suggestion:
         lines.extend([
             "",
@@ -439,22 +439,22 @@ def format_diagnosis_markdown(diagnosis: DoctorDiagnosis) -> str:
             "",
             f"**Why**: {diagnosis.feedback_reason}",
         ])
-        
+
         if diagnosis.feedback_draft_summary:
             lines.extend([
                 "",
                 "### Feedback Draft Summary",
                 f"{diagnosis.feedback_draft_summary}",
             ])
-        
+
         lines.extend([
             "",
             "## Suggested Feedback Command",
             f"`{diagnosis.suggested_feedback_command}`"
         ])
-    
+
     lines.extend(["", f"[dim]Workspace: {diagnosis.workspace_path}[/dim]"])
-    
+
     return "\n".join(lines)
 
 
@@ -481,42 +481,42 @@ def format_diagnosis_yaml(diagnosis: DoctorDiagnosis) -> str:
         "warnings": diagnosis.warnings,
         "workspace_path": diagnosis.workspace_path,
     }
-    
+
     if diagnosis.likely_cause:
         data["likely_cause"] = diagnosis.likely_cause
         data["what_to_check"] = diagnosis.what_to_check
         data["recovery_steps"] = diagnosis.recovery_steps
         data["fallback_next_step"] = diagnosis.fallback_next_step
-    
+
     if diagnosis.feedback_suggestion:
         data["feedback_suggestion"] = diagnosis.feedback_suggestion
         data["feedback_reason"] = diagnosis.feedback_reason
         data["suggested_feedback_command"] = diagnosis.suggested_feedback_command
-        
+
         if diagnosis.feedback_draft_summary:
             data["feedback_draft_summary"] = diagnosis.feedback_draft_summary
             if diagnosis.feedback_draft_fields:
                 data["feedback_draft_fields"] = diagnosis.feedback_draft_fields
-    
+
     if diagnosis.config_safety_status != "not_checked":
         data["config_safety_status"] = diagnosis.config_safety_status
         data["config_safety_issues"] = diagnosis.config_safety_issues
         if diagnosis.tracked_sensitive_files:
             data["tracked_sensitive_files"] = diagnosis.tracked_sensitive_files
-    
+
     return yaml.dump(data, default_flow_style=False, sort_keys=False)
 
 
 def _check_config_safety(diagnosis: DoctorDiagnosis) -> None:
     from runtime.gitignore_manager import GitignoreManager
-    
+
     manager = GitignoreManager()
     summary = manager.get_safety_summary()
-    
+
     diagnosis.config_safety_status = "safe" if summary["safe"] else "issues"
     diagnosis.config_safety_issues = summary["sensitive_not_excluded"] + summary["tracked_sensitive"]
     diagnosis.tracked_sensitive_files = summary["tracked_files"]
-    
+
     if summary["tracked_sensitive"] > 0:
         diagnosis.warnings.append(
             f"Config Safety: {summary['tracked_sensitive']} sensitive files tracked by git"

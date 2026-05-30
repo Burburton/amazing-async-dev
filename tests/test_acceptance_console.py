@@ -4,22 +4,14 @@ import tempfile
 from pathlib import Path
 
 import pytest
-import yaml
 
 from runtime.acceptance_console import (
-    list_acceptance_results,
-    show_acceptance_result,
-    show_acceptance_history,
-    show_recovery_status,
-    get_acceptance_summary,
     format_acceptance_console_output,
-)
-from runtime.acceptance_runner import (
-    AcceptanceResult,
-    AcceptanceTerminalState,
-    AcceptanceFinding,
-    RemediationGuidance,
-    save_acceptance_result,
+    get_acceptance_summary,
+    list_acceptance_results,
+    show_acceptance_history,
+    show_acceptance_result,
+    show_recovery_status,
 )
 from runtime.acceptance_pack_builder import (
     AcceptancePack,
@@ -28,26 +20,32 @@ from runtime.acceptance_pack_builder import (
 )
 from runtime.acceptance_recovery import (
     AcceptanceRecoveryPack,
-    RecoveryItem,
     RecoveryCategory,
+    RecoveryItem,
     RecoveryPriority,
     save_acceptance_recovery_pack,
+)
+from runtime.acceptance_runner import (
+    AcceptanceFinding,
+    AcceptanceResult,
+    AcceptanceTerminalState,
+    RemediationGuidance,
+    save_acceptance_result,
 )
 from runtime.reacceptance_loop import (
     AcceptanceAttempt,
     AcceptanceAttemptHistory,
-    ReAcceptanceState,
     save_attempt_history,
 )
 
 
 class TestListAcceptanceResults:
-    
+
     @pytest.fixture
     def project_with_results(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            
+
             pack1 = AcceptancePack(
                 acceptance_pack_id="ap-list-1",
                 feature_id="feat-list",
@@ -57,7 +55,7 @@ class TestListAcceptanceResults:
                 verification_summary=VerificationSummary(orchestration_terminal_state="success"),
             )
             save_acceptance_pack(project_path, pack1)
-            
+
             result1 = AcceptanceResult(
                 acceptance_result_id="ar-list-1",
                 acceptance_pack_id="ap-list-1",
@@ -66,7 +64,7 @@ class TestListAcceptanceResults:
                 accepted_criteria=["AC-001"],
             )
             save_acceptance_result(project_path, result1)
-            
+
             pack2 = AcceptancePack(
                 acceptance_pack_id="ap-list-2",
                 feature_id="feat-list",
@@ -76,7 +74,7 @@ class TestListAcceptanceResults:
                 verification_summary=VerificationSummary(orchestration_terminal_state="success"),
             )
             save_acceptance_pack(project_path, pack2)
-            
+
             result2 = AcceptanceResult(
                 acceptance_result_id="ar-list-2",
                 acceptance_pack_id="ap-list-2",
@@ -85,20 +83,20 @@ class TestListAcceptanceResults:
                 failed_criteria=["AC-001"],
             )
             save_acceptance_result(project_path, result2)
-            
+
             yield project_path
 
     def test_list_all_results(self, project_with_results):
         results = list_acceptance_results(project_with_results)
-        
+
         assert len(results) == 2
-    
+
     def test_list_with_status_filter(self, project_with_results):
         accepted = list_acceptance_results(project_with_results, status_filter="accepted")
-        
+
         assert len(accepted) == 1
         assert accepted[0]["terminal_state"] == "accepted"
-    
+
     def test_list_empty_if_no_results(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             results = list_acceptance_results(Path(tmpdir))
@@ -106,12 +104,12 @@ class TestListAcceptanceResults:
 
 
 class TestShowAcceptanceResult:
-    
+
     @pytest.fixture
     def project_with_detailed_result(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            
+
             pack = AcceptancePack(
                 acceptance_pack_id="ap-show",
                 feature_id="feat-show",
@@ -121,7 +119,7 @@ class TestShowAcceptanceResult:
                 verification_summary=VerificationSummary(orchestration_terminal_state="success"),
             )
             save_acceptance_pack(project_path, pack)
-            
+
             result = AcceptanceResult(
                 acceptance_result_id="ar-show",
                 acceptance_pack_id="ap-show",
@@ -147,17 +145,17 @@ class TestShowAcceptanceResult:
                 ],
             )
             save_acceptance_result(project_path, result)
-            
+
             yield project_path
 
     def test_show_result(self, project_with_detailed_result):
         details = show_acceptance_result(project_with_detailed_result, "ar-show")
-        
+
         assert details is not None
         assert details["terminal_state"] == "rejected"
         assert len(details["findings"]) == 1
         assert len(details["remediation_guidance"]) == 1
-    
+
     def test_show_result_missing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             details = show_acceptance_result(Path(tmpdir), "ar-missing")
@@ -165,11 +163,11 @@ class TestShowAcceptanceResult:
 
 
 class TestShowAcceptanceHistory:
-    
+
     def test_show_history(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            
+
             history = AcceptanceAttemptHistory(
                 feature_id="feat-history",
                 execution_result_id="exec-hist",
@@ -192,25 +190,25 @@ class TestShowAcceptanceHistory:
                 total_attempts=2,
             )
             save_attempt_history(project_path, history)
-            
+
             details = show_acceptance_history(project_path, "feat-history")
-            
+
             assert details["total_executions"] == 1
             assert details["total_attempts"] == 2
-    
+
     def test_show_history_empty(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             details = show_acceptance_history(Path(tmpdir), "feat-none")
-            
+
             assert details["total_executions"] == 0
 
 
 class TestShowRecoveryStatus:
-    
+
     def test_show_recovery(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            
+
             pack = AcceptanceRecoveryPack(
                 acceptance_recovery_pack_id="arp-recovery",
                 acceptance_result_id="ar-recovery",
@@ -230,26 +228,26 @@ class TestShowRecoveryStatus:
                 total_items=1,
             )
             save_acceptance_recovery_pack(project_path, pack)
-            
+
             details = show_recovery_status(project_path, "feat-recovery")
-            
+
             assert details["pending_items"] == 1
             assert len(details["items"]) == 1
-    
+
     def test_show_recovery_empty(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             details = show_recovery_status(Path(tmpdir), "feat-none")
-            
+
             assert details["pending_items"] == 0
 
 
 class TestGetAcceptanceSummary:
-    
+
     @pytest.fixture
     def project_for_summary(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            
+
             pack = AcceptancePack(
                 acceptance_pack_id="ap-summary",
                 feature_id="feat-summary",
@@ -259,7 +257,7 @@ class TestGetAcceptanceSummary:
                 verification_summary=VerificationSummary(orchestration_terminal_state="success"),
             )
             save_acceptance_pack(project_path, pack)
-            
+
             result = AcceptanceResult(
                 acceptance_result_id="ar-summary",
                 acceptance_pack_id="ap-summary",
@@ -268,24 +266,24 @@ class TestGetAcceptanceSummary:
                 accepted_criteria=["AC-001"],
             )
             save_acceptance_result(project_path, result)
-            
+
             yield project_path
 
     def test_get_summary_accepted(self, project_for_summary):
         summary = get_acceptance_summary(project_for_summary, "feat-summary")
-        
+
         assert summary["status"] == "accepted"
         assert summary["next_action"] == "Feature ready for completion"
-    
+
     def test_get_summary_no_acceptance(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             summary = get_acceptance_summary(Path(tmpdir), "feat-none")
-            
+
             assert summary["status"] == "no_acceptance"
 
 
 class TestFormatConsoleOutput:
-    
+
     def test_format_basic(self):
         summary = {
             "feature_id": "feat-format",
@@ -299,14 +297,14 @@ class TestFormatConsoleOutput:
             "pending_recovery_items": 0,
             "next_action": "Feature ready for completion",
         }
-        
+
         output = format_acceptance_console_output(summary)
-        
+
         assert "ACCEPTANCE CONSOLE" in output
         assert "feat-format" in output
         assert "accepted" in output
         assert "Feature ready for completion" in output
-    
+
     def test_format_with_details(self):
         summary = {
             "feature_id": "feat-details",
@@ -323,8 +321,8 @@ class TestFormatConsoleOutput:
                 {"criterion_id": "AC-001", "result": "failed", "criterion_text": "Works"}
             ],
         }
-        
+
         output = format_acceptance_console_output(summary, include_details=True)
-        
+
         assert "Details:" in output
         assert "[failed] AC-001" in output

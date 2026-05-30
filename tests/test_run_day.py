@@ -1,11 +1,11 @@
 """Tests for asyncdev run-day command and Feature 036."""
 
-import pytest
 from pathlib import Path
-from typer.testing import CliRunner
-from cli.commands.run_day import app, _extract_execution_intent, _check_drift_warnings
-from runtime.state_store import StateStore
 
+import pytest
+from typer.testing import CliRunner
+
+from cli.commands.run_day import _check_drift_warnings, _extract_execution_intent, app
 
 runner = CliRunner()
 
@@ -14,14 +14,14 @@ runner = CliRunner()
 def setup_product(temp_dir):
     """Create a product with runstate for testing."""
     from cli.commands.new_product import app as new_product_app
-    
+
     runner.invoke(new_product_app, [
         "create",
         "--product-id", "test-product",
         "--name", "Test Product",
         "--path", str(temp_dir),
     ])
-    
+
     yield temp_dir / "test-product"
 
 
@@ -34,7 +34,7 @@ class TestRunDayExecute:
             "execute",
             "--mode", "mock",
         ])
-        
+
         assert result.exit_code == 0
         assert "Mock" in result.output or "mock" in result.output.lower()
 
@@ -45,20 +45,20 @@ class TestRunDayExecute:
             "--mode", "mock",
             "--dry-run",
         ])
-        
+
         assert "Dry run" in result.output
 
     def test_project_parameter_with_valid_project(self, setup_product):
         """run-day --project should scope execution to specified project."""
         project_path = setup_product
-        
+
         result = runner.invoke(app, [
             "execute",
             "--project", "test-product",
             "--mode", "mock",
             "--path", str(project_path.parent),
         ])
-        
+
         assert result.exit_code == 0
 
     def test_project_parameter_with_invalid_project(self, temp_dir):
@@ -69,14 +69,14 @@ class TestRunDayExecute:
             "--mode", "mock",
             "--path", str(temp_dir),
         ])
-        
+
         assert result.exit_code == 1
         assert "not found" in result.output.lower() or "Project not found" in result.output
 
     def test_project_parameter_in_help(self):
         """run-day execute --help should show --project parameter."""
         result = runner.invoke(app, ["execute", "--help"])
-        
+
         assert result.exit_code == 0
         assert "--project" in result.output
 
@@ -86,7 +86,7 @@ class TestRunDayExecute:
             "execute",
             "--mode", "mock",
         ])
-        
+
         assert result.exit_code == 0
 
 
@@ -100,9 +100,9 @@ class TestExecutionIntentHelpers:
             "goal": "Execute: Test task",
             "prior_doctor_status": "HEALTHY",
         }
-        
+
         intent = _extract_execution_intent(execution_pack)
-        
+
         assert intent.get("planning_mode") == "continue_work"
         assert intent.get("has_planning_context") is True
         assert intent.get("bounded_target") == "Execute: Test task"
@@ -112,9 +112,9 @@ class TestExecutionIntentHelpers:
         execution_pack = {
             "goal": "Execute: Test task",
         }
-        
+
         intent = _extract_execution_intent(execution_pack)
-        
+
         assert intent.get("has_planning_context") is False
         assert intent.get("planning_mode") == ""
 
@@ -124,9 +124,9 @@ class TestExecutionIntentHelpers:
             "planning_mode": "recover_and_continue",
             "plan_recovery_flag": True,
         }
-        
+
         intent = _extract_execution_intent(execution_pack)
-        
+
         assert intent.get("recovery_flag") is True
 
     def test_extract_intent_with_closeout_flag(self):
@@ -135,9 +135,9 @@ class TestExecutionIntentHelpers:
             "planning_mode": "closeout_first",
             "plan_closeout_flag": True,
         }
-        
+
         intent = _extract_execution_intent(execution_pack)
-        
+
         assert intent.get("closeout_flag") is True
 
     def test_extract_intent_with_blocked_flag(self):
@@ -146,9 +146,9 @@ class TestExecutionIntentHelpers:
             "planning_mode": "blocked_waiting_for_decision",
             "safe_to_execute": False,
         }
-        
+
         intent = _extract_execution_intent(execution_pack)
-        
+
         assert intent.get("blocked_flag") is True
 
     def test_extract_intent_with_prior_recommendation(self):
@@ -157,9 +157,9 @@ class TestExecutionIntentHelpers:
             "planning_mode": "continue_work",
             "prior_recommended_next_action": "Continue execution",
         }
-        
+
         intent = _extract_execution_intent(execution_pack)
-        
+
         assert intent.get("prior_recommendation") == "Continue execution"
 
 
@@ -170,9 +170,9 @@ class TestDriftWarningHelpers:
         """_check_drift_warnings should warn for blocked mode."""
         intent = {"planning_mode": "blocked_waiting_for_decision", "blocked_flag": True}
         execution_pack = {"task_scope": ["Implement feature"]}
-        
+
         warnings = _check_drift_warnings(intent, execution_pack)
-        
+
         assert len(warnings) > 0
         assert any("blocked" in w.lower() for w in warnings)
 
@@ -180,72 +180,72 @@ class TestDriftWarningHelpers:
         """_check_drift_warnings should warn for closeout + expansion."""
         intent = {"planning_mode": "closeout_first"}
         execution_pack = {"task_scope": ["Implement new feature"]}
-        
+
         warnings = _check_drift_warnings(intent, execution_pack)
-        
+
         assert any("closeout" in w.lower() or "expansion" in w.lower() for w in warnings)
 
     def test_check_drift_verification_non_verification(self):
         """_check_drift_warnings should warn for verification_first + non-verification."""
         intent = {"planning_mode": "verification_first"}
         execution_pack = {"task_scope": ["Build new component"]}
-        
+
         warnings = _check_drift_warnings(intent, execution_pack)
-        
+
         assert any("verification" in w.lower() for w in warnings)
 
     def test_check_drift_recovery_no_recovery_task(self):
         """_check_drift_warnings should warn for recovery mode without recovery task."""
         intent = {"planning_mode": "recover_and_continue"}
         execution_pack = {"task_scope": ["Implement feature"]}
-        
+
         warnings = _check_drift_warnings(intent, execution_pack)
-        
+
         assert any("recovery" in w.lower() for w in warnings)
 
     def test_check_drift_prior_blocked_status(self):
         """_check_drift_warnings should warn for prior BLOCKED status."""
         intent = {"planning_mode": "continue_work", "prior_doctor_status": "BLOCKED"}
         execution_pack = {"task_scope": ["Continue work"]}
-        
+
         warnings = _check_drift_warnings(intent, execution_pack)
-        
+
         assert any("blocked" in w.lower() or "blocker" in w.lower() for w in warnings)
 
     def test_check_drift_no_warnings_aligned(self):
         """_check_drift_warnings should return empty for aligned execution."""
         intent = {"planning_mode": "continue_work"}
         execution_pack = {"task_scope": ["Execute normal task"]}
-        
+
         warnings = _check_drift_warnings(intent, execution_pack)
-        
+
         assert len(warnings) == 0
 
     def test_check_drift_closeout_with_closeout_task(self):
         """_check_drift_warnings should not warn for closeout task."""
         intent = {"planning_mode": "closeout_first"}
         execution_pack = {"task_scope": ["Archive feature", "Complete closeout"]}
-        
+
         warnings = _check_drift_warnings(intent, execution_pack)
-        
+
         assert len(warnings) == 0
 
     def test_check_drift_verification_with_verification_task(self):
         """_check_drift_warnings should not warn for verification task."""
         intent = {"planning_mode": "verification_first"}
         execution_pack = {"task_scope": ["Verify implementation", "Run tests"]}
-        
+
         warnings = _check_drift_warnings(intent, execution_pack)
-        
+
         assert len(warnings) == 0
 
     def test_check_drift_recovery_with_recovery_task(self):
         """_check_drift_warnings should not warn when recovery task is present."""
         intent = {"planning_mode": "recover_and_continue", "recovery_flag": True}
         execution_pack = {"task_scope": ["Fix verification issue", "Resolve blocker"]}
-        
+
         warnings = _check_drift_warnings(intent, execution_pack)
-        
+
         assert len(warnings) == 0
 
 
@@ -255,35 +255,35 @@ class TestPlanningModeIntent:
     def test_continue_work_intent(self):
         """continue_work mode should map to correct intent."""
         from cli.commands.run_day import PLANNING_MODE_INTENT
-        
+
         assert PLANNING_MODE_INTENT.get("continue_work") is not None
         assert "Normal" in PLANNING_MODE_INTENT.get("continue_work", "")
 
     def test_recover_and_continue_intent(self):
         """recover_and_continue mode should map to recovery intent."""
         from cli.commands.run_day import PLANNING_MODE_INTENT
-        
+
         assert PLANNING_MODE_INTENT.get("recover_and_continue") is not None
         assert "Recovery" in PLANNING_MODE_INTENT.get("recover_and_continue", "")
 
     def test_verification_first_intent(self):
         """verification_first mode should map to verification intent."""
         from cli.commands.run_day import PLANNING_MODE_INTENT
-        
+
         assert PLANNING_MODE_INTENT.get("verification_first") is not None
         assert "verification" in PLANNING_MODE_INTENT.get("verification_first", "").lower()
 
     def test_closeout_first_intent(self):
         """closeout_first mode should map to closeout intent."""
         from cli.commands.run_day import PLANNING_MODE_INTENT
-        
+
         assert PLANNING_MODE_INTENT.get("closeout_first") is not None
         assert "closeout" in PLANNING_MODE_INTENT.get("closeout_first", "").lower()
 
     def test_blocked_waiting_intent(self):
         """blocked_waiting_for_decision mode should map to blocked intent."""
         from cli.commands.run_day import PLANNING_MODE_INTENT
-        
+
         assert PLANNING_MODE_INTENT.get("blocked_waiting_for_decision") is not None
         assert "blocked" in PLANNING_MODE_INTENT.get("blocked_waiting_for_decision", "").lower()
 
@@ -291,27 +291,27 @@ class TestPlanningModeIntent:
 class TestFrontendVerificationIntegration:
     def test_backend_only_skips_verification(self):
         from cli.commands.run_day import _run_frontend_verification
-        
+
         result = _run_frontend_verification(
             project_path=Path("/tmp/test"),
             execution_pack={"verification_type": "backend_only"},
             product_id="test-product",
             result={"status": "success"},
         )
-        
+
         assert result["status"] == "success"
         assert "orchestration_terminal_state" not in result
-    
+
     def test_frontend_interactive_with_mock_environment(self):
         from cli.commands.run_day import _run_frontend_verification
-        
+
         result = _run_frontend_verification(
             project_path=Path("/tmp/test"),
             execution_pack={"verification_type": "frontend_interactive"},
             product_id="test-project",
             result={"status": "success"},
         )
-        
+
         assert "orchestration_terminal_state" in result
         assert result["orchestration_terminal_state"] in [
             "success",
@@ -319,62 +319,62 @@ class TestFrontendVerificationIntegration:
             "timeout",
             "exception_accepted",
         ]
-    
+
     def test_verification_failure_downgrades_success_to_partial(self):
         from runtime.browser_verification_orchestrator import OrchestrationTerminalState
-        
+
         result = {
             "status": "success",
             "orchestration_terminal_state": OrchestrationTerminalState.FAILURE.value,
         }
-        
+
         if result["orchestration_terminal_state"] == OrchestrationTerminalState.FAILURE.value:
             if result.get("status") == "success":
                 result["status"] = "partial"
-        
+
         assert result["status"] == "partial"
 
 
 class TestCloseoutOrchestrationIntegration:
     def test_closeout_result_structure(self):
         from runtime.external_closeout_state import CloseoutResult, CloseoutState
-        
+
         result = CloseoutResult(
             closeout_state=CloseoutState.CLOSEOUT_COMPLETED_SUCCESS,
         )
-        
+
         data = result.to_dict()
         assert "closeout_state" in data
         assert "execution_result_detected" in data
         assert "verification_required" in data
-    
+
     def test_closeout_gate_blocks_on_failure(self):
         from runtime.external_closeout_state import (
             CloseoutResult,
             CloseoutState,
             CloseoutTerminalClassification,
         )
-        
+
         result = CloseoutResult(
             closeout_state=CloseoutState.CLOSEOUT_COMPLETED_FAILURE,
             terminal_classification=CloseoutTerminalClassification.FAILURE,
         )
-        
+
         assert result.get_gate_status() == "blocked"
         assert result.allows_success_progression() is False
-    
+
     def test_closeout_gate_allows_on_success(self):
         from runtime.external_closeout_state import (
             CloseoutResult,
             CloseoutState,
             CloseoutTerminalClassification,
         )
-        
+
         result = CloseoutResult(
             closeout_state=CloseoutState.CLOSEOUT_COMPLETED_SUCCESS,
             terminal_classification=CloseoutTerminalClassification.SUCCESS,
         )
-        
+
         assert result.get_gate_status() == "allowed"
         assert result.allows_success_progression()
 
@@ -382,26 +382,26 @@ class TestCloseoutOrchestrationIntegration:
 class TestOrchestrationTerminalStateValidation:
     def test_valid_terminal_states_for_success(self):
         from runtime.browser_verification_orchestrator import OrchestrationTerminalState
-        
+
         valid_for_success = [
             OrchestrationTerminalState.NOT_REQUIRED,
             OrchestrationTerminalState.SUCCESS,
             OrchestrationTerminalState.EXCEPTION_ACCEPTED,
             OrchestrationTerminalState.SKIPPED_BY_POLICY,
         ]
-        
+
         for state in valid_for_success:
             assert state.value in ["not_required", "success", "exception_accepted", "skipped_by_policy"]
-    
+
     def test_invalid_terminal_states_for_success(self):
         from runtime.browser_verification_orchestrator import OrchestrationTerminalState
-        
+
         invalid_for_success = [
             OrchestrationTerminalState.REQUIRED_NOT_STARTED,
             OrchestrationTerminalState.IN_PROGRESS,
             OrchestrationTerminalState.FAILURE,
             OrchestrationTerminalState.TIMEOUT,
         ]
-        
+
         for state in invalid_for_success:
             assert state.value in ["required_not_started", "in_progress", "failure", "timeout"]

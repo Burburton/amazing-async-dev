@@ -1,6 +1,5 @@
 """archive-feature command - Archive a completed feature."""
 
-from datetime import datetime
 from pathlib import Path
 
 import typer
@@ -9,10 +8,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from runtime.state_store import StateStore
-from runtime.archive_pack_builder import build_archive_pack
 from cli.utils.output_formatter import print_next_step, print_success_panel
-from cli.utils.path_formatter import get_relative_path
+from runtime.archive_pack_builder import build_archive_pack
+from runtime.state_store import StateStore
 
 app = typer.Typer(help="Archive a completed feature with lessons and patterns")
 console = Console()

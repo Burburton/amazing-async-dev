@@ -1,9 +1,10 @@
 """Tests for SQLite state store and adapter."""
 
-import pytest
-from pathlib import Path
-import tempfile
 import shutil
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from runtime.adapters.sqlite_adapter import SQLiteAdapter
 from runtime.sqlite_state_store import SQLiteStateStore
@@ -257,6 +258,7 @@ class TestSQLiteCLI:
     def test_history_command_works(self, temp_db_dir):
         """sqlite history should display events."""
         from typer.testing import CliRunner
+
         from cli.commands.sqlite_status import app
 
         runner = CliRunner()
@@ -280,6 +282,7 @@ class TestSQLiteCLI:
     def test_features_command_works(self, temp_db_dir):
         """sqlite features should list features."""
         from typer.testing import CliRunner
+
         from cli.commands.sqlite_status import app
 
         runner = CliRunner()
@@ -303,6 +306,7 @@ class TestSQLiteCLI:
     def test_recovery_command_works(self, temp_db_dir):
         """sqlite recovery should show recovery info."""
         from typer.testing import CliRunner
+
         from cli.commands.sqlite_status import app
 
         runner = CliRunner()

@@ -11,11 +11,9 @@ from rich.table import Table
 
 from runtime.gitignore_manager import (
     GitignoreManager,
-    check_gitignore_safety,
     ensure_gitignore_safe,
 )
-from runtime.sensitive_file_detector import SafetyCheckResult
-from runtime.shell_config import get_shell_config, ShellConfig, DEFAULT_CONFIG_PATH
+from runtime.shell_config import DEFAULT_CONFIG_PATH, get_shell_config
 
 app = typer.Typer(name="config", help="Config safety commands")
 console = Console()
@@ -33,9 +31,9 @@ def safety_check(
 ):
     manager = GitignoreManager(root_path=path)
     check_result = manager.check_sensitive_patterns()
-    
+
     is_safe = len(check_result.tracked_sensitive_files) == 0 and check_result.sensitive_not_excluded == 0
-    
+
     if is_safe:
         console.print(Panel(
             f"Gitignore: {check_result.gitignore_path or 'not found'}\n"
@@ -45,7 +43,7 @@ def safety_check(
             border_style="green"
         ))
         return
-    
+
     console.print(Panel(
         f"Gitignore: {check_result.gitignore_path or 'not found'}\n"
         f"Sensitive patterns excluded: {check_result.sensitive_excluded}\n"
@@ -54,7 +52,7 @@ def safety_check(
         title="[WARN] Config Safety Issues",
         border_style="yellow"
     ))
-    
+
     if check_result.tracked_sensitive_files:
         console.print("\n[bold red][DANGER] TRACKED SENSITIVE FILES:[/bold red]")
         for file in check_result.tracked_sensitive_files:
@@ -62,7 +60,7 @@ def safety_check(
         console.print("\n[yellow]Manual remediation required:[/yellow]")
         console.print("  git rm --cached <file>")
         console.print("  git commit -m 'Remove exposed secrets'")
-    
+
     if verbose:
         console.print("\n[bold]Recommendations:[/bold]")
         for rec in check_result.recommendations:
@@ -81,7 +79,7 @@ def safety_fix(
 ):
     manager = GitignoreManager(root_path=path)
     result = ensure_gitignore_safe(root_path=path, auto_fix=False)
-    
+
     if result.safe:
         console.print(Panel(
             "All sensitive patterns already excluded",
@@ -89,23 +87,23 @@ def safety_fix(
             border_style="green"
         ))
         return
-    
+
     if result.missing_gitignore_entries:
         console.print("[cyan]Missing gitignore entries:[/cyan]")
         for entry in result.missing_gitignore_entries:
             console.print(f"  - {entry}")
-        
+
         if dry_run:
             console.print("[yellow]Dry run - not applying changes[/yellow]")
             return
-        
+
         manager.add_entries(result.missing_gitignore_entries)
         console.print(Panel(
             f"Added {len(result.missing_gitignore_entries)} entries to .gitignore",
             title="[OK] Gitignore Updated",
             border_style="green"
         ))
-    
+
     if result.tracked_sensitive_files:
         console.print("\n[bold red][DANGER] Cannot auto-fix tracked files:[/bold red]")
         for detected in result.tracked_sensitive_files:
@@ -130,23 +128,23 @@ def patterns(
         help="Filter by risk level: all, high, medium",
     ),
 ):
-    from runtime.sensitive_file_detector import SensitiveFileDetector, RiskLevel
-    
+    from runtime.sensitive_file_detector import RiskLevel, SensitiveFileDetector
+
     detector = SensitiveFileDetector(root_path=path)
-    
+
     if risk == "high":
         patterns = detector.get_patterns_by_risk()[RiskLevel.HIGH]
     elif risk == "medium":
         patterns = detector.get_patterns_by_risk()[RiskLevel.MEDIUM]
     else:
         patterns = detector.patterns
-    
+
     table = Table(title="Sensitive Patterns")
     table.add_column("Pattern", style="cyan")
     table.add_column("Type", style="blue")
     table.add_column("Risk", style="yellow")
     table.add_column("Category", style="magenta")
-    
+
     for p in patterns:
         table.add_row(
             p.pattern,
@@ -154,7 +152,7 @@ def patterns(
             p.risk_level.value,
             p.category,
         )
-    
+
     console.print(table)
 
 
@@ -169,10 +167,10 @@ def status(
 ):
     manager = GitignoreManager(root_path=path)
     summary = manager.get_safety_summary()
-    
+
     status_color = "green" if summary["safe"] else "yellow"
     status_text = "[OK] SAFE" if summary["safe"] else "[WARN] ISSUES"
-    
+
     console.print(Panel(
         f"Status: {status_text}\n"
         f"Gitignore exists: {summary['gitignore_exists']}\n"
@@ -215,7 +213,7 @@ def shell(
     if show:
         config = get_shell_config(path / DEFAULT_CONFIG_PATH)
         executable = config.get_executable()
-        
+
         console.print(Panel(
             f"Platform: {sys.platform}\n"
             f"Shell type: {config.shell_type}\n"
@@ -226,29 +224,29 @@ def shell(
             title="Shell Configuration",
             border_style="cyan"
         ))
-        
+
         if sys.platform == "win32" and not executable:
             console.print("\n[yellow]Tip: Configure bash to use Git Bash instead of cmd.exe[/yellow]")
             console.print("  asyncdev config shell --bash-path 'C:/Program Files/Git/bin/bash.exe'")
         return
-    
+
     if bash_path:
         config_dir = path / ".runtime"
         config_dir.mkdir(parents=True, exist_ok=True)
         config_file = config_dir / "shell-config.yaml"
-        
+
         config_data = {}
         if config_file.exists():
             with open(config_file, encoding="utf-8") as f:
                 config_data = yaml.safe_load(f) or {}
-        
+
         config_data["windows_bash_executable"] = bash_path
         if force_bash:
             config_data["force_bash"] = True
-        
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f, default_flow_style=False)
-        
+
         console.print(Panel(
             f"Bash path: {bash_path}\n"
             f"Force bash: {force_bash}\n"
@@ -256,26 +254,26 @@ def shell(
             title="[OK] Shell Configuration Updated",
             border_style="green"
         ))
-        
+
         console.print("\n[cyan]Environment variable alternative:[/cyan]")
         console.print(f"  export ASYNCDEV_BASH_EXECUTABLE='{bash_path}'")
         return
-    
+
     if force_bash:
         config_dir = path / ".runtime"
         config_dir.mkdir(parents=True, exist_ok=True)
         config_file = config_dir / "shell-config.yaml"
-        
+
         config_data = {}
         if config_file.exists():
             with open(config_file, encoding="utf-8") as f:
                 config_data = yaml.safe_load(f) or {}
-        
+
         config_data["force_bash"] = True
-        
+
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f, default_flow_style=False)
-        
+
         console.print(Panel(
             f"Force bash: True\n"
             f"Config saved to: {config_file}",
@@ -283,10 +281,10 @@ def shell(
             border_style="green"
         ))
         return
-    
+
     config = get_shell_config(path / DEFAULT_CONFIG_PATH)
     executable = config.get_executable()
-    
+
     console.print(Panel(
         f"Platform: {sys.platform}\n"
         f"Current bash executable: {executable or 'Not configured (using default)'}\n"
@@ -294,7 +292,7 @@ def shell(
         title="Shell Configuration",
         border_style="cyan"
     ))
-    
+
     if sys.platform == "win32":
         console.print("\n[cyan]Options:[/cyan]")
         console.print("  --bash-path 'C:/Program Files/Git/bin/bash.exe'  Set Git Bash path")

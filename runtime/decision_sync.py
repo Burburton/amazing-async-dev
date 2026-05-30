@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from runtime.decision_request_store import (
-    DecisionRequestStore,
     DecisionRequestStatus,
+    DecisionRequestStore,
 )
 
 
@@ -20,14 +20,14 @@ def sync_decision_to_runstate(
     runstate: dict[str, Any],
 ) -> dict[str, Any]:
     """Sync a decision request to RunState.decisions_needed.
-    
+
     Creates decision entry in decisions_needed, sets decision_request_pending,
     and optionally sets current_phase to blocked.
-    
+
     Args:
         request: Decision request dict from DecisionRequestStore
         runstate: Current RunState dict
-        
+
     Returns:
         Updated RunState dict
     """
@@ -37,7 +37,7 @@ def sync_decision_to_runstate(
     recommendation = request.get("recommendation", "")
     decision_type = request.get("decision_type", "technical")
     pause_category = request.get("pause_reason_category", "decision_required")
-    
+
     # Create decision entry for RunState.decisions_needed
     decision_entry = {
         "decision": question,
@@ -49,32 +49,32 @@ def sync_decision_to_runstate(
         "source": "email_request",
         "request_id": request_id,
     }
-    
+
     # Initialize decisions_needed if not present
     if "decisions_needed" not in runstate:
         runstate["decisions_needed"] = []
-    
+
     # Check if this request is already in decisions_needed
     existing_ids = [
         d.get("request_id", d.get("decision_id", ""))
         for d in runstate["decisions_needed"]
     ]
-    
+
     if request_id not in existing_ids:
         runstate["decisions_needed"].append(decision_entry)
-    
+
     # Set decision request tracking fields
     runstate["decision_request_pending"] = request_id
     runstate["decision_request_sent_at"] = request.get("sent_at", datetime.now().isoformat())
-    
+
     # Set phase to blocked if pause category requires it
-    current_phase = runstate.get("current_phase", "executing")
+    runstate.get("current_phase", "executing")
     if pause_category in ["decision_required", "blocker", "scope_change"]:
         runstate["current_phase"] = "blocked"
-    
+
     # Update last_action
     runstate["last_action"] = f"Decision request synced: {request_id}"
-    
+
     return runstate
 
 
@@ -85,23 +85,23 @@ def sync_reply_to_runstate(
     action: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Sync email reply resolution to RunState.
-    
+
     Removes matching entry from decisions_needed, sets last_decision_resolution,
     and sets phase for continuation based on reply.
-    
+
     Args:
         request_id: Decision request ID
         reply: Reply record dict from reply_parser
         runstate: Current RunState dict
         action: Optional action mapping from reply_action_mapper
-        
+
     Returns:
         Updated RunState dict
     """
     reply_value = reply.get("reply_value", "")
     reply_command = reply.get("parsed_result", {}).get("command", "")
     reply_argument = reply.get("parsed_result", {}).get("argument", "")
-    
+
     # Remove matching entry from decisions_needed
     decisions_needed = runstate.get("decisions_needed", [])
     filtered_decisions = [
@@ -109,7 +109,7 @@ def sync_reply_to_runstate(
         if d.get("request_id", d.get("decision_id", "")) != request_id
     ]
     runstate["decisions_needed"] = filtered_decisions
-    
+
     # Set last_decision_resolution
     resolution_record = {
         "request_id": request_id,
@@ -120,11 +120,11 @@ def sync_reply_to_runstate(
         "applied_action": action.get("runstate_action", "") if action else "",
     }
     runstate["last_decision_resolution"] = resolution_record
-    
+
     # Clear decision_request_pending if all decisions resolved
     if len(runstate["decisions_needed"]) == 0:
         runstate["decision_request_pending"] = None
-    
+
     # Set phase for continuation based on action
     if action:
         continuation_phase = action.get("continuation_phase", "planning")
@@ -138,10 +138,10 @@ def sync_reply_to_runstate(
             runstate["current_phase"] = "planning"
         elif reply_command == "RETRY":
             runstate["current_phase"] = "executing"
-    
+
     # Update last_action
     runstate["last_action"] = f"Decision resolved: {request_id} → {reply_value}"
-    
+
     return runstate
 
 
@@ -149,13 +149,13 @@ def reconcile_decision_sources(
     project_path: Path,
 ) -> dict[str, Any]:
     """Reconcile DecisionRequestStore and RunState.
-    
+
     Loads pending requests from DecisionRequestStore and RunState.decisions_needed,
     identifies discrepancies, and returns unified state.
-    
+
     Args:
         project_path: Path to project directory
-        
+
     Returns:
         Unified decision state dict with:
         - pending_email_decisions: list of pending email requests
@@ -166,32 +166,32 @@ def reconcile_decision_sources(
         - resolved_count: resolved count
     """
     store = DecisionRequestStore(project_path)
-    
+
     # Load pending requests from DecisionRequestStore
     pending_requests = store.list_requests(status=DecisionRequestStatus.SENT)
-    
+
     # Load resolved requests
     resolved_requests = store.list_requests(status=DecisionRequestStatus.RESOLVED)
-    
+
     # Load RunState if available
     from runtime.state_store import StateStore
     state_store = StateStore(project_path)
     runstate = state_store.load_runstate()
-    
+
     runstate_decisions = []
     if runstate:
         runstate_decisions = runstate.get("decisions_needed", [])
-    
+
     # Identify discrepancies
     discrepancies = []
-    
+
     # Check for email requests not in RunState
     email_request_ids = {r.get("decision_request_id") for r in pending_requests}
     runstate_request_ids = {
         d.get("request_id", d.get("decision_id", ""))
         for d in runstate_decisions
     }
-    
+
     # Requests in email but not in RunState (need sync)
     missing_in_runstate = email_request_ids - runstate_request_ids
     for req_id in missing_in_runstate:
@@ -200,7 +200,7 @@ def reconcile_decision_sources(
             "request_id": req_id,
             "message": f"Email request {req_id} not in RunState.decisions_needed",
         })
-    
+
     # Requests in RunState but not in email store (orphaned)
     missing_in_email = runstate_request_ids - email_request_ids
     for req_id in missing_in_email:
@@ -210,7 +210,7 @@ def reconcile_decision_sources(
                 "request_id": req_id,
                 "message": f"RunState has entry for {req_id} but no matching email request",
             })
-    
+
     # Build unified state
     unified_state = {
         "pending_email_decisions": pending_requests,
@@ -222,7 +222,7 @@ def reconcile_decision_sources(
         "email_decision_resolved": len(resolved_requests) > 0,
         "has_discrepancies": len(discrepancies) > 0,
     }
-    
+
     # Add latest resolved request if available
     if resolved_requests:
         latest = resolved_requests[-1]  # Most recent
@@ -235,16 +235,16 @@ def reconcile_decision_sources(
             },
             "received_at": latest.get("resolved_at", ""),
         }
-    
+
     return unified_state
 
 
 def get_pending_decision_count(project_path: Path) -> int:
     """Get count of pending decisions from both sources.
-    
+
     Args:
         project_path: Path to project directory
-        
+
     Returns:
         Total count of pending decisions
     """
@@ -254,15 +254,15 @@ def get_pending_decision_count(project_path: Path) -> int:
 
 def get_decision_status_summary(project_path: Path) -> dict[str, Any]:
     """Get summary of decision status for display.
-    
+
     Args:
         project_path: Path to project directory
-        
+
     Returns:
         Summary dict for CLI display
     """
     unified = reconcile_decision_sources(project_path)
-    
+
     summary = {
         "total_pending": unified["pending_count"],
         "total_resolved": unified["resolved_count"],
@@ -270,13 +270,13 @@ def get_decision_status_summary(project_path: Path) -> dict[str, Any]:
         "pending_from_email": len(unified["pending_email_decisions"]),
         "pending_from_runstate": len(unified["runstate_decisions"]),
     }
-    
+
     if unified["has_discrepancies"]:
         summary["discrepancy_details"] = unified["discrepancies"]
-    
+
     if unified.get("resolved_request_id"):
         summary["latest_resolution"] = unified["resolved_request_id"]
-    
+
     return summary
 
 
@@ -284,65 +284,65 @@ def apply_email_resolution_to_runstate(
     project_path: Path,
 ) -> dict[str, Any] | None:
     """Apply latest email resolution to RunState if not already applied.
-    
+
     This is called by resume_next_day to sync resolved email decisions.
-    
+
     Args:
         project_path: Path to project directory
-        
+
     Returns:
         Updated RunState if resolution was applied, None otherwise
     """
+    from runtime.reply_action_mapper import ParsedReply, ReplyCommand, map_reply_to_action
     from runtime.state_store import StateStore
-    from runtime.reply_action_mapper import map_reply_to_action, ParsedReply, ReplyCommand
-    
+
     unified = reconcile_decision_sources(project_path)
-    
+
     if not unified.get("email_decision_resolved"):
         return None
-    
+
     # Check if resolution already applied
     state_store = StateStore(project_path)
     runstate = state_store.load_runstate()
-    
+
     if not runstate:
         return None
-    
+
     last_resolution = runstate.get("last_decision_resolution", {})
     resolved_id = unified.get("resolved_request_id")
-    
+
     if last_resolution.get("request_id") == resolved_id:
         # Already applied
         return None
-    
+
     # Get the request and reply details
     store = DecisionRequestStore(project_path)
     request = store.load_request(resolved_id)
-    
+
     if not request:
         return None
-    
+
     # Build ParsedReply from resolution
     reply_value = request.get("resolution", "")
     parts = reply_value.split()
     command_str = parts[0] if parts else ""
     argument = parts[1] if len(parts) > 1 else None
-    
+
     try:
         command = ReplyCommand(command_str.upper())
     except ValueError:
         command = None
-    
+
     parsed_reply = ParsedReply(
         command=command,
         argument=argument,
         is_valid=True,
         raw_text=reply_value,
     )
-    
+
     # Map reply to action
     action = map_reply_to_action(parsed_reply, request)
-    
+
     # Build reply record
     reply_record = {
         "reply_value": reply_value,
@@ -353,11 +353,11 @@ def apply_email_resolution_to_runstate(
         },
         "received_at": request.get("resolved_at", datetime.now().isoformat()),
     }
-    
+
     # Sync to RunState
     runstate = sync_reply_to_runstate(resolved_id, reply_record, runstate, action)
-    
+
     # Save updated RunState
     state_store.save_runstate(runstate)
-    
+
     return runstate

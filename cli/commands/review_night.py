@@ -7,11 +7,10 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from runtime.state_store import StateStore
-from runtime.review_pack_builder import build_daily_review_pack
-from runtime.auto_day_end_email import check_and_trigger_day_end
 from cli.utils.output_formatter import print_next_step, print_success_panel
-from cli.utils.path_formatter import get_relative_path
+from runtime.auto_day_end_email import check_and_trigger_day_end
+from runtime.review_pack_builder import build_daily_review_pack
+from runtime.state_store import StateStore
 
 app = typer.Typer(help="Generate nightly review pack for human review")
 console = Console()
@@ -49,7 +48,7 @@ def generate(
 
     review_pack = build_daily_review_pack(execution_result, runstate, project_path)
 
-    console.print(Panel(f"DailyReviewPack Preview", title="review-night", border_style="green"))
+    console.print(Panel("DailyReviewPack Preview", title="review-night", border_style="green"))
 
     table = Table(title="Review Summary")
     table.add_column("Field", style="cyan")
@@ -65,7 +64,7 @@ def generate(
     table.add_row("decisions", str(len(review_pack["decisions_needed"])))
 
     console.print(table)
-    
+
     doctor_assessment = review_pack.get("doctor_assessment")
     if doctor_assessment:
         _display_doctor_assessment(doctor_assessment)
@@ -74,16 +73,16 @@ def generate(
         console.print("\n[bold yellow]Decisions Needed:[/bold yellow]")
         for i, d in enumerate(review_pack["decisions_needed"], 1):
             console.print(f"\n  {i}. {d['decision']}")
-            
+
             decision_context = d.get("decision_context", "")
             if decision_context:
                 console.print(f"     Context: {decision_context}")
-            
+
             urgency = d.get("urgency", "medium")
             blocking = d.get("blocking_tomorrow", False)
             console.print(f"     [Urgency: {urgency}]" + (" [BLOCKING]" if blocking else ""))
-            
-            console.print(f"     Options:")
+
+            console.print("     Options:")
             options = d.get("options", [])
             for opt in options:
                 if isinstance(opt, dict):
@@ -96,7 +95,7 @@ def generate(
                         console.print(f"           Effort: {effort} | Risk: {risk}")
                 else:
                     console.print(f"       - {opt}")
-            
+
             recommendation = d.get("recommendation", "")
             if recommendation:
                 console.print(f"     Recommendation: {recommendation}")
@@ -116,7 +115,7 @@ def generate(
     store.save_runstate(runstate)
 
     email_result = check_and_trigger_day_end(project_path, review_pack)
-    
+
     if email_result.triggered:
         console.print(f"\n[green]Day-end summary email sent: {email_result.resend_message_id}[/green]")
     elif email_result.skipped_reason:
@@ -174,18 +173,18 @@ def show(
     console.print(Panel(f"DailyReviewPack: {review_pack['date']}", border_style="green"))
 
     console.print(f"\n[bold]Today's Goal:[/bold] {review_pack['today_goal']}")
-    console.print(f"\n[bold]Completed:[/bold]")
+    console.print("\n[bold]Completed:[/bold]")
     for item in review_pack["what_was_completed"]:
         console.print(f"  - {item}")
 
     if review_pack["decisions_needed"]:
-        console.print(f"\n[bold yellow]Decisions Needed:[/bold yellow]")
+        console.print("\n[bold yellow]Decisions Needed:[/bold yellow]")
         for d in review_pack["decisions_needed"]:
             console.print(f"  {d['decision']}: {d['options']}")
             console.print(f"    Recommended: {d['recommendation']}")
 
     console.print(f"\n[bold]Tomorrow's Plan:[/bold] {review_pack['tomorrow_plan']}")
-    
+
     doctor_assessment = review_pack.get("doctor_assessment")
     if doctor_assessment:
         _display_doctor_assessment(doctor_assessment)
@@ -193,51 +192,51 @@ def show(
 
 def _display_doctor_assessment(assessment: dict) -> None:
     """Display doctor assessment section."""
-    console.print(f"\n[bold cyan]Doctor Assessment[/bold cyan]")
-    
+    console.print("\n[bold cyan]Doctor Assessment[/bold cyan]")
+
     status = assessment.get("doctor_status", "UNKNOWN")
     status_color = _get_status_color(status)
     console.print(f"  Status: [{status_color}]{status}[/{status_color}]")
-    
+
     console.print(f"  Initialization: {assessment.get('initialization_mode', 'unknown')}")
     console.print(f"  Phase: {assessment.get('current_phase', 'unknown')}")
     console.print(f"  Verification: {assessment.get('verification_status', 'not_run')}")
-    
+
     if assessment.get("pending_decisions", 0) > 0:
         console.print(f"  [yellow]Pending Decisions: {assessment['pending_decisions']}[/yellow]")
-    
+
     if assessment.get("blocked_items_count", 0) > 0:
         console.print(f"  [red]Blocked Items: {assessment['blocked_items_count']}[/red]")
-    
+
     if assessment.get("recommended_action"):
         console.print(f"\n  [bold]Recommended Action:[/bold] {assessment['recommended_action']}")
         if assessment.get("suggested_command"):
             console.print(f"  [green]Suggested Command: {assessment['suggested_command']}[/green]")
-    
+
     recovery = assessment.get("recovery_summary")
     if recovery:
-        console.print(f"\n  [bold yellow]Recovery Guidance[/bold yellow]")
+        console.print("\n  [bold yellow]Recovery Guidance[/bold yellow]")
         console.print(f"  Likely Cause: {recovery.get('likely_cause', '')}")
-        console.print(f"  What to Check:")
+        console.print("  What to Check:")
         for item in recovery.get("what_to_check", []):
             console.print(f"    - {item}")
-        console.print(f"  Recovery Steps:")
+        console.print("  Recovery Steps:")
         for i, step in enumerate(recovery.get("recovery_steps", []), 1):
             console.print(f"    {i}. {step}")
-    
+
     feedback = assessment.get("feedback_handoff")
     if feedback:
-        console.print(f"\n  [bold magenta]Feedback Handoff[/bold magenta]")
+        console.print("\n  [bold magenta]Feedback Handoff[/bold magenta]")
         console.print(f"  {feedback.get('suggestion', '')}")
         console.print(f"  Reason: {feedback.get('reason', '')}")
         if feedback.get("draft_summary"):
             console.print(f"  Draft: {feedback['draft_summary']}")
         if feedback.get("suggested_command"):
             console.print(f"  [green]Command: {feedback['suggested_command']}[/green]")
-    
+
     closeout = assessment.get("closeout_reminder")
     if closeout:
-        console.print(f"\n  [bold]Closeout Reminder[/bold]")
+        console.print("\n  [bold]Closeout Reminder[/bold]")
         console.print(f"  {closeout.get('status', '')}")
         console.print(f"  Action: {closeout.get('action', '')}")
 

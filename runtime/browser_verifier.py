@@ -81,11 +81,9 @@ DEFAULT_SCENARIOS = [
 
 def check_playwright_available() -> bool:
     """Check if Playwright is available in the environment."""
-    try:
-        import playwright
-        return True
-    except ImportError:
-        return False
+    import importlib.util
+
+    return importlib.util.find_spec("playwright") is not None
 
 
 def run_browser_verification(
@@ -96,19 +94,19 @@ def run_browser_verification(
     screenshot_dir: Path | None = None,
 ) -> BrowserVerificationResult:
     """Run browser verification via Playwright.
-    
+
     Args:
         url: URL to verify
         project_name: Project name for screenshot subdirectory
         scenarios: List of scenarios to run (default: page_render, console_check, accessibility_snapshot)
         timeout: Timeout in seconds
         screenshot_dir: Base directory for screenshots (defaults to screenshots/{project_name}/)
-        
+
     Returns:
         BrowserVerificationResult with verification outcome
     """
     start_time = datetime.now()
-    
+
     if not check_playwright_available():
         return BrowserVerificationResult(
             executed=False,
@@ -117,33 +115,33 @@ def run_browser_verification(
             exception_details="Playwright is not installed in this environment",
             duration_seconds=0,
         )
-    
+
     target_scenarios = scenarios or DEFAULT_SCENARIOS
-    
+
     if screenshot_dir:
         screenshot_path = screenshot_dir
     elif project_name:
         screenshot_path = Path.cwd() / "screenshots" / project_name
     else:
         screenshot_path = Path.cwd() / "screenshots" / "default"
-    
+
     screenshot_path.mkdir(parents=True, exist_ok=True)
-    
+
     results: list[ScenarioResult] = []
     console_errors: list[ConsoleError] = []
     screenshots: list[str] = []
     accessibility_snapshot: str | None = None
-    
+
     try:
         from playwright.sync_api import sync_playwright
-        
+
         with sync_playwright() as p:
             browser = p.chromium.launch(timeout=timeout * 1000)
             page = browser.new_page()
-            
+
             for scenario in target_scenarios:
                 scenario_start = datetime.now()
-                
+
                 try:
                     if scenario == "page_render":
                         page.goto(url, timeout=timeout * 1000)
@@ -156,10 +154,10 @@ def run_browser_verification(
                             screenshot_path=str(screenshot_file),
                             duration_seconds=(datetime.now() - scenario_start).total_seconds(),
                         ))
-                    
+
                     elif scenario == "console_check":
                         page.goto(url, timeout=timeout * 1000)
-                        
+
                         def capture_console(msg):
                             if msg.type in ["error", "warning"]:
                                 console_errors.append(ConsoleError(
@@ -168,10 +166,10 @@ def run_browser_verification(
                                     url=msg.location.get("url"),
                                     line=msg.location.get("lineNumber"),
                                 ))
-                        
+
                         page.on("console", capture_console)
                         page.wait_for_timeout(2000)
-                        
+
                         passed = len([e for e in console_errors if e.level == "error"]) == 0
                         results.append(ScenarioResult(
                             name=scenario,
@@ -179,7 +177,7 @@ def run_browser_verification(
                             error_message=f"{len(console_errors)} console messages captured" if not passed else None,
                             duration_seconds=(datetime.now() - scenario_start).total_seconds(),
                         ))
-                    
+
                     elif scenario == "accessibility_snapshot":
                         page.goto(url, timeout=timeout * 1000)
                         try:
@@ -197,7 +195,7 @@ def run_browser_verification(
                                 error_message=f"aria_snapshot unavailable: {str(e)[:50]}, skipped",
                                 duration_seconds=(datetime.now() - scenario_start).total_seconds(),
                             ))
-                    
+
                     else:
                         results.append(ScenarioResult(
                             name=scenario,
@@ -205,7 +203,7 @@ def run_browser_verification(
                             error_message=f"Unknown scenario: {scenario}",
                             duration_seconds=(datetime.now() - scenario_start).total_seconds(),
                         ))
-                
+
                 except Exception as e:
                     results.append(ScenarioResult(
                         name=scenario,
@@ -213,9 +211,9 @@ def run_browser_verification(
                         error_message=str(e),
                         duration_seconds=(datetime.now() - scenario_start).total_seconds(),
                     ))
-            
+
             browser.close()
-    
+
     except Exception as e:
         return BrowserVerificationResult(
             executed=False,
@@ -224,12 +222,12 @@ def run_browser_verification(
             exception_details=str(e),
             duration_seconds=(datetime.now() - start_time).total_seconds(),
         )
-    
+
     passed_count = sum(1 for r in results if r.passed)
     failed_count = len(results) - passed_count
-    
+
     final_status = BrowserVerificationStatus.SUCCESS if failed_count == 0 else BrowserVerificationStatus.FAILED
-    
+
     return BrowserVerificationResult(
         executed=True,
         status=final_status,

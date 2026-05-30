@@ -1,30 +1,25 @@
 """Tests for Feature 059 - Browser Verification Completion Enforcement."""
 
-import pytest
-from pathlib import Path
 from datetime import datetime, timedelta
-import json
-
-from runtime.verification_session import (
-    VerificationSessionStatus,
-    TimeoutAction,
-    VerificationSession,
-    VerificationReminder,
-    VerificationSessionManager,
-    format_reminder,
-    generate_session_id,
-    DEFAULT_TIMEOUT,
-)
 
 from runtime.verification_enforcer import (
-    create_verification_session,
-    register_dev_server,
     begin_verification,
-    complete_verification,
+    can_mark_execution_success,
     check_verification_status,
+    complete_verification,
+    create_verification_session,
     enforce_completion,
     get_browser_verification_for_execution_result,
-    can_mark_execution_success,
+    register_dev_server,
+)
+from runtime.verification_session import (
+    DEFAULT_TIMEOUT,
+    VerificationReminder,
+    VerificationSession,
+    VerificationSessionManager,
+    VerificationSessionStatus,
+    format_reminder,
+    generate_session_id,
 )
 
 

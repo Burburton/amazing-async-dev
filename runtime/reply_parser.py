@@ -12,7 +12,7 @@ from typing import Any
 
 class ReplyCommand(str, Enum):
     """Supported reply commands."""
-    
+
     DECISION = "DECISION"
     APPROVE = "APPROVE"
     DEFER = "DEFER"
@@ -22,7 +22,7 @@ class ReplyCommand(str, Enum):
 
 class ValidationStatus(str, Enum):
     """Result of reply validation."""
-    
+
     VALID = "valid"
     INVALID_SYNTAX = "invalid_syntax"
     INVALID_OPTION = "invalid_option"
@@ -34,7 +34,7 @@ class ValidationStatus(str, Enum):
 @dataclass
 class ParsedReply:
     """Parsed reply result."""
-    
+
     command: ReplyCommand | None
     argument: str | None
     is_valid: bool
@@ -52,15 +52,15 @@ REPLY_GRAMMAR = {
 
 def parse_reply(reply_text: str) -> ParsedReply:
     """Parse reply text into structured result.
-    
+
     Args:
         reply_text: Raw reply text
-        
+
     Returns:
         ParsedReply with command, argument, validity
     """
     normalized = reply_text.strip().upper()
-    
+
     for command, pattern in REPLY_GRAMMAR.items():
         match = pattern.match(normalized)
         if match:
@@ -71,7 +71,7 @@ def parse_reply(reply_text: str) -> ParsedReply:
                 is_valid=True,
                 raw_text=reply_text,
             )
-    
+
     return ParsedReply(
         command=None,
         argument=None,
@@ -85,37 +85,37 @@ def validate_reply(
     request: dict[str, Any],
 ) -> tuple[bool, ValidationStatus, str | None]:
     """Validate parsed reply against decision request.
-    
+
     Args:
         parsed: Parsed reply
         request: Decision request to validate against
-        
+
     Returns:
         (is_valid, validation_status, error_message)
     """
     if not parsed.is_valid:
         return False, ValidationStatus.INVALID_SYNTAX, f"Invalid syntax: {parsed.raw_text}"
-    
+
     request_id = request.get("decision_request_id", "")
     status = request.get("status", "")
-    
+
     if status == "resolved":
         return False, ValidationStatus.DUPLICATE_REPLY, f"Request {request_id} already resolved"
-    
+
     if status == "expired":
         return False, ValidationStatus.EXPIRED_REQUEST, f"Request {request_id} is expired"
-    
+
     if parsed.command == ReplyCommand.DECISION:
         valid_options = [opt.get("id", "") for opt in request.get("options", [])]
         if parsed.argument not in valid_options:
             return False, ValidationStatus.INVALID_OPTION, f"Invalid option '{parsed.argument}', valid: {valid_options}"
-    
+
     if parsed.command == ReplyCommand.APPROVE:
         pending_risky = request.get("pending_risky_actions", [])
         risky_types = [a.get("action_type", "") for a in pending_risky]
         if parsed.argument not in risky_types:
             return False, ValidationStatus.INVALID_OPTION, f"Invalid action type '{parsed.argument}'"
-    
+
     return True, ValidationStatus.VALID, None
 
 
@@ -126,13 +126,13 @@ def create_reply_record(
     error_message: str | None = None,
 ) -> dict[str, Any]:
     """Create a reply record for storage.
-    
+
     Args:
         request_id: Decision request ID
         parsed: Parsed reply
         validation_status: Validation result
         error_message: Error if invalid
-        
+
     Returns:
         Reply record dict
     """
@@ -141,7 +141,7 @@ def create_reply_record(
         reply_value = parsed.command.value
         if parsed.argument:
             reply_value += f" {parsed.argument}"
-    
+
     return {
         "decision_request_id": request_id,
         "reply_value": reply_value,
@@ -159,11 +159,11 @@ def create_reply_record(
 
 def get_reply_action(parsed: ParsedReply, request: dict[str, Any]) -> str:
     """Determine action to take based on valid reply.
-    
+
     Args:
         parsed: Valid parsed reply
         request: Decision request
-        
+
     Returns:
         Action description
     """
@@ -174,25 +174,25 @@ def get_reply_action(parsed: ParsedReply, request: dict[str, Any]) -> str:
             if opt.get("id") == option_id:
                 return f"Selected option: {opt.get('label', option_id)}"
         return f"Selected option: {option_id}"
-    
+
     elif parsed.command == ReplyCommand.APPROVE:
         return f"Approved action: {parsed.argument}"
-    
+
     elif parsed.command == ReplyCommand.DEFER:
         return "Decision deferred, proceed with alternative"
-    
+
     elif parsed.command == ReplyCommand.RETRY:
         return "Retry requested"
-    
+
     elif parsed.command == ReplyCommand.CONTINUE:
         return "Continue without change"
-    
+
     return "Unknown action"
 
 
 def extract_request_id_from_email(reply_text: str) -> str | None:
     """Extract request ID from email reply if present.
-    
+
     Looks for patterns like:
     - In-Reply-To: dr-20260412-001
     - Subject: Re: [async-dev] Decision needed... dr-20260412-001
@@ -200,26 +200,26 @@ def extract_request_id_from_email(reply_text: str) -> str | None:
     patterns = [
         r"dr-[0-9]{8}-[0-9]{3}",
     ]
-    
+
     for pattern in patterns:
         match = re.search(pattern, reply_text)
         if match:
             return match.group(0)
-    
+
     return None
 
 
 def find_command_in_reply(reply_text: str) -> str | None:
     """Find command line in multi-line reply.
-    
+
     Looks for lines starting with DECISION, APPROVE, DEFER, RETRY, CONTINUE.
     """
     lines = reply_text.strip().split("\n")
-    
+
     for line in lines:
         line = line.strip()
         for command in ReplyCommand:
             if line.upper().startswith(command.value):
                 return line
-    
+
     return None

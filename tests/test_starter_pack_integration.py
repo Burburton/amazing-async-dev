@@ -1,15 +1,16 @@
 """Tests for starter pack consumer - advisor → async-dev integration."""
 
+from pathlib import Path
+
 import pytest
 import yaml
-from pathlib import Path
+
 from cli.starter_pack_consumer import (
+    MIN_ASYNCDEV_VERSION,
+    SUPPORTED_CONTRACT_VERSIONS,
     consume_starter_pack,
     format_product_brief_with_starter_pack,
     format_runstate_with_starter_pack,
-    ConsumptionResult,
-    SUPPORTED_CONTRACT_VERSIONS,
-    MIN_ASYNCDEV_VERSION,
 )
 
 

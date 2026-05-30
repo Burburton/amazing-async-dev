@@ -1,10 +1,10 @@
 """Tests for asyncdev acceptance CLI commands (Feature 077)."""
 
-import pytest
-from pathlib import Path
-from typer.testing import CliRunner
-from cli.commands.acceptance import app
 
+import pytest
+from typer.testing import CliRunner
+
+from cli.commands.acceptance import app
 
 runner = CliRunner()
 
@@ -14,7 +14,7 @@ def temp_project(temp_dir):
     """Create a minimal project with runstate."""
     project_path = temp_dir / "test-project"
     project_path.mkdir(parents=True)
-    
+
     runstate_path = project_path / "runstate.md"
     runstate_content = """# RunState
 
@@ -28,10 +28,10 @@ def temp_project(temp_dir):
 - updated_at: 2025-01-15T10:00:00Z
 """
     runstate_path.write_text(runstate_content)
-    
+
     execution_results_path = project_path / "execution-results"
     execution_results_path.mkdir()
-    
+
     execution_result_path = execution_results_path / "exec-test-001.md"
     execution_result_content = """# ExecutionResult
 
@@ -45,7 +45,7 @@ artifacts_created:
     type: file
 """
     execution_result_path.write_text(execution_result_content)
-    
+
     return project_path
 
 
@@ -168,45 +168,45 @@ class TestRecoveryClassifierAcceptance:
 
     def test_awaiting_acceptance_classification(self):
         from runtime.recovery_classifier import RecoveryClassification, classify_recovery
-        
+
         runstate = {
             "current_phase": "reviewing",
             "acceptance_recovery_pending": True,
         }
-        
+
         classification = classify_recovery(runstate)
         assert classification == RecoveryClassification.AWAITING_ACCEPTANCE
 
     def test_acceptance_terminal_state_failure_classification(self):
         from runtime.recovery_classifier import RecoveryClassification, classify_recovery
-        
+
         runstate = {
             "current_phase": "reviewing",
             "acceptance_terminal_state": "failure",
         }
-        
+
         classification = classify_recovery(runstate)
         assert classification == RecoveryClassification.AWAITING_ACCEPTANCE
 
     def test_needs_acceptance_eligibility(self):
         from runtime.recovery_classifier import ResumeEligibility, check_resume_eligibility
-        
+
         runstate = {
             "current_phase": "reviewing",
             "acceptance_recovery_pending": True,
         }
-        
+
         eligibility = check_resume_eligibility(runstate)
         assert eligibility == ResumeEligibility.NEEDS_ACCEPTANCE
 
     def test_acceptance_guidance_available(self):
         from runtime.recovery_classifier import RecoveryClassification, get_recovery_guidance
-        
+
         runstate = {
             "current_phase": "reviewing",
             "acceptance_recovery_pending": True,
         }
-        
+
         guidance = get_recovery_guidance(runstate)
         assert guidance["classification"] == RecoveryClassification.AWAITING_ACCEPTANCE.value
         assert "acceptance" in guidance["recommended_action"].lower()

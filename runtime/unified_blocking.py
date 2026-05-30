@@ -16,8 +16,6 @@ from pathlib import Path
 from typing import Any
 
 from runtime.decision_waiting_session import check_blocking_state, get_blocking_message
-from runtime.decision_request_store import DecisionRequestStore, DecisionRequestStatus
-from runtime.state_store import StateStore
 
 
 @dataclass
@@ -53,22 +51,22 @@ class VerificationException:
 @dataclass
 class UnifiedBlockingState:
     """Complete unified blocking state across all surfaces."""
-    
+
     # Session blocking (decisions)
     session_blocking: list[SessionBlockingState] = field(default_factory=list)
-    
+
     # Acceptance escalation
     acceptance_escalations: list[AcceptanceEscalation] = field(default_factory=list)
-    
+
     # Verification exceptions
     verification_exceptions: list[VerificationException] = field(default_factory=list)
-    
+
     # Computed properties
     is_blocked: bool = False
     total_blocking_count: int = 0
     blocking_summary: str = ""
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "session_blocking": [
@@ -106,7 +104,7 @@ class UnifiedBlockingState:
             "blocking_summary": self.blocking_summary,
             "updated_at": self.updated_at,
         }
-    
+
     def is_calm(self) -> bool:
         """Check if no blocking conditions exist."""
         return self.total_blocking_count == 0
@@ -115,12 +113,12 @@ class UnifiedBlockingState:
 def get_session_blocking_for_project(project_path: Path) -> SessionBlockingState | None:
     """Get session blocking state for a single project."""
     status, request_id = check_blocking_state(project_path)
-    
+
     if status == "CLEAR":
         return None
-    
+
     message = get_blocking_message(project_path)
-    
+
     return SessionBlockingState(
         status=status,
         request_id=request_id,
@@ -131,7 +129,7 @@ def get_session_blocking_for_project(project_path: Path) -> SessionBlockingState
 
 def get_acceptance_escalations_for_project(project_path: Path) -> list[AcceptanceEscalation]:
     """Get acceptance escalations for a project.
-    
+
     Currently returns empty list - acceptance escalation detection
     would need acceptance store integration.
     """
@@ -142,7 +140,7 @@ def get_acceptance_escalations_for_project(project_path: Path) -> list[Acceptanc
 
 def get_verification_exceptions_for_project(project_path: Path) -> list[VerificationException]:
     """Get verification exceptions for a project.
-    
+
     Currently returns empty list - verification exception detection
     would need verification store integration.
     """
@@ -153,45 +151,44 @@ def get_verification_exceptions_for_project(project_path: Path) -> list[Verifica
 
 def get_unified_blocking_state(projects_path: Path) -> UnifiedBlockingState:
     """Get unified blocking state across all projects.
-    
+
     Aggregates:
     - Session blocking (pending decisions)
     - Acceptance escalations
     - Verification exceptions
     """
     state = UnifiedBlockingState()
-    
+
     if not projects_path.exists():
         return state
-    
+
     project_dirs = [
         p for p in projects_path.iterdir()
         if p.is_dir() and not p.name.startswith(".")
     ]
-    
+
     for project_path in project_dirs:
-        project_id = project_path.name
-        
+
         # Session blocking
         session_blocking = get_session_blocking_for_project(project_path)
         if session_blocking:
             state.session_blocking.append(session_blocking)
-        
+
         # Acceptance escalations
         acceptance_escalations = get_acceptance_escalations_for_project(project_path)
         state.acceptance_escalations.extend(acceptance_escalations)
-        
+
         # Verification exceptions
         verification_exceptions = get_verification_exceptions_for_project(project_path)
         state.verification_exceptions.extend(verification_exceptions)
-    
+
     # Compute totals
     state.total_blocking_count = (
         len(state.session_blocking)
         + len(state.acceptance_escalations)
         + len(state.verification_exceptions)
     )
-    
+
     # Determine if blocked
     state.is_blocked = (
         any(sb.status == "BLOCKED" for sb in state.session_blocking)
@@ -199,7 +196,7 @@ def get_unified_blocking_state(projects_path: Path) -> UnifiedBlockingState:
         or len(state.acceptance_escalations) > 0
         or len(state.verification_exceptions) > 0
     )
-    
+
     # Generate summary
     if state.is_blocked:
         parts = []
@@ -217,7 +214,7 @@ def get_unified_blocking_state(projects_path: Path) -> UnifiedBlockingState:
         state.blocking_summary = ", ".join(parts)
     else:
         state.blocking_summary = "All clear"
-    
+
     return state
 
 

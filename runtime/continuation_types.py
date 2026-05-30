@@ -14,11 +14,11 @@ from typing import Any
 
 class ExecutionState(str, Enum):
     """Execution states for continuation semantics.
-    
+
     These states are operational, not merely descriptive.
     They determine what happens after a checkpoint.
     """
-    
+
     CHECKPOINT = "checkpoint"  # Milestone reached, evaluate continuation
     CONTINUE = "continue"      # Proceed to next canonical stage
     STOP = "stop"              # Terminal stop with explicit reason
@@ -29,11 +29,11 @@ class ExecutionState(str, Enum):
 
 class CheckpointType(str, Enum):
     """Types of checkpoint events.
-    
+
     Checkpoint events are milestones that should trigger
     continuation evaluation, not automatic termination.
     """
-    
+
     ITERATION_COMPLETED = "iteration_completed"
     IMPLEMENTATION_DONE = "implementation_done"
     TESTS_PASSED = "tests_passed"
@@ -47,12 +47,12 @@ class CheckpointType(str, Enum):
 
 class TerminalStopType(str, Enum):
     """Types of terminal stop events.
-    
+
     Terminal stops require explicit reasons matching
     valid stop conditions. Phase boundary alone is NOT
     a sufficient stop reason.
     """
-    
+
     ESCALATION_REQUIRED = "escalation_required"
     NO_MEANINGFUL_NEXT_STEP = "no_meaningful_next_step"
     EXTERNAL_BLOCKER = "external_blocker"
@@ -63,12 +63,12 @@ class TerminalStopType(str, Enum):
 
 class CanonicalStage(str, Enum):
     """Canonical next stages for continuation.
-    
+
     After a checkpoint, the system may continue into
     one of these stages based on current artifacts
     and governance context.
     """
-    
+
     DOGFOOD = "dogfood"
     FRICTION_CAPTURE = "friction_capture"
     AUDIT_CONSOLIDATION = "audit_consolidation"
@@ -84,18 +84,18 @@ class CanonicalStage(str, Enum):
 @dataclass
 class StopCondition:
     """Represents a stop condition with full context.
-    
+
     Stop conditions are explicit and inspectable.
     They must match a valid TerminalStopType.
     """
-    
+
     stop_type: TerminalStopType
     summary: str
     reason: str
     required_to_continue: str
     suggested_action: str
     details: dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -111,12 +111,12 @@ class StopCondition:
 @dataclass
 class ContinuationDecision:
     """Decision result from ContinuationEvaluator.
-    
+
     This is the output of evaluating whether to continue
     after a checkpoint. It provides clear, inspectable
     reasoning for the decision.
     """
-    
+
     state: ExecutionState
     checkpoint_type: CheckpointType | None = None
     stop_condition: StopCondition | None = None
@@ -126,7 +126,7 @@ class ContinuationDecision:
     reason: str = ""
     artifacts_for_next_stage: list[str] = field(default_factory=list)
     candidate_next_actions: list[str] = field(default_factory=list)
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -140,15 +140,15 @@ class ContinuationDecision:
             "artifacts_for_next_stage": self.artifacts_for_next_stage,
             "candidate_next_actions": self.candidate_next_actions,
         }
-    
+
     def is_checkpoint(self) -> bool:
         """Check if this is a checkpoint (non-terminal)."""
         return self.state == ExecutionState.CHECKPOINT
-    
+
     def should_continue(self) -> bool:
         """Check if continuation should proceed."""
         return self.state in (ExecutionState.CONTINUE, ExecutionState.CHECKPOINT)
-    
+
     def requires_escalation(self) -> bool:
         """Check if human escalation is required."""
         return self.state == ExecutionState.ESCALATE or self.escalation_required
@@ -157,13 +157,13 @@ class ContinuationDecision:
 @dataclass
 class ContinuityArtifact:
     """Machine-readable continuity artifact for checkpoint boundaries.
-    
+
     This artifact survives checkpoint boundaries and enables
     autonomous continuation and later audit.
-    
+
     Stored in RunState as 'continuity_context' field.
     """
-    
+
     latest_checkpoint: str = ""
     latest_checkpoint_type: CheckpointType | None = None
     continuation_allowed: bool = True
@@ -174,7 +174,7 @@ class ContinuityArtifact:
     last_meaningful_outputs: list[str] = field(default_factory=list)
     candidate_next_actions: list[str] = field(default_factory=list)
     updated_at: str = ""
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for RunState storage."""
         return {
@@ -189,7 +189,7 @@ class ContinuityArtifact:
             "candidate_next_actions": self.candidate_next_actions,
             "updated_at": self.updated_at,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ContinuityArtifact":
         """Create from dictionary."""
@@ -199,14 +199,14 @@ class ContinuityArtifact:
                 checkpoint_type = CheckpointType(data["latest_checkpoint_type"])
             except ValueError:
                 pass
-        
+
         next_stage = None
         if data.get("next_intended_stage"):
             try:
                 next_stage = CanonicalStage(data["next_intended_stage"])
             except ValueError:
                 pass
-        
+
         return cls(
             latest_checkpoint=data.get("latest_checkpoint", ""),
             latest_checkpoint_type=checkpoint_type,
@@ -235,7 +235,7 @@ INVALID_STOP_REASONS = [
 
 def is_valid_stop_reason(reason: str) -> bool:
     """Check if a stop reason is valid.
-    
+
     Invalid reasons are those that cite phase boundaries
     or session-style completion without genuine blockers.
     """

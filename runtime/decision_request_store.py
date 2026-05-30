@@ -1,15 +1,15 @@
 """Decision request store for async human decision channel (Feature 021)."""
 
+import json
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
-import json
 
 
 class DecisionRequestStatus(str, Enum):
     """Status of decision request."""
-    
+
     PENDING = "pending"
     SENT = "sent"
     REPLY_RECEIVED = "reply_received"
@@ -21,7 +21,7 @@ class DecisionRequestStatus(str, Enum):
 
 class DecisionType(str, Enum):
     """Type of decision needed."""
-    
+
     TECHNICAL = "technical"
     SCOPE = "scope"
     PRIORITY = "priority"
@@ -33,7 +33,7 @@ class DecisionType(str, Enum):
 
 class DeliveryChannel(str, Enum):
     """Channel for decision delivery."""
-    
+
     EMAIL = "email"
     MOCK_FILE = "mock_file"
     CONSOLE = "console"
@@ -42,24 +42,24 @@ class DeliveryChannel(str, Enum):
 
 class DecisionRequestStore:
     """Store for decision request lifecycle management."""
-    
+
     DEFAULT_OUTBOX_PATH = ".runtime/email-outbox"
     DEFAULT_REQUESTS_PATH = ".runtime/decision-requests"
-    
+
     def __init__(self, runtime_path: Path) -> None:
         self.runtime_path = runtime_path
         self.requests_path = runtime_path / self.DEFAULT_REQUESTS_PATH
         self.outbox_path = runtime_path / self.DEFAULT_OUTBOX_PATH
         self.requests_path.mkdir(parents=True, exist_ok=True)
         self.outbox_path.mkdir(parents=True, exist_ok=True)
-    
+
     def generate_request_id(self) -> str:
         """Generate unique decision request ID."""
         today = datetime.now().strftime("%Y%m%d")
         existing = list(self.requests_path.glob(f"dr-{today}-*.json"))
         next_num = len(existing) + 1
         return f"dr-{today}-{next_num:03d}"
-    
+
     def create_request(
         self,
         product_id: str,
@@ -75,7 +75,7 @@ class DecisionRequestStore:
         delivery_channel: DeliveryChannel = DeliveryChannel.MOCK_FILE,
     ) -> dict[str, Any]:
         """Create a new decision request.
-        
+
         Args:
             product_id: Product context
             feature_id: Feature context
@@ -88,18 +88,18 @@ class DecisionRequestStore:
             recommended_next_action: What happens after valid reply
             expires_hours: Hours until expiration
             delivery_channel: How to deliver
-            
+
         Returns:
             Created decision request
         """
         request_id = self.generate_request_id()
         now = datetime.now().isoformat()
-        
+
         expires_at = None
         if expires_hours:
             expires_dt = datetime.now() + timedelta(hours=expires_hours)
             expires_at = expires_dt.isoformat()
-        
+
         request = {
             "decision_request_id": request_id,
             "product_id": product_id,
@@ -117,24 +117,24 @@ class DecisionRequestStore:
             "sent_at": now,
             "status": DecisionRequestStatus.PENDING.value,
         }
-        
+
         self.save_request(request)
         return request
-    
+
     def _build_reply_hint(self, options: list[dict[str, str]]) -> str:
         """Build reply format hint from options."""
         option_ids = [opt.get("id", "?") for opt in options]
         commands = [f"DECISION {id}" for id in option_ids]
         commands.extend(["DEFER", "RETRY"])
         return f"Reply with: {', '.join(commands)}"
-    
+
     def save_request(self, request: dict[str, Any]) -> None:
         """Save decision request to file."""
         request_id = request.get("decision_request_id", "unknown")
         file_path = self.requests_path / f"{request_id}.json"
         with open(file_path, "w") as f:
             json.dump(request, f, indent=2)
-    
+
     def load_request(self, request_id: str) -> dict[str, Any] | None:
         """Load decision request by ID."""
         file_path = self.requests_path / f"{request_id}.json"
@@ -142,7 +142,7 @@ class DecisionRequestStore:
             return None
         with open(file_path) as f:
             return json.load(f)
-    
+
     def list_requests(
         self,
         status: DecisionRequestStatus | None = None,
@@ -155,7 +155,7 @@ class DecisionRequestStore:
                 if status is None or request.get("status") == status.value:
                     requests.append(request)
         return sorted(requests, key=lambda r: r.get("sent_at", ""))
-    
+
     def update_request_status(
         self,
         request_id: str,
@@ -167,21 +167,21 @@ class DecisionRequestStore:
         request = self.load_request(request_id)
         if not request:
             return None
-        
+
         request["status"] = status.value
         now = datetime.now().isoformat()
-        
+
         if status == DecisionRequestStatus.REPLY_RECEIVED:
             request["reply_received_at"] = now
             request["reply_raw_text"] = reply_raw_text
-        
+
         if status == DecisionRequestStatus.RESOLVED:
             request["resolved_at"] = now
             request["resolution"] = resolution
-        
+
         self.save_request(request)
         return request
-    
+
     def mark_sent(
         self,
         request_id: str,
@@ -193,19 +193,19 @@ class DecisionRequestStore:
         request = self.load_request(request_id)
         if not request:
             return None
-        
+
         request["status"] = DecisionRequestStatus.SENT.value
-        
+
         if email_to:
             request["email_to"] = email_to
         if email_subject:
             request["email_subject"] = email_subject
         if mock_path:
             request["email_sent_mock_path"] = mock_path
-        
+
         self.save_request(request)
         return request
-    
+
     def mark_resolved(
         self,
         request_id: str,
@@ -217,12 +217,12 @@ class DecisionRequestStore:
             DecisionRequestStatus.RESOLVED,
             resolution=resolution,
         )
-    
+
     def check_expired(self) -> list[dict[str, Any]]:
         """Check for expired requests and update their status."""
         now = datetime.now()
         expired = []
-        
+
         for request in self.list_requests(status=DecisionRequestStatus.SENT):
             expires_at = request.get("expires_at")
             if expires_at:
@@ -233,9 +233,9 @@ class DecisionRequestStore:
                         DecisionRequestStatus.EXPIRED,
                     )
                     expired.append(request)
-        
+
         return expired
-    
+
     def get_pending_for_product(
         self,
         product_id: str,
@@ -247,7 +247,7 @@ class DecisionRequestStore:
         if feature_id:
             filtered = [r for r in filtered if r.get("feature_id") == feature_id]
         return filtered
-    
+
     def get_statistics(self) -> dict[str, int]:
         """Get statistics about decision requests."""
         stats = {}
@@ -257,4 +257,4 @@ class DecisionRequestStore:
         return stats
 
 
-from datetime import timedelta  # Import at end to avoid circular reference
+from datetime import timedelta  # noqa: E402  # Import at end to avoid circular reference

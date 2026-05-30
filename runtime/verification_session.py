@@ -5,12 +5,12 @@ ensuring AI agents complete verification workflows instead of
 stopping at "server started".
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+import json
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
-import json
 
 
 class VerificationSessionStatus(str, Enum):

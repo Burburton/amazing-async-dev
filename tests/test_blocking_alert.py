@@ -35,7 +35,7 @@ class TestGenerateBlockingAlert:
         assert "**[!WARNING] BLOCKING ALERT**" in alert
         assert "dr-001" in alert
         assert "BLOCKED - Waiting for human decision reply" in alert
-    
+
     def test_generates_alert_when_pending_request_exists(self):
         runstate = {
             "current_phase": "planning",
@@ -46,21 +46,21 @@ class TestGenerateBlockingAlert:
         assert "**[!WARNING] BLOCKING ALERT**" in alert
         assert "dr-002" in alert
         assert "WAITING_DECISION" in alert
-    
+
     def test_no_alert_when_clear(self):
         runstate = {
             "current_phase": "planning",
         }
         alert = generate_blocking_alert(runstate)
         assert alert == ""
-    
+
     def test_no_alert_when_blocked_without_request(self):
         runstate = {
             "current_phase": "blocked",
         }
         alert = generate_blocking_alert(runstate)
         assert alert == ""
-    
+
     def test_no_alert_when_completed(self):
         runstate = {
             "current_phase": "completed",
@@ -73,7 +73,7 @@ class TestHasBlockingAlert:
     def test_detects_alert_in_content(self):
         content = "# RunState\n\n> **[!WARNING] BLOCKING ALERT**\n\n```yaml\n..."
         assert has_blocking_alert(content) is True
-    
+
     def test_returns_false_without_alert(self):
         content = "# RunState\n\n```yaml\n...\n```"
         assert has_blocking_alert(content) is False
@@ -84,9 +84,9 @@ class TestRemoveBlockingAlert:
         content = """# RunState
 
 > **[!WARNING] BLOCKING ALERT**
-> 
+>
 > **Status**: BLOCKED
-> 
+>
 > **Reference**: AGENTS.md
 
 ```yaml
@@ -96,7 +96,7 @@ current_phase: blocked
         cleaned = remove_blocking_alert(content)
         assert "**[!WARNING] BLOCKING ALERT**" not in cleaned
         assert "```yaml" in cleaned
-    
+
     def test_preserves_content_without_alert(self):
         content = "# RunState\n\n```yaml\n...\n```"
         cleaned = remove_blocking_alert(content)
@@ -106,7 +106,7 @@ current_phase: blocked
 class TestStateStoreBlockingAlert:
     def test_save_injects_alert_when_blocked(self, temp_project):
         store = StateStore(temp_project)
-        
+
         runstate = {
             "project_id": "test",
             "feature_id": "001",
@@ -122,16 +122,16 @@ class TestStateStoreBlockingAlert:
             "last_action": "test",
             "next_recommended_action": "test",
         }
-        
+
         store.save_runstate(runstate)
-        
+
         content = (temp_project / "runstate.md").read_text()
         assert has_blocking_alert(content) is True
         assert "dr-001" in content
-    
+
     def test_save_no_alert_when_clear(self, temp_project):
         store = StateStore(temp_project)
-        
+
         runstate = {
             "project_id": "test",
             "feature_id": "001",
@@ -145,15 +145,15 @@ class TestStateStoreBlockingAlert:
             "last_action": "test",
             "next_recommended_action": "test",
         }
-        
+
         store.save_runstate(runstate)
-        
+
         content = (temp_project / "runstate.md").read_text()
         assert has_blocking_alert(content) is False
-    
+
     def test_alert_removed_after_unblock(self, temp_project):
         store = StateStore(temp_project)
-        
+
         runstate_blocked = {
             "project_id": "test",
             "feature_id": "001",
@@ -169,12 +169,12 @@ class TestStateStoreBlockingAlert:
             "last_action": "test",
             "next_recommended_action": "test",
         }
-        
+
         store.save_runstate(runstate_blocked)
-        
+
         content_blocked = (temp_project / "runstate.md").read_text()
         assert has_blocking_alert(content_blocked) is True
-        
+
         runstate_clear = {
             "project_id": "test",
             "feature_id": "001",
@@ -188,15 +188,15 @@ class TestStateStoreBlockingAlert:
             "last_action": "unblocked",
             "next_recommended_action": "continue",
         }
-        
+
         store.save_runstate(runstate_clear)
-        
+
         content_clear = (temp_project / "runstate.md").read_text()
         assert has_blocking_alert(content_clear) is False
-    
+
     def test_load_preserves_yaml_data_with_alert(self, temp_project):
         store = StateStore(temp_project)
-        
+
         runstate = {
             "project_id": "test",
             "feature_id": "001",
@@ -212,11 +212,11 @@ class TestStateStoreBlockingAlert:
             "last_action": "test",
             "next_recommended_action": "test",
         }
-        
+
         store.save_runstate(runstate)
-        
+
         loaded = store.load_runstate()
-        
+
         assert loaded is not None
         assert loaded["project_id"] == "test"
         assert loaded["current_phase"] == "blocked"
@@ -227,10 +227,11 @@ class TestStateStoreBlockingAlert:
 class TestSessionStartCLI:
     def test_check_returns_exit_2_when_blocked(self, temp_project):
         from typer.testing import CliRunner
+
         from cli.commands.session_start import app
-        
+
         store = StateStore(temp_project)
-        
+
         runstate = {
             "project_id": temp_project.name,
             "feature_id": "001",
@@ -246,22 +247,23 @@ class TestSessionStartCLI:
             "last_action": "test",
             "next_recommended_action": "test",
         }
-        
+
         store.save_runstate(runstate)
-        
+
         runner = CliRunner()
         result = runner.invoke(app, ["check", "--project", temp_project.name, "--path", str(temp_project.parent)])
-        
+
         assert result.exit_code == 2
         assert "BLOCKING ALERT" in result.output
         assert "dr-001" in result.output
-    
+
     def test_check_returns_exit_0_when_clear(self, temp_project):
         from typer.testing import CliRunner
+
         from cli.commands.session_start import app
-        
+
         store = StateStore(temp_project)
-        
+
         runstate = {
             "project_id": temp_project.name,
             "feature_id": "001",
@@ -275,21 +277,22 @@ class TestSessionStartCLI:
             "last_action": "test",
             "next_recommended_action": "test",
         }
-        
+
         store.save_runstate(runstate)
-        
+
         runner = CliRunner()
         result = runner.invoke(app, ["check", "--project", temp_project.name, "--path", str(temp_project.parent)])
-        
+
         assert result.exit_code == 0
         assert "CLEAR" in result.output
-    
+
     def test_status_shows_blocking_summary(self, temp_project):
         from typer.testing import CliRunner
+
         from cli.commands.session_start import app
-        
+
         store = StateStore(temp_project)
-        
+
         runstate = {
             "project_id": temp_project.name,
             "feature_id": "001",
@@ -305,12 +308,12 @@ class TestSessionStartCLI:
             "last_action": "test",
             "next_recommended_action": "test",
         }
-        
+
         store.save_runstate(runstate)
-        
+
         runner = CliRunner()
         result = runner.invoke(app, ["status", "--path", str(temp_project.parent)])
-        
+
         assert result.exit_code == 0
         assert "BLOCKED" in result.output
         assert "1" in result.output

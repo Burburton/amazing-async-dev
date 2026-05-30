@@ -3,12 +3,12 @@
 from enum import Enum
 from typing import Any
 
-from runtime.pause_reason import PauseReason, PauseCategory
+from runtime.pause_reason import PauseCategory, PauseReason
 
 
 class PolicyMode(str, Enum):
     """Execution policy modes."""
-    
+
     CONSERVATIVE = "conservative"
     BALANCED = "balanced"
     LOW_INTERRUPTION = "low_interruption"
@@ -16,7 +16,7 @@ class PolicyMode(str, Enum):
 
 class ActionType(str, Enum):
     """Types of actions that may require pause."""
-    
+
     GIT_PUSH = "git_push"
     GIT_COMMIT_TO_REMOTE = "git_commit_to_remote"
     ARCHIVE_IRREVERSIBLE = "archive_irreversible"
@@ -58,38 +58,38 @@ def should_auto_continue(
     execution_result: dict[str, Any] | None = None,
 ) -> bool:
     """Check if transition should auto-continue based on policy.
-    
+
     Args:
         runstate: Current RunState
         transition_type: Type of transition (e.g., 'execution_success_to_review')
         execution_result: Optional execution result for context
-        
+
     Returns:
         True if should auto-continue, False if should pause
     """
     policy_mode = get_policy_mode(runstate)
-    
+
     # Check must-pause conditions first (always pause regardless of mode)
     pause_reason = check_must_pause_conditions(runstate)
     if pause_reason:
         return False
-    
+
     # Check auto-continue rules based on mode
     auto_continue_rules = get_auto_continue_rules(policy_mode)
-    
+
     if transition_type in auto_continue_rules:
         # Verify conditions are met
         conditions_met = check_auto_continue_conditions(
             runstate, transition_type, execution_result
         )
         return conditions_met
-    
+
     # Check conditional pause rules
     conditional_pause = get_conditional_pause_rules(policy_mode)
     if transition_type in conditional_pause:
         # Conditional - may pause depending on context
         return False
-    
+
     # Default: pause in conservative, auto-continue in low-interruption
     if policy_mode == PolicyMode.CONSERVATIVE:
         return False
@@ -102,7 +102,7 @@ def should_auto_continue(
 
 def check_must_pause_conditions(runstate: dict[str, Any]) -> PauseReason | None:
     """Check must-pause conditions (always pause regardless of mode).
-    
+
     Returns PauseReason if must pause, None if can proceed.
     """
     # Check blocked_items
@@ -116,7 +116,7 @@ def check_must_pause_conditions(runstate: dict[str, Any]) -> PauseReason | None:
             required_to_continue="Resolve blocker or use alternative task",
             suggested_next_action="asyncdev resume-next-day unblock --retry or --alternative <task>",
         )
-    
+
     # Check decisions_needed (must pause in conservative/balanced)
     decisions_needed = runstate.get("decisions_needed", [])
     policy_mode = get_policy_mode(runstate)
@@ -129,7 +129,7 @@ def check_must_pause_conditions(runstate: dict[str, Any]) -> PauseReason | None:
             required_to_continue="Make decision (approve/revise/defer) or use --force",
             suggested_next_action="asyncdev resume-next-day continue-loop --decision approve",
         )
-    
+
     # Check scope_change_flag
     if runstate.get("scope_change_flag", False):
         return PauseReason(
@@ -139,7 +139,7 @@ def check_must_pause_conditions(runstate: dict[str, Any]) -> PauseReason | None:
             required_to_continue="Acknowledge scope change or revert",
             suggested_next_action="Review scope change, use --acknowledge-scope or --revert",
         )
-    
+
     # Check pending_risky_actions
     pending_risky = runstate.get("pending_risky_actions", [])
     for action in pending_risky:
@@ -152,7 +152,7 @@ def check_must_pause_conditions(runstate: dict[str, Any]) -> PauseReason | None:
                 required_to_continue=f"Confirm {action_type} to proceed",
                 suggested_next_action=f"Use --confirm-{action_type.replace('_', '-')} to proceed",
             )
-    
+
     return None
 
 
@@ -163,11 +163,11 @@ def check_auto_continue_conditions(
 ) -> bool:
     """Check if conditions for auto-continue are met."""
     conditions = get_transition_conditions(transition_type)
-    
+
     for condition in conditions:
         if not evaluate_condition(runstate, condition, execution_result):
             return False
-    
+
     return True
 
 
@@ -289,13 +289,13 @@ def register_risky_action(
     requires_confirmation: bool = True,
 ) -> dict[str, Any]:
     """Register a pending risky action in RunState.
-    
+
     Args:
         runstate: Current RunState (will be modified)
         action_type: Type of risky action
         target: Optional target of the action
         requires_confirmation: Whether confirmation is required
-        
+
     Returns:
         Updated runstate
     """
@@ -311,11 +311,11 @@ def register_risky_action(
 
 def clear_risky_action(runstate: dict[str, Any], action_type: ActionType) -> dict[str, Any]:
     """Clear a pending risky action after confirmation.
-    
+
     Args:
         runstate: Current RunState (will be modified)
         action_type: Type of action to clear
-        
+
     Returns:
         Updated runstate
     """
@@ -327,11 +327,11 @@ def clear_risky_action(runstate: dict[str, Any], action_type: ActionType) -> dic
 
 def set_scope_change_flag(runstate: dict[str, Any], flag: bool) -> dict[str, Any]:
     """Set scope change flag in RunState.
-    
+
     Args:
         runstate: Current RunState (will be modified)
         flag: Value to set
-        
+
     Returns:
         Updated runstate
     """
@@ -341,11 +341,11 @@ def set_scope_change_flag(runstate: dict[str, Any], flag: bool) -> dict[str, Any
 
 def set_policy_mode(runstate: dict[str, Any], mode: PolicyMode) -> dict[str, Any]:
     """Set policy mode in RunState.
-    
+
     Args:
         runstate: Current RunState (will be modified)
         mode: Policy mode to set
-        
+
     Returns:
         Updated runstate
     """
@@ -365,10 +365,10 @@ def get_pause_reason_for_action(action_type: ActionType, target: str | None = No
         ActionType.GITHUB_ISSUE_CREATE: "Create GitHub issue",
         ActionType.REMOTE_STATE_CHANGE: "Remote state mutation",
     }
-    
+
     desc = action_descriptions.get(action_type, action_type.value)
     target_str = f" (target: {target})" if target else ""
-    
+
     return PauseReason(
         category=PauseCategory.RISKY_ACTION,
         summary=f"{desc}{target_str}",
@@ -383,11 +383,11 @@ def can_auto_proceed_after_execution(
     execution_result: dict[str, Any],
 ) -> tuple[bool, PauseReason | None]:
     """Check if system can auto-proceed after execution result.
-    
+
     Args:
         runstate: Current RunState
         execution_result: Execution result from run-day
-        
+
     Returns:
         (can_proceed, pause_reason_if_blocked)
     """
@@ -400,22 +400,22 @@ def can_auto_proceed_after_execution(
             required_to_continue="Review execution result and retry or handle failure",
             suggested_next_action="asyncdev resume-next-day handle-failed --retry or --abandon",
         )
-    
+
     # Check if auto-continue is allowed
     can_auto = should_auto_continue(
         runstate,
         "execution_success_to_review",
         execution_result,
     )
-    
+
     if can_auto:
         return True, None
-    
+
     # Get the reason for pause
     pause_reason = check_must_pause_conditions(runstate)
     if pause_reason:
         return False, pause_reason
-    
+
     # Policy boundary pause
     return False, PauseReason(
         category=PauseCategory.POLICY_BOUNDARY,

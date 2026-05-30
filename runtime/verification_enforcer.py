@@ -5,7 +5,6 @@ preventing AI agents from stopping at "server started"
 without completing actual verification.
 """
 
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 

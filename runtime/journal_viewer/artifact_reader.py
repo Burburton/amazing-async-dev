@@ -3,16 +3,17 @@
 V1.1: Stabilized artifact ingestion with fallback handling.
 """
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
 import yaml
-from dataclasses import dataclass, field
 
 
 @dataclass
 class JournalEntry:
     """Normalized journal entry from an async-dev artifact.
-    
+
     V1.1: Stable internal event shape for timeline view.
     """
     timestamp: str = ""
@@ -279,7 +280,7 @@ def parse_runstate(path: Path) -> JournalEntry:
     except Exception as e:
         return JournalEntry(
             artifact_type="runstate",
-            title=f"Parse Error - runstate.md",
+            title="Parse Error - runstate.md",
             summary=f"Could not read artifact: {str(e)[:50]}",
             source_path=str(path),
             parse_status="error",
@@ -297,7 +298,7 @@ PARSERS = {
 
 def build_journal_timeline(project_path: Path) -> tuple[list[JournalEntry], list[str]]:
     """Build journal timeline with warnings for missing/partial artifacts.
-    
+
     Returns:
         tuple: (entries, warnings)
     """

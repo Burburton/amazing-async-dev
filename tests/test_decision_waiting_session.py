@@ -1,12 +1,10 @@
 """Tests for Decision Waiting Session (Feature 064)."""
 
-import pytest
-from pathlib import Path
 from runtime.decision_waiting_session import (
     check_blocking_state,
-    should_block_todo_continuation,
     get_blocking_message,
     session_startup_check,
+    should_block_todo_continuation,
 )
 
 
@@ -21,7 +19,7 @@ class TestCheckBlockingState:
         project_path = temp_dir / "test-project"
         project_path.mkdir()
         (project_path / ".runtime").mkdir()
-        
+
         runstate_content = """# RunState
 
 ```yaml
@@ -35,7 +33,7 @@ decision_request_pending: dr-20260422-001
 ```
 """
         (project_path / "runstate.md").write_text(runstate_content)
-        
+
         status, request_id = check_blocking_state(project_path)
         assert status == "BLOCKED"
         assert request_id == "dr-20260422-001"
@@ -44,7 +42,7 @@ decision_request_pending: dr-20260422-001
         project_path = temp_dir / "test-project"
         project_path.mkdir()
         (project_path / ".runtime").mkdir()
-        
+
         runstate_content = """# RunState
 
 ```yaml
@@ -57,7 +55,7 @@ decision_request_pending: dr-20260422-002
 ```
 """
         (project_path / "runstate.md").write_text(runstate_content)
-        
+
         status, request_id = check_blocking_state(project_path)
         assert status == "WAITING_DECISION"
         assert request_id == "dr-20260422-002"
@@ -66,7 +64,7 @@ decision_request_pending: dr-20260422-002
         project_path = temp_dir / "test-project"
         project_path.mkdir()
         (project_path / ".runtime").mkdir()
-        
+
         runstate_content = """# RunState
 
 ```yaml
@@ -77,7 +75,7 @@ decisions_needed: []
 ```
 """
         (project_path / "runstate.md").write_text(runstate_content)
-        
+
         status, request_id = check_blocking_state(project_path)
         assert status == "CLEAR"
         assert request_id is None
@@ -93,7 +91,7 @@ class TestShouldBlockTodoContinuation:
         project_path = temp_dir / "test-project"
         project_path.mkdir()
         (project_path / ".runtime").mkdir()
-        
+
         runstate_content = """# RunState
 
 ```yaml
@@ -102,7 +100,7 @@ decision_request_pending: dr-test-001
 ```
 """
         (project_path / "runstate.md").write_text(runstate_content)
-        
+
         result = should_block_todo_continuation(project_path)
         assert result is True
 
@@ -110,7 +108,7 @@ decision_request_pending: dr-test-001
         project_path = temp_dir / "test-project"
         project_path.mkdir()
         (project_path / ".runtime").mkdir()
-        
+
         runstate_content = """# RunState
 
 ```yaml
@@ -119,7 +117,7 @@ decision_request_pending: dr-test-002
 ```
 """
         (project_path / "runstate.md").write_text(runstate_content)
-        
+
         result = should_block_todo_continuation(project_path)
         assert result is True
 
@@ -134,7 +132,7 @@ class TestGetBlockingMessage:
         project_path = temp_dir / "test-project"
         project_path.mkdir()
         (project_path / ".runtime").mkdir()
-        
+
         runstate_content = """# RunState
 
 ```yaml
@@ -143,7 +141,7 @@ decision_request_pending: dr-123
 ```
 """
         (project_path / "runstate.md").write_text(runstate_content)
-        
+
         message = get_blocking_message(project_path)
         assert "blocked" in message.lower()
         assert "dr-123" in message
@@ -161,7 +159,7 @@ class TestSessionStartupCheck:
         project_path = temp_dir / "test-project"
         project_path.mkdir()
         (project_path / ".runtime").mkdir()
-        
+
         runstate_content = """# RunState
 
 ```yaml
@@ -170,7 +168,7 @@ decision_request_pending: dr-test-003
 ```
 """
         (project_path / "runstate.md").write_text(runstate_content)
-        
+
         result = session_startup_check(project_path)
         assert result["status"] == "BLOCKED"
         assert result["action"] == "poll_and_wait"

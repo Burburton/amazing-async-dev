@@ -1,14 +1,13 @@
 """Tests for reply_action_mapper module (Feature 043)."""
 
-import pytest
 
 from runtime.reply_action_mapper import (
     REPLY_ACTION_MAP,
-    map_reply_to_action,
     get_continuation_phase_for_reply,
     get_next_recommended_for_reply,
+    map_reply_to_action,
 )
-from runtime.reply_parser import ReplyCommand, ParsedReply
+from runtime.reply_parser import ParsedReply, ReplyCommand
 
 
 class TestReplyActionMap:
@@ -46,9 +45,9 @@ class TestMapReplyToAction:
         request = {
             "options": [{"id": "A", "label": "Use YAML"}],
         }
-        
+
         result = map_reply_to_action(parsed, request)
-        
+
         assert result["runstate_action"] == "select_option"
         assert result["selected_option_id"] == "A"
         assert result["selected_option_label"] == "Use YAML"
@@ -61,9 +60,9 @@ class TestMapReplyToAction:
             raw_text="APPROVE PUSH",
         )
         request = {}
-        
+
         result = map_reply_to_action(parsed, request)
-        
+
         assert result["runstate_action"] == "approve_risky_action"
         assert result["approved_action_type"] == "PUSH"
 
@@ -75,9 +74,9 @@ class TestMapReplyToAction:
             raw_text="DEFER",
         )
         request = {}
-        
+
         result = map_reply_to_action(parsed, request)
-        
+
         assert result["runstate_action"] == "defer_decision"
         assert result["continuation_phase"] == "planning"
 
@@ -89,9 +88,9 @@ class TestMapReplyToAction:
             raw_text="RETRY",
         )
         request = {}
-        
+
         result = map_reply_to_action(parsed, request)
-        
+
         assert result["runstate_action"] == "mark_retry_needed"
         assert result["continuation_phase"] == "executing"
 
@@ -103,9 +102,9 @@ class TestMapReplyToAction:
             raw_text="UNKNOWN",
         )
         request = {}
-        
+
         result = map_reply_to_action(parsed, request)
-        
+
         assert result["runstate_action"] == "unknown"
 
 

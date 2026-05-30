@@ -5,11 +5,11 @@ from enum import Enum
 
 class ExecutionEventType(str, Enum):
     """Types of execution lifecycle events to log.
-    
+
     These events provide inspectable history of workflow actions,
     supporting recovery diagnosis and operational debugging.
     """
-    
+
     # Day loop lifecycle
     PLAN_DAY_STARTED = "plan-day-started"
     PLAN_DAY_COMPLETED = "plan-day-completed"
@@ -19,36 +19,36 @@ class ExecutionEventType(str, Enum):
     REVIEW_NIGHT_STARTED = "review-night-started"
     REVIEW_NIGHT_GENERATED = "review-night-generated"
     RESUME_NEXT_DAY_STARTED = "resume-next-day-started"
-    
+
     # External execution mode
     EXTERNAL_EXECUTION_TRIGGERED = "external-execution-triggered"
     EXTERNAL_EXECUTION_AWAITING = "external-execution-awaiting"
     EXTERNAL_EXECUTION_CLOSEOUT = "external-execution-closeout"
-    
+
     # State transitions
     BLOCKED_ENTERED = "blocked-entered"
     BLOCKED_RESOLVED = "blocked-resolved"
     FAILED_ENTERED = "failed-entered"
     FAILED_HANDLED = "failed-handled"
-    
+
     # Decision handling
     DECISION_ESCALATED = "decision-escalated"
     DECISION_APPROVED = "decision-approved"
     DECISION_REVISED = "decision-revised"
     DECISION_DEFERRED = "decision-deferred"
-    
+
     # Feature lifecycle
     COMPLETE_FEATURE = "complete-feature"
     ARCHIVE_FEATURE = "archive-feature"
     NEW_FEATURE = "new-feature"
     NEW_PRODUCT = "new-product"
-    
+
     # Recovery actions
     RESUME_ATTEMPTED = "resume-attempted"
     RESUME_VALIDATED = "resume-validated"
     RESUME_BLOCKED = "resume-blocked"
     RECOVERY_GUIDANCE_PROVIDED = "recovery-guidance-provided"
-    
+
     # Stop points
     NORMAL_STOP = "normal-stop"
     INTERRUPTED_STOP = "interrupted-stop"

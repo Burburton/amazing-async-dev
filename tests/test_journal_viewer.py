@@ -1,32 +1,29 @@
 """Tests for Loop Journal Viewer V1.3 - Project and Feature Scoped Views."""
 
+
 import pytest
-from pathlib import Path
 from typer.testing import CliRunner
+
+from cli.commands.journal import app
 from runtime.journal_viewer.artifact_reader import (
+    CANONICAL_LOOP_ORDER,
+    DAY_DETAIL_ORDER,
     JournalEntry,
     build_journal_timeline,
     extract_yaml_block,
-    safe_extract_date_from_exec_id,
-    parse_review_pack,
     parse_execution_pack,
     parse_execution_result,
-    CANONICAL_LOOP_ORDER,
-    DAY_DETAIL_ORDER,
+    parse_review_pack,
+    safe_extract_date_from_exec_id,
 )
 from runtime.journal_viewer.tui_viewer import (
     filter_entries,
     filter_entries_strict,
-    group_entries_by_day,
-    group_entries_by_feature,
     get_artifact_summary,
     get_available_features,
-    display_day_detail,
-    display_feature_timeline,
-    display_project_summary,
+    group_entries_by_day,
+    group_entries_by_feature,
 )
-from cli.commands.journal import app
-
 
 runner = CliRunner()
 

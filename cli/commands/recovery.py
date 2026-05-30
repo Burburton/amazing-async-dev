@@ -6,27 +6,26 @@ Architecture Reference: docs/infra/async-dev-platform-architecture-product-posit
 Spec: docs/infra/execution-recovery-console-spec-v1.md
 """
 
-from pathlib import Path
-from datetime import datetime
 import subprocess
 import sys
+from datetime import datetime
+from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from runtime.state_store import StateStore
-from runtime.sqlite_state_store import SQLiteStateStore
+from runtime.execution_observer import run_observer
 from runtime.recovery_classifier import (
-    classify_recovery,
-    check_resume_eligibility,
-    get_recovery_guidance,
     RecoveryClassification,
-    ResumeEligibility,
+    check_resume_eligibility,
+    classify_recovery,
+    get_recovery_guidance,
 )
-from runtime.execution_observer import run_observer, ObservationResult
-from runtime.recovery_data_adapter import RecoveryDataAdapter, get_recovery_item_for_project
+from runtime.recovery_data_adapter import RecoveryDataAdapter
+from runtime.sqlite_state_store import SQLiteStateStore
+from runtime.state_store import StateStore
 
 app = typer.Typer(help="Execution Recovery Console - Operator surface for recovery operations")
 console = Console()
@@ -38,15 +37,15 @@ def _invoke_asyncdev_command(command: str, project_id: str, extra_args: list[str
     args = [sys.executable, str(cli_path)] + command.split() + ["--project", project_id]
     if extra_args:
         args.extend(extra_args)
-    
+
     console.print(f"\n[cyan]Invoking: {command} --project {project_id}[/cyan]")
     result = subprocess.run(args, capture_output=True, text=True)
-    
+
     if result.stdout:
         console.print(result.stdout)
     if result.stderr:
         console.print(f"[red]{result.stderr}[/red]")
-    
+
     return result.returncode
 
 
@@ -59,10 +58,10 @@ def _get_all_projects(path: Path) -> list[Path]:
 def _get_recoveries_for_project(project_path: Path) -> list[dict]:
     adapter = RecoveryDataAdapter(project_path)
     item = adapter.get_recovery_item()
-    
+
     if item is None:
         return []
-    
+
     return [{
         "project": item.product_id,
         "feature": item.feature_id,
@@ -90,7 +89,7 @@ def list(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """List all executions needing recovery.
-    
+
     Shows executions across all projects that are in recovery-required state:
     - BLOCKED: Workflow blocked by external dependency
     - FAILED: Execution failed unexpectedly
@@ -98,26 +97,26 @@ def list(
     - UNSAFE_TO_RESUME: State inconsistent, needs inspection
     """
     console.print(Panel("Execution Recovery Console", title="recovery list", border_style="blue"))
-    
+
     projects = _get_all_projects(path)
-    
+
     if project:
         project_path = path / project
         if not project_path.exists():
             console.print(f"[red]Project not found: {project}[/red]")
             raise typer.Exit(1)
         projects = [project_path]
-    
+
     all_recoveries = []
     for project_path in projects:
         recoveries = _get_recoveries_for_project(project_path)
         all_recoveries.extend(recoveries)
-    
+
     if not all_recoveries:
         console.print("[green]No executions needing recovery[/green]")
         console.print("[dim]All workflows are in healthy state[/dim]")
         return
-    
+
     urgency_order = {
         "failed": 0,
         "blocked": 1,
@@ -125,12 +124,12 @@ def list(
         "awaiting_acceptance": 3,
         "unsafe_to_resume": 4,
     }
-    
+
     all_recoveries.sort(key=lambda r: (
         urgency_order.get(r["classification"], 4),
         r["updated_at"] or "",
     ))
-    
+
     table = Table(title="Executions Needing Recovery")
     table.add_column("Execution ID", style="cyan", width=25)
     table.add_column("Project", style="green", width=15)
@@ -138,7 +137,7 @@ def list(
     table.add_column("Reason", style="white", width=35)
     table.add_column("Suggested Action", style="magenta", width=25)
     table.add_column("Updated", style="dim", width=10)
-    
+
     classification_style = {
         "failed": "red",
         "blocked": "orange1",
@@ -146,13 +145,13 @@ def list(
         "awaiting_acceptance": "cyan",
         "unsafe_to_resume": "magenta",
     }
-    
+
     for r in all_recoveries:
         style = classification_style.get(r["classification"], "white")
         updated = r["updated_at"][:10] if r["updated_at"] else "N/A"
         reason_short = r["reason"][:35] if len(r["reason"]) > 35 else r["reason"]
         action_short = r["recommended_action"][:25] if len(r["recommended_action"]) > 25 else r["recommended_action"]
-        
+
         table.add_row(
             r["execution_id"],
             r["project"],
@@ -161,28 +160,28 @@ def list(
             action_short,
             updated,
         )
-    
+
     console.print(table)
-    
+
     console.print(f"\n[bold]Summary:[/bold] {len(all_recoveries)} executions need recovery")
-    
+
     counts = {}
     for r in all_recoveries:
         c = r["classification"]
         counts[c] = counts.get(c, 0) + 1
-    
+
     console.print("\n[bold]By Type:[/bold]")
     for c, count in sorted(counts.items(), key=lambda x: urgency_order.get(x[0], 4)):
         style = classification_style.get(c, "white")
         console.print(f"  [{style}]{c}[/{style}]: {count}")
-    
-    console.print(f"\n[dim]Use 'asyncdev recovery show --execution <id>' for details[/dim]")
-    console.print(f"[dim]Use 'asyncdev recovery resume --execution <id> --action <action>' to recover[/dim]")
+
+    console.print("\n[dim]Use 'asyncdev recovery show --execution <id>' for details[/dim]")
+    console.print("[dim]Use 'asyncdev recovery resume --execution <id> --action <action>' to recover[/dim]")
 
 
 def _parse_execution_id(execution: str, path: Path) -> tuple[str, str]:
     """Parse execution ID by matching against existing project directories.
-    
+
     Handles hyphenated project/feature IDs like:
     - exec-acceptance-pilot-001-001-backend-cli-test
     - project_id: acceptance-pilot-001
@@ -191,7 +190,7 @@ def _parse_execution_id(execution: str, path: Path) -> tuple[str, str]:
     parts = execution.split("-")
     if len(parts) < 3 or parts[0] != "exec":
         return None, None
-    
+
     # Try to find project_id by matching against existing directories
     rest = parts[1:]  # All parts after "exec"
     for i in range(len(rest), 0, -1):
@@ -199,7 +198,7 @@ def _parse_execution_id(execution: str, path: Path) -> tuple[str, str]:
         if (path / candidate_project).exists():
             feature_id = "-".join(rest[i:])
             return candidate_project, feature_id
-    
+
     # Fallback: use first segment as project, rest as feature
     return rest[0], "-".join(rest[1:])
 
@@ -212,30 +211,30 @@ def show(
 ):
     """Show detailed recovery information for an execution."""
     project_id, feature_id = _parse_execution_id(execution, path)
-    
+
     if project_id is None:
         console.print(f"[red]Invalid execution ID format: {execution}[/red]")
         console.print("[yellow]Expected format: exec-{project}-{feature}[/yellow]")
         raise typer.Exit(1)
-    
+
     project_path = path / project_id
     if not project_path.exists():
         console.print(f"[red]Project not found: {project_id}[/red]")
         raise typer.Exit(1)
-    
+
     store = StateStore(project_path)
     runstate = store.load_runstate()
-    
+
     if runstate is None:
         console.print(f"[red]No RunState found for project: {project_id}[/red]")
         raise typer.Exit(1)
-    
+
     console.print(Panel(f"Recovery Details: {execution}", title="recovery show", border_style="blue"))
-    
+
     classification = classify_recovery(runstate)
     eligibility = check_resume_eligibility(runstate)
     guidance = get_recovery_guidance(runstate)
-    
+
     classification_style = {
         RecoveryClassification.FAILED: "red",
         RecoveryClassification.BLOCKED: "orange1",
@@ -244,13 +243,13 @@ def show(
         RecoveryClassification.NORMAL_PAUSE: "green",
         RecoveryClassification.READY_TO_RESUME: "green",
     }
-    
+
     style = classification_style.get(classification, "white")
-    
+
     info_table = Table(title="Recovery Analysis", show_header=False)
     info_table.add_column("Field", style="cyan")
     info_table.add_column("Value", style="green")
-    
+
     info_table.add_row("Execution ID", execution)
     info_table.add_row("Project", project_id)
     info_table.add_row("Feature", feature_id)
@@ -259,103 +258,103 @@ def show(
     info_table.add_row("Current Phase", runstate.get("current_phase", "N/A"))
     info_table.add_row("Last Action", runstate.get("last_action", "N/A")[:50])
     info_table.add_row("Updated", runstate.get("updated_at", "N/A")[:19])
-    
+
     console.print(info_table)
-    
+
     console.print(Panel(guidance["explanation"], title="Diagnosis", border_style="yellow"))
     console.print(f"[bold cyan]Recommended Action:[/bold cyan] {guidance['recommended_action']}")
-    
+
     if guidance.get("warnings"):
         console.print("\n[bold red]Warnings:[/bold red]")
         for w in guidance["warnings"]:
             console.print(f"  - {w}")
-    
-    console.print(f"\n[bold]Context:[/bold]")
+
+    console.print("\n[bold]Context:[/bold]")
     console.print(f"  Blocked items: {guidance['blocked_count']}")
     console.print(f"  Pending decisions: {guidance['decisions_count']}")
-    
+
     sqlite_store = SQLiteStateStore(project_path)
     events = sqlite_store.get_recent_events(feature_id, limit=10)
-    
+
     if events:
         console.print("\n[bold]Recent Events:[/bold]")
         events_table = Table()
         events_table.add_column("Event", style="cyan")
         events_table.add_column("Time", style="dim")
-        
+
         for e in events[:5]:
             event_type = e.get("event_type", "unknown")
             event_time = e.get("occurred_at", "N/A")
             events_table.add_row(event_type, event_time[:19] if len(event_time) > 19 else event_time)
-        
+
         console.print(events_table)
-    
+
     sqlite_store.close()
-    
+
     console.print("\n[bold]Linked Artifacts:[/bold]")
-    
+
     runstate_path = project_path / "runstate.md"
     if runstate_path.exists():
         console.print(f"  RunState: {runstate_path}")
-    
+
     execution_packs_dir = project_path / "execution-packs"
     if execution_packs_dir.exists():
         packs = sorted(execution_packs_dir.glob("*.md"))
         if packs:
             console.print(f"  ExecutionPacks: {len(packs)} files")
             console.print(f"    Latest: {packs[-1].name}")
-    
+
     execution_results_dir = project_path / "execution-results"
     if execution_results_dir.exists():
         results = sorted(execution_results_dir.glob("*.md"))
         if results:
             console.print(f"  ExecutionResults: {len(results)} files")
             console.print(f"    Latest: {results[-1].name}")
-    
+
     acceptance_status = runstate.get("acceptance_terminal_state", "")
     acceptance_recovery_pending = runstate.get("acceptance_recovery_pending", False)
-    
+
     if acceptance_status or acceptance_recovery_pending or classification == RecoveryClassification.AWAITING_ACCEPTANCE:
         console.print("\n[bold cyan]Acceptance Recovery:[/bold cyan]")
-        
+
         if acceptance_status:
             console.print(f"  Terminal State: {acceptance_status}")
-        
+
         if acceptance_recovery_pending:
-            console.print(f"  Recovery Pending: Yes")
+            console.print("  Recovery Pending: Yes")
             recovery_pack_id = runstate.get("acceptance_recovery_pack_id", "")
             if recovery_pack_id:
                 console.print(f"  Recovery Pack: {recovery_pack_id}")
-        
+
         acceptance_results_dir = project_path / "acceptance-results"
         if acceptance_results_dir.exists():
             acc_results = sorted(acceptance_results_dir.glob("*.md"))
             if acc_results:
                 console.print(f"  Acceptance Results: {len(acc_results)} files")
                 console.print(f"    Latest: {acc_results[-1].name}")
-        
+
         from runtime.acceptance_recovery_adapter import AcceptanceRecoveryAdapter
         adapter = AcceptanceRecoveryAdapter(project_path)
         summary = adapter.get_acceptance_recovery_summary(feature_id, runstate)
-        
+
         if summary and summary.recovery_significant:
             console.print(f"\n  [bold]Failed Criteria: {len(summary.latest_failed_criteria)}[/bold]")
             for criterion in summary.latest_failed_criteria[:5]:
                 console.print(f"    [red]- {criterion}[/red]")
-            
+
             if summary.latest_remediation_summary:
-                console.print(f"\n  [bold]Remediation Guidance:[/bold]")
+                console.print("\n  [bold]Remediation Guidance:[/bold]")
                 for remediation in summary.latest_remediation_summary[:3]:
                     console.print(f"    [{remediation.get('priority', 'medium')}]{remediation.get('criterion_id', '')}[/{remediation.get('priority', 'medium')}]: {remediation.get('suggested_fix', '')[:50]}")
-            
+
             if summary.needs_reacceptance:
                 console.print(f"\n  [yellow]Re-acceptance Required: {summary.reacceptance_required_reason}[/yellow]")
                 console.print(f"  [cyan]Next Action: {summary.recommended_action}[/cyan]")
                 if summary.suggested_command:
                     console.print(f"  [cyan]Command: {summary.suggested_command}[/cyan]")
-    
+
     console.print("\n[bold]Available Recovery Actions:[/bold]")
-    
+
     action_map = {
         RecoveryClassification.BLOCKED: [
             ("unblock", "Resolve blocker and continue"),
@@ -383,17 +382,17 @@ def show(
             ("abort", "Abort execution"),
         ],
     }
-    
+
     available_actions = action_map.get(classification, [("abort", "Abort execution")])
-    
+
     for action, desc in available_actions:
         console.print(f"  [cyan]{action}[/cyan]: {desc}")
-    
+
     if observe:
         console.print("\n[bold]Observer Findings:[/bold]")
-        
+
         obs_result = run_observer(project_path)
-        
+
         if obs_result.findings:
             findings_table = Table()
             findings_table.add_column("Type", style="cyan")
@@ -401,16 +400,16 @@ def show(
             findings_table.add_column("Reason")
             findings_table.add_column("Action")
             findings_table.add_column("Detected", style="dim")
-            
+
             for f in obs_result.findings:
                 sev_style = {
                     "critical": "red bold",
                     "high": "yellow",
                     "medium": "blue",
                 }.get(f.severity.value, "")
-                
+
                 detected = f.detected_at[:19] if len(f.detected_at) > 19 else f.detected_at
-                
+
                 findings_table.add_row(
                     f.finding_type.value,
                     f"[{sev_style}]{f.severity.value}[/{sev_style}]",
@@ -418,32 +417,32 @@ def show(
                     f.suggested_action[:35] if len(f.suggested_action) > 35 else f.suggested_action,
                     detected,
                 )
-            
+
             console.print(findings_table)
-            
+
             recovery_sig = [f for f in obs_result.findings if f.recovery_significant]
             if recovery_sig:
                 console.print(f"\n[bold red]Recovery-significant findings: {len(recovery_sig)}[/bold red]")
-            
+
             if obs_result.findings:
                 for f in obs_result.findings[:3]:
                     if f.related_artifacts:
                         console.print(f"[dim]Related artifacts for {f.finding_type.value}:[/dim]")
                         for artifact in f.related_artifacts[:2]:
                             console.print(f"  [dim]- {artifact}[/dim]")
-            
+
             console.print(f"[dim]Summary: {obs_result.summary}[/dim]")
         else:
             console.print("[green]No observer findings[/green]")
-    
+
     from runtime.cross_surface_links import (
-        get_recovery_to_decision_link,
-        get_recovery_to_acceptance_link,
         format_cross_link,
+        get_recovery_to_acceptance_link,
+        get_recovery_to_decision_link,
     )
-    
+
     cross_links = []
-    
+
     if classification == RecoveryClassification.AWAITING_DECISION:
         decision_request_id = runstate.get("decision_request_pending")
         link = get_recovery_to_decision_link(
@@ -454,7 +453,7 @@ def show(
         )
         if link:
             cross_links.append(link)
-    
+
     if classification == RecoveryClassification.AWAITING_ACCEPTANCE or acceptance_recovery_pending:
         link = get_recovery_to_acceptance_link(
             project_id=project_id,
@@ -464,13 +463,13 @@ def show(
         )
         if link:
             cross_links.append(link)
-    
+
     if cross_links:
         console.print("\n[bold magenta]Cross-Surface Links[/bold magenta]")
         formatted = format_cross_link(cross_links)
         for link_str in formatted:
             console.print(f"  {link_str}")
-    
+
     console.print(f"\n[dim]Run: asyncdev recovery resume --execution {execution} --action <action>[/dim]")
 
 
@@ -483,7 +482,7 @@ def resume(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Execute a recovery action to resume execution.
-    
+
     With --execute flag, automatically invokes the suggested asyncdev command.
     Without --execute, updates state and prints suggested command for operator review.
     """
@@ -491,23 +490,23 @@ def resume(
     if len(parts) < 3 or parts[0] != "exec":
         console.print(f"[red]Invalid execution ID format: {execution}[/red]")
         raise typer.Exit(1)
-    
+
     project_id = "-".join(parts[1:-1])
     feature_id = parts[-1]
-    
+
     project_path = path / project_id
     store = StateStore(project_path)
     runstate = store.load_runstate()
-    
+
     if runstate is None:
-        console.print(f"[red]No RunState found[/red]")
+        console.print("[red]No RunState found[/red]")
         raise typer.Exit(1)
-    
+
     classification = classify_recovery(runstate)
-    eligibility = check_resume_eligibility(runstate)
-    
+    check_resume_eligibility(runstate)
+
     console.print(Panel(f"Executing Recovery: {action}", title="recovery resume", border_style="green"))
-    
+
     valid_action_map = {
         RecoveryClassification.BLOCKED: ["unblock", "abort"],
         RecoveryClassification.FAILED: ["retry", "escalate", "abort"],
@@ -516,14 +515,14 @@ def resume(
         RecoveryClassification.NORMAL_PAUSE: ["continue"],
         RecoveryClassification.READY_TO_RESUME: ["continue"],
     }
-    
+
     valid_actions = valid_action_map.get(classification, [])
-    
+
     if action not in valid_actions:
         console.print(f"[red]Action '{action}' not valid for classification '{classification.value}'[/red]")
         console.print(f"[yellow]Valid actions: {', '.join(valid_actions)}[/yellow]")
         raise typer.Exit(1)
-    
+
     if action == "abort":
         console.print("[yellow]Aborting execution...[/yellow]")
         runstate["current_phase"] = "completed"
@@ -532,7 +531,7 @@ def resume(
         store.save_runstate(runstate)
         console.print("[green]Execution aborted[/green]")
         console.print("[dim]RunState updated to 'completed' phase[/dim]")
-    
+
     elif action == "unblock":
         console.print("[yellow]Unblocking execution...[/yellow]")
         runstate["blocked_items"] = []
@@ -543,7 +542,7 @@ def resume(
         console.print("[green]Blockers cleared[/green]")
         console.print("[dim]RunState updated to 'planning' phase[/dim]")
         console.print("[dim]Next: asyncdev plan-day create[/dim]")
-    
+
     elif action == "continue":
         console.print("[yellow]Continuing execution...[/yellow]")
         runstate["current_phase"] = "planning"
@@ -553,7 +552,7 @@ def resume(
         console.print("[green]Execution ready to continue[/green]")
         console.print("[dim]RunState updated to 'planning' phase[/dim]")
         console.print("[dim]Next: asyncdev plan-day create[/dim]")
-    
+
     elif action == "retry":
         console.print("[yellow]Marking for retry...[/yellow]")
         runstate["current_phase"] = "planning"
@@ -563,7 +562,7 @@ def resume(
         console.print("[green]Ready for retry[/green]")
         console.print("[dim]RunState updated to 'planning' phase[/dim]")
         console.print("[dim]Next: asyncdev run-day[/dim]")
-    
+
     elif action == "defer":
         console.print("[yellow]Deferring execution...[/yellow]")
         runstate["last_action"] = f"recovery_defer: {reason or 'Operator deferred'}"
@@ -571,12 +570,12 @@ def resume(
         store.save_runstate(runstate)
         console.print("[green]Execution deferred[/green]")
         console.print("[dim]RunState unchanged, decisions preserved[/dim]")
-    
+
     elif action == "inspect":
         console.print("[yellow]Marking for manual inspection...[/yellow]")
         console.print("[bold]Manual inspection required[/bold]")
         console.print(f"[dim]Run: asyncdev inspect-stop --project {project_id}[/dim]")
-    
+
     elif action == "reset":
         console.print("[yellow]Resetting to safe state...[/yellow]")
         runstate["current_phase"] = "planning"
@@ -589,16 +588,16 @@ def resume(
         console.print("[green]State reset[/green]")
         console.print("[dim]RunState reset to clean 'planning' phase[/dim]")
         console.print("[dim]Next: asyncdev plan-day create[/dim]")
-    
+
     elif action == "escalate":
         console.print("[yellow]Escalating to human...[/yellow]")
         console.print("[bold]This requires manual intervention[/bold]")
         console.print(f"[dim]Review the execution and decide: {execution}[/dim]")
-    
+
     else:
         console.print(f"[red]Unknown action: {action}[/red]")
         raise typer.Exit(1)
-    
+
     sqlite_store = SQLiteStateStore(project_path)
     sqlite_store.log_event(
         "recovery-action",
@@ -611,9 +610,9 @@ def resume(
         },
     )
     sqlite_store.close()
-    
-    console.print(f"\n[dim]Recovery logged to SQLite[/dim]")
-    
+
+    console.print("\n[dim]Recovery logged to SQLite[/dim]")
+
     if execute and action in ("unblock", "continue", "retry", "reset"):
         next_command = {
             "unblock": "plan-day create",

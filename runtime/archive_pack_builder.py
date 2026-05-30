@@ -188,10 +188,10 @@ def build_backfill_archive_pack(
     feature_spec_path: Path | None = None,
 ) -> dict[str, Any]:
     """Build ArchivePack for historical feature backfill.
-    
+
     Creates a simplified archive record for features completed before
     the formal archive system existed. Clearly marked as backfilled.
-    
+
     Args:
         feature_id: Feature being backfilled
         product_id: Product ID
@@ -204,13 +204,13 @@ def build_backfill_archive_pack(
         artifact_links: List of important artifact paths
         historical_notes: Notes about historical context
         feature_spec_path: Path to feature-spec.yaml for extraction
-        
+
     Returns:
         ArchivePack dict with backfill metadata
     """
     if title is None:
         title = _extract_title_from_spec(feature_id, product_id, feature_spec_path)
-    
+
     outputs = []
     for output in (delivered_outputs or []):
         outputs.append({
@@ -218,7 +218,7 @@ def build_backfill_archive_pack(
             "path": output,
             "type": _guess_output_type(output),
         })
-    
+
     decisions = []
     for decision in (decisions_made or []):
         decisions.append({
@@ -226,21 +226,21 @@ def build_backfill_archive_pack(
             "rationale": "Historical record",
             "impact": "Documented during backfill",
         })
-    
+
     lessons = _parse_lessons(lessons_input)
     if not lessons:
         lessons = [{
             "lesson": "No explicit lessons recorded",
             "context": "Historical feature - lessons may need manual addition",
         }]
-    
+
     patterns = _parse_patterns(patterns_input)
     if not patterns:
         patterns = [{
             "pattern": "Standard implementation approach",
             "applicability": "Historical feature context",
         }]
-    
+
     links = []
     for link in (artifact_links or []):
         links.append({
@@ -248,7 +248,7 @@ def build_backfill_archive_pack(
             "type": _guess_output_type(link),
             "note": "Historical reference",
         })
-    
+
     archive_pack = {
         "feature_id": feature_id,
         "product_id": product_id,
@@ -264,18 +264,18 @@ def build_backfill_archive_pack(
         "backfilled_at": datetime.now().isoformat(),
         "backfill_source": "manual-backfill-command",
     }
-    
+
     if historical_notes:
         archive_pack["historical_notes"] = historical_notes
-    
+
     archive_pack["known_gaps"] = [
         "Original execution logs not available",
         "Intermediate runtime artifacts may be missing",
         "Decision traceability limited to backfill input",
     ]
-    
+
     archive_pack["backfill_confidence"] = "medium"
-    
+
     return archive_pack
 
 
@@ -285,15 +285,15 @@ def _extract_title_from_spec(
     spec_path: Path | None = None,
 ) -> str:
     import yaml
-    
+
     if spec_path is None:
         spec_path = Path("projects") / product_id / "features" / feature_id / "feature-spec.yaml"
-    
+
     if spec_path.exists():
         with open(spec_path, encoding="utf-8") as f:
             spec = yaml.safe_load(f)
             return spec.get("name", spec.get("title", feature_id))
-    
+
     return feature_id
 
 
@@ -303,12 +303,12 @@ def check_backfill_eligibility(
     projects_path: Path = Path("projects"),
 ) -> dict[str, Any]:
     """Check if a feature is eligible for archive backfill.
-    
+
     Args:
         feature_id: Feature to check
         product_id: Product ID
         projects_path: Root projects directory
-        
+
     Returns:
         Dict with eligibility status and reasoning
     """
@@ -316,7 +316,7 @@ def check_backfill_eligibility(
     feature_dir = project_path / "features" / feature_id
     archive_path = project_path / "archive" / feature_id / "archive-pack.yaml"
     runstate_path = project_path / "runstate.md"
-    
+
     result = {
         "feature_id": feature_id,
         "product_id": product_id,
@@ -324,17 +324,17 @@ def check_backfill_eligibility(
         "reasons": [],
         "warnings": [],
     }
-    
+
     if archive_path.exists():
         result["reasons"].append("Already archived - no need to backfill")
         result["warnings"].append("Archive pack already exists at: " + str(archive_path))
         return result
-    
+
     if not feature_dir.exists():
         result["reasons"].append("Feature directory does not exist")
         result["warnings"].append("No feature found at: " + str(feature_dir))
         return result
-    
+
     spec_path = feature_dir / "feature-spec.yaml"
     if spec_path.exists():
         result["has_spec"] = True
@@ -342,7 +342,7 @@ def check_backfill_eligibility(
     else:
         result["has_spec"] = False
         result["warnings"].append("No feature-spec.yaml found")
-    
+
     if runstate_path.exists():
         import yaml
         with open(runstate_path, encoding="utf-8") as f:
@@ -352,18 +352,18 @@ def check_backfill_eligibility(
             if yaml_start >= 0 and yaml_end >= 0:
                 yaml_content = content[yaml_start + 7:yaml_end]
                 runstate = yaml.safe_load(yaml_content)
-                
+
                 current_feature = runstate.get("feature_id", "")
                 current_phase = runstate.get("current_phase", "")
-                
+
                 if current_feature == feature_id and current_phase == "archived":
                     result["already_archived_in_runstate"] = True
                     result["warnings"].append("Feature marked archived in RunState but no archive-pack found")
                 elif current_feature == feature_id:
                     result["current_phase"] = current_phase
                     result["warnings"].append(f"Feature in RunState at phase: {current_phase}")
-    
+
     result["eligible"] = True
     result["reasons"].append("Feature exists and not yet archived")
-    
+
     return result

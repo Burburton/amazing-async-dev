@@ -1,10 +1,8 @@
 """Tests for asyncdev init command."""
 
-import pytest
-from pathlib import Path
 from typer.testing import CliRunner
-from cli.commands.init import app
 
+from cli.commands.init import app
 
 runner = CliRunner()
 

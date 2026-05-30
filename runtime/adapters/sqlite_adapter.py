@@ -5,7 +5,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 DB_FILENAME = "amazing_async_dev.db"
 
 

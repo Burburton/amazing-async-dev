@@ -7,17 +7,16 @@ Tests for:
 - FrontendRecipeResult serialization and gate status
 """
 
-import pytest
 
 from runtime.frontend_recipe_state import (
-    FrontendRecipeStage,
-    FrontendRecipeFailureReason,
-    ServerStartupInfo,
-    ReadinessProbeInfo,
-    FrontendRecipeResult,
-    DEFAULT_SERVER_START_TIMEOUT_SECONDS,
-    DEFAULT_READINESS_PROBE_TIMEOUT_SECONDS,
     DEFAULT_BROWSER_VERIFICATION_TIMEOUT_SECONDS,
+    DEFAULT_READINESS_PROBE_TIMEOUT_SECONDS,
+    DEFAULT_SERVER_START_TIMEOUT_SECONDS,
+    FrontendRecipeFailureReason,
+    FrontendRecipeResult,
+    FrontendRecipeStage,
+    ReadinessProbeInfo,
+    ServerStartupInfo,
 )
 
 
@@ -30,28 +29,28 @@ class TestFrontendRecipeStage:
         assert FrontendRecipeStage.RESULT_PERSISTING.value == "result_persisting"
         assert FrontendRecipeStage.COMPLETED_SUCCESS.value == "completed_success"
         assert FrontendRecipeStage.COMPLETED_FAILURE.value == "completed_failure"
-    
+
     def test_terminal_stages(self):
         terminal = FrontendRecipeStage.terminal_stages()
         assert FrontendRecipeStage.COMPLETED_SUCCESS in terminal
         assert FrontendRecipeStage.COMPLETED_FAILURE in terminal
         assert FrontendRecipeStage.COMPLETED_TIMEOUT in terminal
         assert FrontendRecipeStage.SERVER_STARTING not in terminal
-    
+
     def test_success_terminal(self):
         success = FrontendRecipeStage.success_terminal()
         assert FrontendRecipeStage.COMPLETED_SUCCESS in success
         assert FrontendRecipeStage.COMPLETED_FAILURE not in success
-    
+
     def test_is_terminal(self):
         assert FrontendRecipeStage.COMPLETED_SUCCESS.is_terminal()
         assert FrontendRecipeStage.COMPLETED_FAILURE.is_terminal()
         assert FrontendRecipeStage.SERVER_STARTING.is_terminal() is False
-    
+
     def test_is_success(self):
         assert FrontendRecipeStage.COMPLETED_SUCCESS.is_success()
         assert FrontendRecipeStage.COMPLETED_FAILURE.is_success() is False
-    
+
     def test_stage_from_string(self):
         stage = FrontendRecipeStage("server_starting")
         assert stage == FrontendRecipeStage.SERVER_STARTING
@@ -79,7 +78,7 @@ class TestServerStartupInfo:
         assert info.command == ["npm", "run", "dev"]
         assert info.detected_port == 5173
         assert info.detected_url == "http://localhost:5173"
-    
+
     def test_server_startup_defaults(self):
         info = ServerStartupInfo(command=["npm", "run", "dev"])
         assert info.detected_port is None
@@ -101,7 +100,7 @@ class TestReadinessProbeInfo:
         assert info.probe_attempts == 3
         assert info.successful_probe is True
         assert info.http_status_code == 200
-    
+
     def test_readiness_probe_defaults(self):
         info = ReadinessProbeInfo(target_url="http://localhost:5173")
         assert info.probe_attempts == 0
@@ -121,7 +120,7 @@ class TestFrontendRecipeResult:
         assert result.execution_id == "exec-test-001"
         assert result.framework == "vite"
         assert result.success is False
-    
+
     def test_result_to_dict(self):
         server_info = ServerStartupInfo(
             command=["npm", "run", "dev"],
@@ -129,13 +128,13 @@ class TestFrontendRecipeResult:
             detected_url="http://localhost:5173",
             startup_duration_seconds=2.5,
         )
-        
+
         readiness_info = ReadinessProbeInfo(
             target_url="http://localhost:5173",
             probe_attempts=2,
             successful_probe=True,
         )
-        
+
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.COMPLETED_SUCCESS,
             execution_id="exec-test-002",
@@ -147,9 +146,9 @@ class TestFrontendRecipeResult:
             success=True,
             total_duration_seconds=125.0,
         )
-        
+
         data = result.to_dict()
-        
+
         assert data["stage"] == "completed_success"
         assert data["execution_id"] == "exec-test-002"
         assert data["framework"] == "vite"
@@ -157,7 +156,7 @@ class TestFrontendRecipeResult:
         assert data["browser_verification_executed"] is True
         assert data["server_startup"]["detected_port"] == 5173
         assert data["readiness_probe"]["successful_probe"] is True
-    
+
     def test_result_is_complete(self):
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.SERVER_STARTING,
@@ -165,10 +164,10 @@ class TestFrontendRecipeResult:
             project_path="/tmp/test-project",
         )
         assert result.is_complete() is False
-        
+
         result.stage = FrontendRecipeStage.COMPLETED_SUCCESS
         assert result.is_complete()
-    
+
     def test_result_allows_success_progression(self):
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.COMPLETED_SUCCESS,
@@ -177,14 +176,14 @@ class TestFrontendRecipeResult:
             success=True,
         )
         assert result.allows_success_progression()
-        
+
         result.success = False
         assert result.allows_success_progression() is False
-        
+
         result.stage = FrontendRecipeStage.SERVER_STARTING
         result.success = True
         assert result.allows_success_progression() is False
-    
+
     def test_result_get_gate_status(self):
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.COMPLETED_SUCCESS,
@@ -193,10 +192,10 @@ class TestFrontendRecipeResult:
             success=True,
         )
         assert result.get_gate_status() == "allowed"
-        
+
         result.success = False
         assert result.get_gate_status() == "blocked"
-    
+
     def test_result_with_failure_reason(self):
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.COMPLETED_FAILURE,
@@ -206,11 +205,11 @@ class TestFrontendRecipeResult:
             failure_reason=FrontendRecipeFailureReason.SERVER_START_FAILED,
             error_message="npm run dev exited with code 1",
         )
-        
+
         assert result.failure_reason == FrontendRecipeFailureReason.SERVER_START_FAILED
         assert result.error_message == "npm run dev exited with code 1"
         assert result.allows_success_progression() is False
-        
+
         data = result.to_dict()
         assert data["failure_reason"] == "server_start_failed"
 
@@ -222,13 +221,13 @@ class TestStageTransitions:
             execution_id="exec-transition-001",
             project_path="/tmp/test",
         )
-        
+
         result.stage = FrontendRecipeStage.SERVER_STARTING
         result.server_startup = ServerStartupInfo(command=["npm", "run", "dev"])
-        
+
         assert result.stage == FrontendRecipeStage.SERVER_STARTING
         assert result.server_startup is not None
-    
+
     def test_server_starting_to_readiness_probing(self):
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.SERVER_STARTING,
@@ -240,15 +239,15 @@ class TestStageTransitions:
                 detected_url="http://localhost:5173",
             ),
         )
-        
+
         result.stage = FrontendRecipeStage.READINESS_PROBING
         result.readiness_probe = ReadinessProbeInfo(
             target_url="http://localhost:5173",
         )
-        
+
         assert result.stage == FrontendRecipeStage.READINESS_PROBING
         assert result.readiness_probe.target_url == "http://localhost:5173"
-    
+
     def test_readiness_to_browser_verification(self):
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.READINESS_PROBING,
@@ -259,13 +258,13 @@ class TestStageTransitions:
                 successful_probe=True,
             ),
         )
-        
+
         result.stage = FrontendRecipeStage.BROWSER_VERIFICATION
         result.browser_verification_executed = True
-        
+
         assert result.stage == FrontendRecipeStage.BROWSER_VERIFICATION
         assert result.browser_verification_executed
-    
+
     def test_browser_to_result_persisting(self):
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.BROWSER_VERIFICATION,
@@ -273,37 +272,37 @@ class TestStageTransitions:
             project_path="/tmp/test",
             browser_verification_executed=True,
         )
-        
+
         result.stage = FrontendRecipeStage.RESULT_PERSISTING
-        
+
         assert result.stage == FrontendRecipeStage.RESULT_PERSISTING
-    
+
     def test_persisting_to_completed_success(self):
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.RESULT_PERSISTING,
             execution_id="exec-transition-005",
             project_path="/tmp/test",
         )
-        
+
         result.stage = FrontendRecipeStage.COMPLETED_SUCCESS
         result.success = True
         result.result_persisted = True
         result.result_artifact_path = "/tmp/test/execution-results/exec-transition-005.md"
-        
+
         assert result.is_complete()
         assert result.allows_success_progression()
-    
+
     def test_any_stage_to_failure(self):
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.SERVER_STARTING,
             execution_id="exec-failure-001",
             project_path="/tmp/test",
         )
-        
+
         result.stage = FrontendRecipeStage.COMPLETED_FAILURE
         result.success = False
         result.failure_reason = FrontendRecipeFailureReason.SERVER_START_FAILED
-        
+
         assert result.is_complete()
         assert result.allows_success_progression() is False
 
@@ -311,9 +310,9 @@ class TestStageTransitions:
 class TestTimeoutConstants:
     def test_server_start_timeout(self):
         assert DEFAULT_SERVER_START_TIMEOUT_SECONDS == 30
-    
+
     def test_readiness_probe_timeout(self):
         assert DEFAULT_READINESS_PROBE_TIMEOUT_SECONDS == 60
-    
+
     def test_browser_verification_timeout(self):
         assert DEFAULT_BROWSER_VERIFICATION_TIMEOUT_SECONDS == 120

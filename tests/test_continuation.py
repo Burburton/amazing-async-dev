@@ -14,32 +14,31 @@ AC-8: The system no longer emits behavior equivalent to:
 "successful implementation complete, next step known, no blocker, but stopping because this would be a new session"
 """
 
+from runtime.continuation_evaluator import (
+    apply_continuation_decision_to_runstate,
+    evaluate_continuation,
+    get_continuation_summary,
+    should_auto_proceed_to_next_stage,
+    validate_stop_reason,
+)
 from runtime.continuation_types import (
-    ExecutionState,
-    CheckpointType,
     CanonicalStage,
-    TerminalStopType,
+    CheckpointType,
     ContinuationDecision,
-    StopCondition,
     ContinuityArtifact,
+    ExecutionState,
+    StopCondition,
+    TerminalStopType,
     is_valid_stop_reason,
 )
 from runtime.stop_conditions import (
     check_escalation_required,
-    check_no_meaningful_next_step,
     check_external_blocker,
     check_integrity_safety_pause,
+    check_no_meaningful_next_step,
     check_policy_based_stop,
     evaluate_all_stop_conditions,
     resolve_next_canonical_stage,
-    has_meaningful_next_step,
-)
-from runtime.continuation_evaluator import (
-    evaluate_continuation,
-    should_auto_proceed_to_next_stage,
-    get_continuation_summary,
-    validate_stop_reason,
-    apply_continuation_decision_to_runstate,
 )
 
 
@@ -79,21 +78,21 @@ class TestContinuationTypes:
         result = decision.to_dict()
         assert result["state"] == "continue"
         assert result["checkpoint_type"] == "iteration_completed"
-        assert result["continuation_allowed"] == True
+        assert result["continuation_allowed"]
 
     def test_continuation_decision_is_checkpoint(self):
         decision = ContinuationDecision(state=ExecutionState.CHECKPOINT)
-        assert decision.is_checkpoint() == True
+        assert decision.is_checkpoint()
 
         decision = ContinuationDecision(state=ExecutionState.STOP)
-        assert decision.is_checkpoint() == False
+        assert not decision.is_checkpoint()
 
     def test_continuation_decision_should_continue(self):
         decision = ContinuationDecision(state=ExecutionState.CONTINUE)
-        assert decision.should_continue() == True
+        assert decision.should_continue()
 
         decision = ContinuationDecision(state=ExecutionState.STOP)
-        assert decision.should_continue() == False
+        assert not decision.should_continue()
 
     def test_continuity_artifact_to_dict_and_from_dict(self):
         artifact = ContinuityArtifact(
@@ -108,16 +107,16 @@ class TestContinuationTypes:
         assert restored.continuation_allowed == artifact.continuation_allowed
 
     def test_is_valid_stop_reason_rejects_phase_boundary(self):
-        assert is_valid_stop_reason("iteration ended cleanly") == False
-        assert is_valid_stop_reason("commit was pushed") == False
-        assert is_valid_stop_reason("next step is in a new logical phase") == False
-        assert is_valid_stop_reason("work could be described as a new session") == False
-        assert is_valid_stop_reason("phase boundary reached") == False
+        assert not is_valid_stop_reason("iteration ended cleanly")
+        assert not is_valid_stop_reason("commit was pushed")
+        assert not is_valid_stop_reason("next step is in a new logical phase")
+        assert not is_valid_stop_reason("work could be described as a new session")
+        assert not is_valid_stop_reason("phase boundary reached")
 
     def test_is_valid_stop_reason_accepts_valid_reasons(self):
-        assert is_valid_stop_reason("external dependency missing") == True
-        assert is_valid_stop_reason("human decision required on architecture") == True
-        assert is_valid_stop_reason("execution failed with critical error") == True
+        assert is_valid_stop_reason("external dependency missing")
+        assert is_valid_stop_reason("human decision required on architecture")
+        assert is_valid_stop_reason("execution failed with critical error")
 
 
 class TestStopConditions:
@@ -246,7 +245,7 @@ class TestContinuationEvaluator:
         }
         decision = evaluate_continuation(runstate, execution_result)
         assert decision.state == ExecutionState.CONTINUE
-        assert decision.continuation_allowed == True
+        assert decision.continuation_allowed
 
     def test_scenario_2_no_meaningful_next_step_stops(self):
         runstate = {
@@ -262,7 +261,7 @@ class TestContinuationEvaluator:
         }
         decision = evaluate_continuation(runstate, execution_result)
         assert decision.state == ExecutionState.STOP
-        assert decision.continuation_allowed == False
+        assert not decision.continuation_allowed
 
     def test_scenario_3_escalation_trigger_escalates(self):
         runstate = {
@@ -276,7 +275,7 @@ class TestContinuationEvaluator:
         }
         decision = evaluate_continuation(runstate, execution_result)
         assert decision.state == ExecutionState.ESCALATE
-        assert decision.escalation_required == True
+        assert decision.escalation_required
 
     def test_scenario_4_external_blocker_blocked(self):
         runstate = {
@@ -287,7 +286,7 @@ class TestContinuationEvaluator:
         execution_result = {"status": "success"}
         decision = evaluate_continuation(runstate, execution_result)
         assert decision.state == ExecutionState.BLOCKED
-        assert decision.continuation_allowed == False
+        assert not decision.continuation_allowed
 
     def test_scenario_5_commit_push_not_terminal(self):
         runstate = {
@@ -327,7 +326,7 @@ class TestContinuationEvaluator:
         runstate = {"task_queue": ["task1"], "blocked_items": [], "decisions_needed": []}
         execution_result = {"status": "success"}
         should_proceed, reason = should_auto_proceed_to_next_stage(runstate, execution_result)
-        assert should_proceed == True
+        assert should_proceed
 
     def test_should_auto_proceed_blocked_false(self):
         runstate = {
@@ -337,15 +336,15 @@ class TestContinuationEvaluator:
         }
         execution_result = {"status": "success"}
         should_proceed, reason = should_auto_proceed_to_next_stage(runstate, execution_result)
-        assert should_proceed == False
+        assert not should_proceed
 
     def test_validate_stop_reason_invalid_rejected(self):
         valid, reason = validate_stop_reason("this would be a new session")
-        assert valid == False
+        assert not valid
 
     def test_validate_stop_reason_valid_accepted(self):
         valid, reason = validate_stop_reason("external blocker prevents progress")
-        assert valid == True
+        assert valid
 
     def test_get_continuation_summary_continue(self):
         decision = ContinuationDecision(
@@ -377,7 +376,7 @@ class TestContinuationEvaluator:
         execution_result = {"execution_id": "exec-001"}
         updated = apply_continuation_decision_to_runstate(runstate, decision, execution_result)
         assert updated["current_phase"] == "planning"
-        assert updated["continuation_allowed"] == True
+        assert updated["continuation_allowed"]
         assert "continuity_context" in updated
 
     def test_apply_continuation_decision_to_runstate_blocked(self):
@@ -386,7 +385,7 @@ class TestContinuationEvaluator:
         execution_result = {"execution_id": "exec-001"}
         updated = apply_continuation_decision_to_runstate(runstate, decision, execution_result)
         assert updated["current_phase"] == "blocked"
-        assert updated["continuation_allowed"] == False
+        assert not updated["continuation_allowed"]
 
     def test_ac8_no_session_style_stop_reason(self):
         runstate = {
@@ -424,13 +423,13 @@ class TestIntegration:
             "completed_items": ["task1_output"],
             "recommended_next_step": "Continue with task2",
         }
-        
+
         decision = evaluate_continuation(runstate, execution_result)
         updated_runstate = apply_continuation_decision_to_runstate(runstate, decision, execution_result)
-        
+
         assert decision.state == ExecutionState.CONTINUE
         assert updated_runstate["current_phase"] == "planning"
-        assert updated_runstate["continuity_context"]["continuation_allowed"] == True
+        assert updated_runstate["continuity_context"]["continuation_allowed"]
 
     def test_full_flow_blocked_to_blocked_phase(self):
         runstate = {
@@ -445,10 +444,10 @@ class TestIntegration:
             "execution_id": "exec-001",
             "status": "success",
         }
-        
+
         decision = evaluate_continuation(runstate, execution_result)
         updated_runstate = apply_continuation_decision_to_runstate(runstate, decision, execution_result)
-        
+
         assert decision.state == ExecutionState.BLOCKED
         assert updated_runstate["current_phase"] == "blocked"
-        assert updated_runstate["continuation_allowed"] == False
+        assert not updated_runstate["continuation_allowed"]

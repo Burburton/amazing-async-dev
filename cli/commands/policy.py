@@ -7,14 +7,13 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from runtime.state_store import StateStore
 from runtime.execution_policy import (
+    DEFAULT_POLICY_MODE,
     PolicyMode,
     get_policy_mode,
     set_policy_mode,
-    DEFAULT_POLICY_MODE,
 )
-from runtime.pause_reason import format_pause_reasons_table
+from runtime.state_store import StateStore
 
 app = typer.Typer(help="Execution policy configuration")
 console = Console()
@@ -26,7 +25,7 @@ def show(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Show current execution policy mode and rules.
-    
+
     Example:
         asyncdev policy show
         asyncdev policy show --project my-app
@@ -34,24 +33,24 @@ def show(
     project_path = path / project
     store = StateStore(project_path)
     runstate = store.load_runstate()
-    
+
     if runstate is None:
         console.print("[yellow]No RunState found. Using default policy: conservative[/yellow]")
         current_mode = DEFAULT_POLICY_MODE
     else:
         current_mode = get_policy_mode(runstate)
-    
+
     mode_table = Table(title="Policy Mode")
     mode_table.add_column("Setting", style="cyan")
     mode_table.add_column("Value", style="green")
-    
+
     mode_table.add_row("Current Mode", current_mode.value)
     mode_table.add_row("Default Mode", DEFAULT_POLICY_MODE.value)
     mode_table.add_row("Scope Change Flag", str(runstate.get("scope_change_flag", False) if runstate else False))
     mode_table.add_row("Pending Risky Actions", str(len(runstate.get("pending_risky_actions", []) if runstate else [])))
-    
+
     console.print(mode_table)
-    
+
     rules_table = Table(title="Policy Rules")
     rules_table.add_column("Category", style="cyan")
     rules_table.add_column("Auto-Continue", style="green")
@@ -62,7 +61,7 @@ def show(
     rules_table.add_row("Blockers", "always pause")
     rules_table.add_row("Decisions needed", "pause" if current_mode != PolicyMode.LOW_INTERRUPTION else "may auto-resolve")
     rules_table.add_row("Scope change", "pause" if current_mode != PolicyMode.LOW_INTERRUPTION else "review")
-    
+
     console.print(rules_table)
 
 
@@ -77,12 +76,12 @@ def set(
     dry_run: bool = typer.Option(False, help="Preview without saving"),
 ):
     """Set execution policy mode.
-    
+
     Modes:
     - conservative: Ask for confirmation on most transitions
     - balanced: Auto-continue safe transitions, pause for decisions/risky
     - low_interruption: Minimize interruptions, only pause for blockers/risky
-    
+
     Example:
         asyncdev policy set --mode balanced
         asyncdev policy set --project my-app --mode low_interruption
@@ -93,32 +92,32 @@ def set(
         console.print(f"[red]Invalid mode: {mode}[/red]")
         console.print(f"Valid modes: {list(PolicyMode.__members__.keys())}")
         raise typer.Exit(1)
-    
+
     project_path = path / project
     store = StateStore(project_path)
     runstate = store.load_runstate()
-    
+
     if runstate is None:
         console.print("[red]No RunState found. Create project first.[/red]")
         raise typer.Exit(1)
-    
+
     old_mode = get_policy_mode(runstate)
-    
+
     console.print(Panel(
         f"Policy Mode Change\nOld: {old_mode.value}\nNew: {policy_mode.value}",
         title="policy set",
         border_style="blue"
     ))
-    
+
     if dry_run:
         console.print("[yellow]Dry run - not saving[/yellow]")
         return
-    
+
     runstate = set_policy_mode(runstate, policy_mode)
     store.save_runstate(runstate)
-    
+
     console.print(f"[green]Policy mode set to: {policy_mode.value}[/green]")
-    
+
     if policy_mode == PolicyMode.LOW_INTERRUPTION:
         console.print("[yellow]Warning: low_interruption mode will auto-continue more transitions[/yellow]")
         console.print("[yellow]Risky actions and blockers will still pause[/yellow]")
@@ -134,10 +133,10 @@ def scope_flag(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Manage scope change flag.
-    
+
     Scope change flag indicates task scope has changed from original plan.
     When set, workflow will pause for review.
-    
+
     Example:
         asyncdev policy scope-flag --set-flag true
         asyncdev policy scope-flag --clear
@@ -145,13 +144,13 @@ def scope_flag(
     project_path = path / project
     store = StateStore(project_path)
     runstate = store.load_runstate()
-    
+
     if runstate is None:
         console.print("[red]No RunState found[/red]")
         raise typer.Exit(1)
-    
+
     current_flag = runstate.get("scope_change_flag", False)
-    
+
     if clear:
         runstate["scope_change_flag"] = False
         store.save_runstate(runstate)
@@ -174,9 +173,9 @@ def risky_actions(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Manage pending risky actions.
-    
+
     Risky actions require explicit confirmation before proceeding.
-    
+
     Example:
         asyncdev policy risky-actions --list
         asyncdev policy risky-actions --clear-all
@@ -184,48 +183,48 @@ def risky_actions(
     project_path = path / project
     store = StateStore(project_path)
     runstate = store.load_runstate()
-    
+
     if runstate is None:
         console.print("[red]No RunState found[/red]")
         raise typer.Exit(1)
-    
+
     pending = runstate.get("pending_risky_actions", [])
-    
+
     if clear_all:
         runstate["pending_risky_actions"] = []
         store.save_runstate(runstate)
         console.print(f"[green]Cleared {len(pending)} pending risky actions[/green]")
         return
-    
+
     if list_actions or not pending:
         if not pending:
             console.print("[green]No pending risky actions[/green]")
             return
-        
+
         table = Table(title="Pending Risky Actions")
         table.add_column("Action Type", style="cyan")
         table.add_column("Target", style="yellow")
         table.add_column("Requires Confirmation", style="magenta")
-        
+
         for action in pending:
             table.add_row(
                 action.get("action_type", "unknown"),
                 action.get("target", "N/A") or "N/A",
                 str(action.get("requires_confirmation", True)),
             )
-        
+
         console.print(table)
 
 
 @app.command()
 def modes():
     """List available policy modes with descriptions."""
-    
+
     table = Table(title="Available Policy Modes")
     table.add_column("Mode", style="cyan")
     table.add_column("Description", style="white")
     table.add_column("Auto-Continue", style="green")
-    
+
     table.add_row(
         "conservative",
         "Ask for confirmation on most transitions",
@@ -241,9 +240,9 @@ def modes():
         "Minimize interruptions, pause only blockers/risky",
         "most transitions"
     )
-    
+
     console.print(table)
-    
+
     console.print("\n[bold]Default mode: conservative[/bold]")
     console.print("\n[yellow]All modes still pause for:[/yellow]")
     console.print("  - Git push / remote mutations")

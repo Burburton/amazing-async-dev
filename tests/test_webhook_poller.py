@@ -1,26 +1,23 @@
 """Tests for Feature 058 - Webhook Auto-Polling."""
 
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-from datetime import datetime
+from unittest.mock import patch
 
 from runtime.webhook_poller import (
-    PollingStatus,
-    ReplyType,
     PendingDecision,
-    PollResult,
     PollingConfig,
+    PollingDaemon,
+    PollingStatus,
+    PollResult,
+    ReplyType,
+    format_poll_result,
+    get_continuation_phase,
     get_polling_config,
-    poll_pending_decisions,
+    get_reply_type,
     parse_reply_from_pending,
+    poll_pending_decisions,
     process_pending_decision,
     run_poll_cycle,
-    get_reply_type,
     should_resume_execution,
-    get_continuation_phase,
-    PollingDaemon,
-    format_poll_result,
 )
 
 
@@ -191,7 +188,7 @@ class TestPollPendingDecisions:
 
     def test_successful_poll_data_format(self):
         mock_data = {"ok": True, "count": 1, "decisions": [{"id": "dr-001", "from": "user@example.com", "option": "A", "receivedAt": "2026-04-19T10:00:00"}]}
-        
+
         pending = []
         decisions = mock_data.get("decisions", [])
         for d in decisions:
@@ -202,7 +199,7 @@ class TestPollPendingDecisions:
                 comment=d.get("comment", ""),
                 received_at=d.get("receivedAt", ""),
             ))
-        
+
         assert len(pending) == 1
         assert pending[0].id == "dr-001"
 
@@ -264,7 +261,6 @@ class TestGetPollingConfig:
         assert config.interval_seconds == 60
 
     def test_load_from_file(self, tmp_path):
-        import yaml
         runtime_dir = tmp_path / ".runtime"
         runtime_dir.mkdir()
 

@@ -4,21 +4,20 @@ Primary experience for viewing async-dev loop artifacts.
 """
 
 from pathlib import Path
-from typing import Any
+
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 from runtime.journal_viewer.artifact_reader import (
+    CANONICAL_LOOP_ORDER,
+    DAY_DETAIL_ORDER,
     JournalEntry,
     build_journal_timeline,
     detect_project_path,
     find_artifacts,
     get_artifact_summary,
-    CANONICAL_LOOP_ORDER,
-    DAY_DETAIL_ORDER,
 )
-
 
 console = Console()
 
@@ -143,7 +142,6 @@ def render_entry_detail(entry: JournalEntry) -> Panel:
     type_color = ARTIFACT_COLORS.get(entry.artifact_type, "white")
     artifact_label = ARTIFACT_LABELS.get(entry.artifact_type, entry.artifact_type.upper())
 
-    status_style = "" if entry.parse_status == "success" else "[red]"
     return Panel(
         "\n".join(content_lines),
         title=f"[{type_color}]{artifact_label}[/{type_color}] - {entry.day}",
@@ -200,7 +198,7 @@ def display_timeline_tui(
     show_warnings: bool = True,
 ) -> None:
     """Display canonical timeline - primary view for V1.1."""
-    console.print(f"\n[bold cyan]Loop Journal Viewer V1.1[/bold cyan]")
+    console.print("\n[bold cyan]Loop Journal Viewer V1.1[/bold cyan]")
     console.print(f"[dim]Project: {project_path}[/dim]")
 
     entries, warnings = build_journal_timeline(project_path)
@@ -394,7 +392,7 @@ def display_project_summary(project_path: Path) -> None:
 
 def display_stats(project_path: Path) -> None:
     """Display artifact statistics."""
-    console.print(f"\n[bold cyan]Artifact Statistics[/bold cyan]")
+    console.print("\n[bold cyan]Artifact Statistics[/bold cyan]")
     console.print(f"[dim]Project: {project_path}[/dim]\n")
 
     summary = get_artifact_summary(project_path)

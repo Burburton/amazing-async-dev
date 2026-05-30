@@ -3,10 +3,11 @@
 Feature 039: Added --ownership-mode and --repo-url for managed external products.
 """
 
+from datetime import datetime
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
-from datetime import datetime
 
 app = typer.Typer(help="Create new product")
 console = Console()
@@ -57,9 +58,15 @@ def create(
         asyncdev new-product create --product-id my-app --name "My App" --enable-email --email-sender noreply@example.com
     """
     from pathlib import Path
-    from runtime.adapters.filesystem_adapter import FilesystemAdapter
-    from cli.starter_pack_consumer import consume_starter_pack, format_product_brief_with_starter_pack, format_runstate_with_starter_pack
+
     import yaml
+
+    from cli.starter_pack_consumer import (
+        consume_starter_pack,
+        format_product_brief_with_starter_pack,
+        format_runstate_with_starter_pack,
+    )
+    from runtime.adapters.filesystem_adapter import FilesystemAdapter
 
     fs = FilesystemAdapter()
     root = Path(path)
@@ -82,20 +89,20 @@ def create(
     console.print(Panel(f"Create Product: {name}", border_style="green"))
 
     if ownership_mode == "managed_external":
-        console.print(f"[blue]Ownership mode:[/blue] managed_external (Mode B)")
+        console.print("[blue]Ownership mode:[/blue] managed_external (Mode B)")
         console.print(f"[blue]Product repo:[/blue] {repo_url}")
     else:
-        console.print(f"[blue]Ownership mode:[/blue] self_hosted (Mode A)")
+        console.print("[blue]Ownership mode:[/blue] self_hosted (Mode A)")
 
     consumption = None
     if starter_pack:
         console.print(f"[blue]Consuming starter pack:[/blue] {starter_pack}")
         consumption = consume_starter_pack(starter_pack)
-        
+
         if not consumption.success:
             console.print(f"[red]Starter pack error:[/red] {consumption.error}")
             raise typer.Exit(1)
-        
+
         if consumption.warnings:
             for warning in consumption.warnings:
                 console.print(f"[yellow]Warning:[/yellow] {warning}")
@@ -166,11 +173,11 @@ def create(
         "created_at": datetime.now().isoformat(),
         "updated_at": datetime.now().isoformat(),
     }
-    
+
     if ownership_mode == "managed_external":
         project_link_data["repo_name"] = repo_name or product_id
         project_link_data["repo_url"] = repo_url
-    
+
     if enable_email:
         project_link_data["email_channel"] = {
             "enabled": True,
@@ -178,14 +185,14 @@ def create(
             "decision_inbox": email_inbox or f"decisions-{product_id}@async-dev.local",
         }
         console.print(f"[blue]Email channel enabled:[/blue] {email_sender or 'noreply@async-dev.local'}")
-    
+
     if ownership_mode == "managed_external" or enable_email:
         link_path = product_dir / "project-link.yaml"
         with open(link_path, "w", encoding="utf-8") as f:
             yaml.dump(project_link_data, f, default_flow_style=False, sort_keys=False)
-        
+
         console.print(f"[green]Created:[/green] {link_path}")
-        
+
         if ownership_mode == "managed_external":
             console.print("\n[blue]Governance note:[/blue]")
             console.print("[dim]Product truth should live in the product repo.[/dim]")
@@ -208,6 +215,7 @@ def list(
 ):
     """List all products."""
     from pathlib import Path
+
     import yaml
 
     root = Path(path)

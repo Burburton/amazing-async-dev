@@ -1,29 +1,24 @@
 """Tests for Feature 062 - Controlled Frontend Verification Execution Recipe."""
 
-import pytest
-from pathlib import Path
-from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
-import tempfile
 import re
+import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from runtime.frontend_recipe_state import (
-    FrontendRecipeStage,
+    PORT_PATTERNS,
     FrontendRecipeFailureReason,
     FrontendRecipeResult,
-    ServerStartupInfo,
+    FrontendRecipeStage,
     ReadinessProbeInfo,
-    PORT_PATTERNS,
-    DEFAULT_SERVER_START_TIMEOUT_SECONDS,
-    DEFAULT_READINESS_PROBE_TIMEOUT_SECONDS,
+    ServerStartupInfo,
 )
 from runtime.frontend_verification_recipe import (
+    FrontendVerificationRecipe,
+    execute_frontend_verification_recipe,
     parse_port_from_stdout,
     probe_port_availability,
     probe_url_readiness,
-    find_port_by_probe,
-    FrontendVerificationRecipe,
-    execute_frontend_verification_recipe,
 )
 
 
@@ -131,7 +126,7 @@ class TestFrontendRecipeResult:
             result_artifact_path="/test/execution-results/frontend-verify-002.md",
         )
         dict_result = result.to_dict()
-        
+
         assert dict_result["stage"] == "completed_success"
         assert dict_result["execution_id"] == "frontend-verify-002"
         assert dict_result["framework"] == "next"
@@ -146,7 +141,7 @@ class TestFrontendRecipeResult:
             project_path="/test",
         )
         assert result.is_complete() is True
-        
+
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.SERVER_STARTING,
             execution_id="frontend-verify-004",
@@ -162,7 +157,7 @@ class TestFrontendRecipeResult:
             success=True,
         )
         assert result.allows_success_progression() is True
-        
+
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.COMPLETED_FAILURE,
             execution_id="frontend-verify-006",
@@ -179,7 +174,7 @@ class TestFrontendRecipeResult:
             success=True,
         )
         assert result.get_gate_status() == "allowed"
-        
+
         result = FrontendRecipeResult(
             stage=FrontendRecipeStage.COMPLETED_FAILURE,
             execution_id="frontend-verify-008",
@@ -237,7 +232,7 @@ class TestProbePortAvailability:
         mock_sock = MagicMock()
         mock_socket.return_value.__enter__.return_value = mock_sock
         mock_sock.connect.return_value = None
-        
+
         result = probe_port_availability(3000)
         assert result is True
         mock_sock.connect.assert_called_once()
@@ -247,7 +242,7 @@ class TestProbePortAvailability:
         mock_sock = MagicMock()
         mock_socket.return_value.__enter__.return_value = mock_sock
         mock_sock.connect.side_effect = ConnectionRefusedError
-        
+
         result = probe_port_availability(3000)
         assert result is False
 
@@ -258,7 +253,7 @@ class TestProbeUrlReadiness:
         mock_response = MagicMock()
         mock_response.status = 200
         mock_urlopen.return_value = mock_response
-        
+
         ready, status = probe_url_readiness("http://localhost:3000", timeout=5)
         assert ready is True
         assert status == 200
@@ -267,7 +262,7 @@ class TestProbeUrlReadiness:
     @patch("time.sleep")
     def test_probe_url_timeout(self, mock_sleep, mock_urlopen):
         mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
-        
+
         ready, status = probe_url_readiness("http://localhost:3000", timeout=1)
         assert ready is False
         assert status is None
@@ -292,7 +287,7 @@ class TestFrontendVerificationRecipe:
     def test_recipe_framework_unknown(self, mock_detect):
         from runtime.dev_server_manager import DevServerFramework
         mock_detect.return_value = DevServerFramework.UNKNOWN
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
             recipe = FrontendVerificationRecipe(
@@ -300,7 +295,7 @@ class TestFrontendVerificationRecipe:
                 execution_id="test-exec-002",
             )
             result = recipe.execute()
-            
+
             assert result.stage == FrontendRecipeStage.COMPLETED_FAILURE
             assert result.failure_reason == FrontendRecipeFailureReason.FRAMEWORK_UNKNOWN
 
@@ -333,16 +328,16 @@ class TestConvenienceFunction:
             success=True,
         )
         mock_execute.return_value = mock_result
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             result = execute_frontend_verification_recipe(
                 project_path=Path(tmpdir),
                 execution_id="test-exec-003",
             )
-            
+
             assert result.stage == FrontendRecipeStage.COMPLETED_SUCCESS
 
 
 # Import urllib for tests
-import urllib.request
-import urllib.error
+import urllib.error  # noqa: E402
+import urllib.request  # noqa: E402

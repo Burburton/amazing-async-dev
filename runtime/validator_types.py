@@ -16,7 +16,7 @@ from typing import Any
 
 class ValidatorType(str, Enum):
     """Types of validators for acceptance (Feature 069/071)."""
-    
+
     AI_SESSION = "ai_session"
     HUMAN_REVIEW = "human_review"
     AUTOMATED_SCRIPT = "automated_script"
@@ -24,7 +24,7 @@ class ValidatorType(str, Enum):
 
 class ValidatorContext(str, Enum):
     """Execution context for validator."""
-    
+
     INDEPENDENT = "independent"
     DEFAULT = "default"
 
@@ -32,12 +32,12 @@ class ValidatorContext(str, Enum):
 @dataclass
 class ValidatorIdentity:
     """Identity and context of validator (Feature 071)."""
-    
+
     validator_type: ValidatorType
     validator_id: str
     validator_context: ValidatorContext = ValidatorContext.INDEPENDENT
     invoked_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "validator_type": self.validator_type.value,
@@ -45,7 +45,7 @@ class ValidatorIdentity:
             "validator_context": self.validator_context.value,
             "invoked_at": self.invoked_at,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ValidatorIdentity":
         return cls(

@@ -7,6 +7,7 @@ Feature view: asyncdev journal feature <feature-id>
 
 from pathlib import Path
 from typing import Optional
+
 import typer
 from rich.console import Console
 
@@ -29,23 +30,23 @@ def timeline(
     warnings: bool = typer.Option(True, "--warnings/--no-warnings", help="Show parsing warnings"),
 ) -> None:
     """Display canonical timeline of async-dev artifacts.
-    
+
     This is the PRIMARY view for Loop Journal Viewer V1.1.
     Shows the sequence: Plan Day → Run Day → Review Night
     """
     from runtime.journal_viewer.tui_viewer import display_timeline_tui
-    
+
     if project:
         project_path = path / project
     else:
         project_path = Path.cwd()
-    
+
     if not project_path.exists():
         console.print(f"[red]Project not found: {project_path}[/red]")
         console.print("[dim]Use --project <id> to specify a project[/dim]")
         console.print("[dim]Or run from within a project directory[/dim]")
         raise typer.Exit(1)
-    
+
     display_timeline_tui(
         project_path,
         feature_filter=feature,
@@ -62,16 +63,16 @@ def stats(
 ) -> None:
     """Display artifact statistics for a project."""
     from runtime.journal_viewer.tui_viewer import display_stats
-    
+
     if project:
         project_path = path / project
     else:
         project_path = Path.cwd()
-    
+
     if not project_path.exists():
         console.print(f"[red]Project not found: {project_path}[/red]")
         raise typer.Exit(1)
-    
+
     display_stats(project_path)
 
 
@@ -86,16 +87,16 @@ def day(
     V1.2: Shows each phase header with graceful handling for missing artifacts.
     """
     from runtime.journal_viewer.tui_viewer import display_day_detail
-    
+
     if project:
         project_path = path / project
     else:
         project_path = Path.cwd()
-    
+
     if not project_path.exists():
         console.print(f"[red]Project not found: {project_path}[/red]")
         raise typer.Exit(1)
-    
+
     display_day_detail(project_path, date)
 
 
@@ -106,16 +107,16 @@ def interactive(
 ) -> None:
     """Launch interactive viewer mode."""
     from runtime.journal_viewer.tui_viewer import interactive_viewer
-    
+
     if project:
         project_path = path / project
     else:
         project_path = Path.cwd()
-    
+
     if not project_path.exists():
         console.print(f"[red]Project not found: {project_path}[/red]")
         raise typer.Exit(1)
-    
+
     interactive_viewer(project_path)
 
 
@@ -131,16 +132,16 @@ def feature(
     Gracefully handles partial or missing feature metadata.
     """
     from runtime.journal_viewer.tui_viewer import display_feature_timeline
-    
+
     if project:
         project_path = path / project
     else:
         project_path = Path.cwd()
-    
+
     if not project_path.exists():
         console.print(f"[red]Project not found: {project_path}[/red]")
         raise typer.Exit(1)
-    
+
     display_feature_timeline(project_path, feature_id)
 
 
@@ -154,16 +155,16 @@ def project_summary(
     V1.3: Shows artifact counts and feature grouping overview.
     """
     from runtime.journal_viewer.tui_viewer import display_project_summary
-    
+
     if project:
         project_path = path / project
     else:
         project_path = Path.cwd()
-    
+
     if not project_path.exists():
         console.print(f"[red]Project not found: {project_path}[/red]")
         raise typer.Exit(1)
-    
+
     display_project_summary(project_path)
 
 

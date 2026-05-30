@@ -1,12 +1,10 @@
 """Tests for Execution Recovery Console CLI."""
 
-import pytest
-from pathlib import Path
 from typer.testing import CliRunner
+
 from cli.commands.recovery import app
 from runtime.recovery_classifier import RecoveryClassification, classify_recovery
 from runtime.state_store import StateStore
-
 
 runner = CliRunner()
 
@@ -107,7 +105,7 @@ class TestRecoveryObserverIntegration:
     def test_show_observe_displays_findings_table(self, temp_dir):
         project = temp_dir / "test-obs"
         project.mkdir()
-        
+
         result = runner.invoke(app, [
             "show",
             "--execution", "exec-test-obs-test",
@@ -118,7 +116,7 @@ class TestRecoveryObserverIntegration:
     def test_show_observe_without_observer(self, temp_dir):
         project = temp_dir / "test-empty"
         project.mkdir()
-        
+
         result = runner.invoke(app, [
             "show",
             "--execution", "exec-test-empty-test",
@@ -131,8 +129,8 @@ class TestObserverFindingConsumption:
     """Test that recovery console properly consumes ObserverFinding fields."""
 
     def test_recovery_displays_suggested_action(self):
-        from runtime.execution_observer import ObserverFinding, ObserverFindingType, FindingSeverity
-        
+        from runtime.execution_observer import FindingSeverity, ObserverFinding, ObserverFindingType
+
         finding = ObserverFinding(
             finding_id="test-001",
             finding_type=ObserverFindingType.RECOVERY_OVERDUE,
@@ -141,31 +139,31 @@ class TestObserverFindingConsumption:
             suggested_action="Test action",
             suggested_command="test command",
         )
-        
+
         assert finding.suggested_action == "Test action"
         assert finding.suggested_command == "test command"
 
     def test_recovery_displays_detected_at_timestamp(self):
-        from runtime.execution_observer import ObserverFinding, ObserverFindingType, FindingSeverity
-        
+        from runtime.execution_observer import FindingSeverity, ObserverFinding, ObserverFindingType
+
         finding = ObserverFinding(
             finding_id="test-002",
             finding_type=ObserverFindingType.DECISION_OVERDUE,
             severity=FindingSeverity.MEDIUM,
             reason="Decision pending",
         )
-        
+
         assert finding.detected_at is not None
         assert len(finding.detected_at) > 0
 
     def test_recovery_filters_recovery_significant(self):
         from runtime.execution_observer import (
-            ObserverFinding,
-            ObserverFindingType,
             FindingSeverity,
             ObservationResult,
+            ObserverFinding,
+            ObserverFindingType,
         )
-        
+
         finding1 = ObserverFinding(
             finding_id="test-001",
             finding_type=ObserverFindingType.RECOVERY_OVERDUE,
@@ -173,7 +171,7 @@ class TestObserverFindingConsumption:
             reason="Recovery needed",
             recovery_significant=True,
         )
-        
+
         finding2 = ObserverFinding(
             finding_id="test-002",
             finding_type=ObserverFindingType.BLOCKED_STATE,
@@ -181,14 +179,14 @@ class TestObserverFindingConsumption:
             reason="Info only",
             recovery_significant=False,
         )
-        
+
         result = ObservationResult(
             observation_id="obs-test",
             project_id="test",
             started_at="2026-01-01T00:00:00",
             findings=[finding1, finding2],
         )
-        
+
         recovery_sig = [f for f in result.findings if f.recovery_significant]
         assert len(recovery_sig) == 1
         assert recovery_sig[0].finding_type == ObserverFindingType.RECOVERY_OVERDUE
@@ -217,6 +215,6 @@ class TestRecoveryActionWiring:
         }
         store = StateStore(project)
         store.save_runstate(runstate)
-        
+
         result = runner.invoke(app, ["resume", "exec-test-wiring-feature-001", "unblock", "--path", str(temp_dir)])
         assert "Blockers cleared" in result.output or "No RunState found" in result.output

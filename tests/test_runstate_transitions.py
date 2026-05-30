@@ -1,10 +1,10 @@
 """Tests for RunState phase transitions."""
 
-import pytest
-from pathlib import Path
-from typer.testing import CliRunner
-from runtime.state_store import StateStore, update_runstate_from_result
 
+import pytest
+from typer.testing import CliRunner
+
+from runtime.state_store import StateStore, update_runstate_from_result
 
 runner = CliRunner()
 
@@ -13,14 +13,14 @@ runner = CliRunner()
 def setup_product(temp_dir):
     """Create a product with runstate for testing."""
     from cli.commands.new_product import app as new_product_app
-    
+
     runner.invoke(new_product_app, [
         "create",
         "--product-id", "test-product",
         "--name", "Test Product",
         "--path", str(temp_dir),
     ])
-    
+
     yield temp_dir / "test-product"
 
 
@@ -30,7 +30,7 @@ class TestPlanningToExecuting:
     def test_plan_day_sets_executing_phase(self, setup_product):
         """plan-day create should transition from planning to executing."""
         from cli.commands.plan_day import app as plan_app
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         assert runstate["current_phase"] == "planning"
@@ -43,7 +43,7 @@ class TestPlanningToExecuting:
         ])
 
         assert result.exit_code == 0
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         assert runstate["current_phase"] == "executing"
@@ -51,7 +51,7 @@ class TestPlanningToExecuting:
     def test_plan_day_updates_active_task(self, setup_product):
         """plan-day create should set active_task."""
         from cli.commands.plan_day import app as plan_app
-        
+
         runner.invoke(plan_app, [
             "create",
             "--project", "test-product",
@@ -71,7 +71,7 @@ class TestExecutingToReviewing:
         """review-night generate should transition to reviewing."""
         from cli.commands.plan_day import app as plan_app
         from cli.commands.review_night import app as review_app
-        
+
         runner.invoke(plan_app, [
             "create",
             "--project", "test-product",
@@ -104,7 +104,7 @@ class TestExecutingToReviewing:
         ])
 
         assert result.exit_code == 0
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         assert runstate["current_phase"] == "reviewing"
@@ -116,7 +116,7 @@ class TestExecutingToBlocked:
     def test_blocked_result_sets_blocked_phase(self, setup_product):
         """blocked ExecutionResult should transition to blocked."""
         from runtime.state_store import update_runstate_from_result
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["current_phase"] = "executing"
@@ -139,7 +139,7 @@ class TestExecutingToBlocked:
     def test_blocked_result_preserves_blocked_items(self, setup_product):
         """blocked result should add to blocked_items."""
         from runtime.state_store import update_runstate_from_result
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["current_phase"] = "executing"
@@ -165,7 +165,7 @@ class TestBlockedToPlanning:
     def test_unblock_sets_planning_phase(self, setup_product):
         """resume-next-day unblock should transition to planning."""
         from cli.commands.resume_next_day import app as resume_app
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["current_phase"] = "blocked"
@@ -180,7 +180,7 @@ class TestBlockedToPlanning:
         ])
 
         assert result.exit_code == 0
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         assert runstate["current_phase"] == "planning"
@@ -189,7 +189,7 @@ class TestBlockedToPlanning:
     def test_unblock_clears_blocked_items(self, setup_product):
         """unblock should clear blocked_items list."""
         from cli.commands.resume_next_day import app as resume_app
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["current_phase"] = "blocked"
@@ -216,7 +216,7 @@ class TestReviewingToPlanning:
     def test_continue_loop_sets_planning_phase(self, setup_product):
         """resume-next-day continue-loop should transition to planning."""
         from cli.commands.resume_next_day import app as resume_app
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["current_phase"] = "reviewing"
@@ -231,7 +231,7 @@ class TestReviewingToPlanning:
         ])
 
         assert result.exit_code == 0
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         assert runstate["current_phase"] == "planning"
@@ -239,7 +239,7 @@ class TestReviewingToPlanning:
     def test_continue_loop_sets_next_recommended_action(self, setup_product):
         """continue-loop should set next_recommended_action."""
         from cli.commands.resume_next_day import app as resume_app
-        
+
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["current_phase"] = "reviewing"
@@ -267,7 +267,7 @@ class TestUpdateRunstateFromResult:
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["current_phase"] = "executing"
-        
+
         execution_result = {
             "execution_id": "exec-test",
             "status": "success",
@@ -283,7 +283,7 @@ class TestUpdateRunstateFromResult:
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["current_phase"] = "executing"
-        
+
         execution_result = {
             "execution_id": "exec-test",
             "status": "partial",
@@ -299,7 +299,7 @@ class TestUpdateRunstateFromResult:
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["current_phase"] = "executing"
-        
+
         execution_result = {
             "execution_id": "exec-test",
             "status": "failed",
@@ -314,7 +314,7 @@ class TestUpdateRunstateFromResult:
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["completed_outputs"] = ["Previous item"]
-        
+
         execution_result = {
             "execution_id": "exec-test",
             "status": "success",
@@ -330,7 +330,7 @@ class TestUpdateRunstateFromResult:
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["decisions_needed"] = []
-        
+
         execution_result = {
             "execution_id": "exec-test",
             "status": "blocked",
@@ -347,7 +347,7 @@ class TestUpdateRunstateFromResult:
         """should update last_action field."""
         store = StateStore(setup_product)
         runstate = store.load_runstate()
-        
+
         execution_result = {
             "execution_id": "exec-20240101-001",
             "status": "success",
@@ -361,7 +361,7 @@ class TestUpdateRunstateFromResult:
         store = StateStore(setup_product)
         runstate = store.load_runstate()
         runstate["updated_at"] = ""
-        
+
         execution_result = {
             "execution_id": "exec-test",
             "status": "success",
@@ -377,11 +377,11 @@ class TestPhaseTransitionSequence:
     def test_full_day_loop_sequence(self, setup_product):
         """Test complete day loop: planning → executing → reviewing → planning."""
         from cli.commands.plan_day import app as plan_app
-        from cli.commands.review_night import app as review_app
         from cli.commands.resume_next_day import app as resume_app
-        
+        from cli.commands.review_night import app as review_app
+
         store = StateStore(setup_product)
-        
+
         phase = store.load_runstate()["current_phase"]
         assert phase == "planning"
 
@@ -391,7 +391,7 @@ class TestPhaseTransitionSequence:
             "--task", "Task 1",
             "--path", str(setup_product.parent),
         ])
-        
+
         phase = store.load_runstate()["current_phase"]
         assert phase == "executing"
 
@@ -414,7 +414,7 @@ class TestPhaseTransitionSequence:
             "--execution-id", "exec-20240101-001",
             "--path", str(setup_product.parent),
         ])
-        
+
         phase = store.load_runstate()["current_phase"]
         assert phase == "reviewing"
 
@@ -424,7 +424,7 @@ class TestPhaseTransitionSequence:
             "--decision", "approve",
             "--path", str(setup_product.parent),
         ])
-        
+
         phase = store.load_runstate()["current_phase"]
         assert phase == "planning"
 
@@ -432,16 +432,16 @@ class TestPhaseTransitionSequence:
         """Test blocked sequence: executing → blocked → planning."""
         from cli.commands.plan_day import app as plan_app
         from cli.commands.resume_next_day import app as resume_app
-        
+
         store = StateStore(setup_product)
-        
+
         runner.invoke(plan_app, [
             "create",
             "--project", "test-product",
             "--task", "Task 1",
             "--path", str(setup_product.parent),
         ])
-        
+
         phase = store.load_runstate()["current_phase"]
         assert phase == "executing"
 
@@ -449,7 +449,7 @@ class TestPhaseTransitionSequence:
         runstate["current_phase"] = "blocked"
         runstate["blocked_items"] = [{"reason": "API down"}]
         store.save_runstate(runstate)
-        
+
         phase = store.load_runstate()["current_phase"]
         assert phase == "blocked"
 
@@ -459,6 +459,6 @@ class TestPhaseTransitionSequence:
             "--reason", "API restored",
             "--path", str(setup_product.parent),
         ])
-        
+
         phase = store.load_runstate()["current_phase"]
         assert phase == "planning"

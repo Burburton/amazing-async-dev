@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
+
 from typer.testing import CliRunner
 
+from cli.commands.backfill import app as backfill_app
 from runtime.archive_pack_builder import (
     build_backfill_archive_pack,
     check_backfill_eligibility,
     save_archive_pack,
-    load_archive_pack,
 )
-from cli.commands.backfill import app as backfill_app
-
 
 runner = CliRunner()
 
@@ -28,7 +27,7 @@ class TestBuildBackfillArchivePack:
             feature_id="001-test",
             product_id="test-product",
         )
-        
+
         assert pack["feature_id"] == "001-test"
         assert pack["product_id"] == "test-product"
         assert pack["archived_via_backfill"] is True
@@ -42,7 +41,7 @@ class TestBuildBackfillArchivePack:
             product_id="test-product",
             title="Test Feature",
         )
-        
+
         assert pack["archived_via_backfill"] is True
         assert pack["backfill_source"] == "manual-backfill-command"
         assert pack["backfill_confidence"] == "medium"
@@ -55,7 +54,7 @@ class TestBuildBackfillArchivePack:
             product_id="test-product",
             delivered_outputs=["schema.yaml", "template.md"],
         )
-        
+
         assert len(pack["delivered_outputs"]) == 2
         assert pack["delivered_outputs"][0]["name"] == "schema.yaml"
 
@@ -67,7 +66,7 @@ class TestBuildBackfillArchivePack:
             lessons_input="Small tasks work,Test early",
             patterns_input="Schema-first approach,Iterative testing",
         )
-        
+
         assert len(pack["lessons_learned"]) == 2
         assert len(pack["reusable_patterns"]) == 2
 
@@ -78,7 +77,7 @@ class TestBuildBackfillArchivePack:
             product_id="test-product",
             historical_notes="Completed before archive system existed",
         )
-        
+
         assert pack["historical_notes"] == "Completed before archive system existed"
 
 
@@ -92,7 +91,7 @@ class TestCheckBackfillEligibility:
             product_id="test-product",
             projects_path=setup_test_project,
         )
-        
+
         assert eligibility["eligible"] is True
         assert "not yet archived" in eligibility["reasons"][0]
 
@@ -103,7 +102,7 @@ class TestCheckBackfillEligibility:
             product_id="test-product",
             projects_path=setup_archived_feature,
         )
-        
+
         assert eligibility["eligible"] is False
         assert "Already archived" in eligibility["reasons"][0]
 
@@ -114,7 +113,7 @@ class TestCheckBackfillEligibility:
             product_id="test-product",
             projects_path=setup_test_project,
         )
-        
+
         assert eligibility["eligible"] is False
         assert "does not exist" in eligibility["reasons"][0]
 
@@ -125,7 +124,7 @@ class TestCheckBackfillEligibility:
             product_id="test-product",
             projects_path=setup_feature_with_spec,
         )
-        
+
         assert eligibility.get("has_spec") is True
         assert eligibility.get("spec_path") is not None
 
@@ -142,7 +141,7 @@ class TestBackfillCLI:
             "--dry-run",
             "--path", str(setup_feature_with_spec),
         ])
-        
+
         assert result.exit_code == 0
         assert "Backfill Archive Preview" in result.output
         assert "archived_via_backfill" in result.output
@@ -155,9 +154,9 @@ class TestBackfillCLI:
             "--feature", "001-spec",
             "--path", str(setup_feature_with_spec),
         ])
-        
+
         assert result.exit_code == 0
-        
+
         archive_path = setup_feature_with_spec / "test-product" / "archive" / "001-spec" / "archive-pack.yaml"
         assert archive_path.exists()
 
@@ -169,7 +168,7 @@ class TestBackfillCLI:
             "--feature", "001-archived",
             "--path", str(setup_archived_feature),
         ])
-        
+
         assert result.exit_code == 1
         assert "not eligible" in result.output
 
@@ -181,7 +180,7 @@ class TestBackfillCLI:
             "--feature", "001-spec",
             "--path", str(setup_feature_with_spec),
         ])
-        
+
         assert result.exit_code == 0
         assert "eligible" in result.output
 
@@ -192,7 +191,7 @@ class TestBackfillCLI:
             "--project", "test-product",
             "--path", str(setup_multiple_features),
         ])
-        
+
         assert result.exit_code == 0
         assert "Features Status" in result.output or "Backfill Candidates" in result.output
 
@@ -206,7 +205,7 @@ class TestBackfillArchivePackFields:
             feature_id="001-fields",
             product_id="test-product",
         )
-        
+
         required_fields = [
             "feature_id",
             "product_id",
@@ -220,7 +219,7 @@ class TestBackfillArchivePackFields:
             "archived_via_backfill",
             "backfilled_at",
         ]
-        
+
         for field in required_fields:
             assert field in pack
 
@@ -230,7 +229,7 @@ class TestBackfillArchivePackFields:
             feature_id="002-marker",
             product_id="test-product",
         )
-        
+
         assert pack["archived_via_backfill"] is True
 
     def test_backfilled_at_timestamp_present(self):
@@ -239,12 +238,11 @@ class TestBackfillArchivePackFields:
             feature_id="003-timestamp",
             product_id="test-product",
         )
-        
+
         assert pack["backfilled_at"] is not None
         assert "T" in pack["backfilled_at"]  # ISO format
 
-
-import pytest
+import pytest  # noqa: E402
 
 
 @pytest.fixture
@@ -253,35 +251,34 @@ def setup_test_project():
     temp_dir = Path(tempfile.mkdtemp())
     project_dir = temp_dir / "test-product"
     project_dir.mkdir()
-    
+
     (project_dir / "features").mkdir()
     (project_dir / "archive").mkdir()
-    
+
     feature_dir = project_dir / "features" / "001-test"
     feature_dir.mkdir()
-    
+
     yield temp_dir
-    
+
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @pytest.fixture
 def setup_archived_feature():
     """Create test project with archived feature."""
-    import yaml
-    
+
     temp_dir = Path(tempfile.mkdtemp())
     project_dir = temp_dir / "test-product"
     project_dir.mkdir()
-    
+
     features_dir = project_dir / "features"
     features_dir.mkdir()
     feature_dir = features_dir / "001-archived"
     feature_dir.mkdir()
-    
+
     archive_dir = project_dir / "archive" / "001-archived"
     archive_dir.mkdir(parents=True)
-    
+
     archive_pack = {
         "feature_id": "001-archived",
         "product_id": "test-product",
@@ -290,9 +287,9 @@ def setup_archived_feature():
         "archived_at": "2024-01-01",
     }
     save_archive_pack(archive_pack, archive_dir / "archive-pack.yaml")
-    
+
     yield temp_dir
-    
+
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -300,15 +297,15 @@ def setup_archived_feature():
 def setup_feature_with_spec():
     """Create test project with feature-spec.yaml."""
     import yaml
-    
+
     temp_dir = Path(tempfile.mkdtemp())
     project_dir = temp_dir / "test-product"
     project_dir.mkdir()
-    
+
     (project_dir / "features").mkdir()
     feature_dir = project_dir / "features" / "001-spec"
     feature_dir.mkdir()
-    
+
     spec = {
         "feature_id": "001-spec",
         "name": "Test Feature With Spec",
@@ -316,9 +313,9 @@ def setup_feature_with_spec():
     }
     with open(feature_dir / "feature-spec.yaml", "w") as f:
         yaml.dump(spec, f)
-    
+
     yield temp_dir
-    
+
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -326,22 +323,22 @@ def setup_feature_with_spec():
 def setup_multiple_features():
     """Create test project with multiple features."""
     import yaml
-    
+
     temp_dir = Path(tempfile.mkdtemp())
     project_dir = temp_dir / "test-product"
     project_dir.mkdir()
-    
+
     (project_dir / "features").mkdir()
     (project_dir / "archive").mkdir()
-    
+
     for i in range(3):
         feature_dir = project_dir / "features" / f"00{i}-feature"
         feature_dir.mkdir()
-        
+
         spec = {"feature_id": f"00{i}-feature", "name": f"Feature {i}"}
         with open(feature_dir / "feature-spec.yaml", "w") as f:
             yaml.dump(spec, f)
-    
+
     yield temp_dir
-    
+
     shutil.rmtree(temp_dir, ignore_errors=True)

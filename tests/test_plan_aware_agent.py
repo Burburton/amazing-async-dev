@@ -1,22 +1,22 @@
 """Tests for Feature 017 - Archive-aware Plan Agent."""
 
+
 import pytest
-from pathlib import Path
 import yaml
 
 from runtime.plan_aware_agent import (
+    analyze_blocker_constraints,
+    analyze_decision_constraints,
+    determine_safe_to_execute,
+    estimate_task_scope,
+    extract_task_keywords,
     gather_archive_context,
+    generate_aware_execution_pack,
+    generate_planning_rationale,
     get_applicable_lessons,
     get_applicable_patterns,
-    extract_task_keywords,
-    analyze_decision_constraints,
-    get_decision_safe_alternatives,
-    analyze_blocker_constraints,
     get_blocker_safe_alternatives,
-    generate_planning_rationale,
-    determine_safe_to_execute,
-    generate_aware_execution_pack,
-    estimate_task_scope,
+    get_decision_safe_alternatives,
     get_planning_context_summary,
 )
 
@@ -108,10 +108,10 @@ def archive_setup(temp_dir):
     """Create sample archives for testing."""
     product_dir = temp_dir / "test-product"
     archive_dir = product_dir / "archive"
-    
+
     feature1_dir = archive_dir / "001-core-objects"
     feature1_dir.mkdir(parents=True, exist_ok=True)
-    
+
     archive_pack1 = {
         "feature_id": "001-core-objects",
         "product_id": "test-product",
@@ -131,13 +131,13 @@ def archive_setup(temp_dir):
         ],
         "archived_at": "2026-04-10T18:00:00Z",
     }
-    
+
     with open(feature1_dir / "archive-pack.yaml", "w") as f:
         yaml.dump(archive_pack1, f)
-    
+
     feature2_dir = archive_dir / "002-cli-commands"
     feature2_dir.mkdir(parents=True, exist_ok=True)
-    
+
     archive_pack2 = {
         "feature_id": "002-cli-commands",
         "product_id": "test-product",
@@ -155,10 +155,10 @@ def archive_setup(temp_dir):
         ],
         "archived_at": "2026-04-09T18:00:00Z",
     }
-    
+
     with open(feature2_dir / "archive-pack.yaml", "w") as f:
         yaml.dump(archive_pack2, f)
-    
+
     yield temp_dir
 
 
@@ -168,7 +168,7 @@ class TestGatherArchiveContext:
     def test_gathers_from_archives(self, archive_setup):
         """Should gather context from existing archives."""
         context = gather_archive_context(archive_setup, product_id="test-product")
-        
+
         assert "recent_archives" in context
         assert "relevant_lessons" in context
         assert "relevant_patterns" in context
@@ -177,24 +177,24 @@ class TestGatherArchiveContext:
     def test_includes_lessons_and_patterns(self, archive_setup):
         """Should include lessons and patterns from archives."""
         context = gather_archive_context(archive_setup, product_id="test-product")
-        
+
         lessons = context.get("relevant_lessons", [])
         patterns = context.get("relevant_patterns", [])
-        
+
         assert len(lessons) >= 2
         assert len(patterns) >= 2
 
     def test_filters_by_product(self, archive_setup):
         """Should filter archives by product."""
         context = gather_archive_context(archive_setup, product_id="test-product")
-        
+
         summary = context.get("archive_summary", {})
         assert summary.get("total_archives", 0) >= 2
 
     def test_handles_empty_projects(self, temp_dir):
         """Should handle empty projects directory."""
         context = gather_archive_context(temp_dir)
-        
+
         assert context.get("archive_summary", {}).get("total_archives", 0) == 0
 
 
@@ -205,21 +205,21 @@ class TestGetApplicableLessons:
         """Should match lessons for CLI tasks."""
         context = gather_archive_context(archive_setup, product_id="test-product")
         lessons = get_applicable_lessons(context, "Implement CLI commands")
-        
+
         assert len(lessons) >= 1
 
     def test_matches_test_keywords(self, archive_setup):
         """Should match lessons for test tasks."""
         context = gather_archive_context(archive_setup, product_id="test-product")
         lessons = get_applicable_lessons(context, "Add test fixtures")
-        
+
         assert len(lessons) >= 1
 
     def test_returns_empty_for_no_matches(self, archive_setup):
         """Should return empty list for non-matching tasks."""
         context = gather_archive_context(archive_setup, product_id="test-product")
         lessons = get_applicable_lessons(context, "Unrelated task xyz")
-        
+
         assert len(lessons) == 0
 
 
@@ -230,14 +230,14 @@ class TestGetApplicablePatterns:
         """Should match schema patterns."""
         context = gather_archive_context(archive_setup, product_id="test-product")
         patterns = get_applicable_patterns(context, "Create schema files")
-        
+
         assert len(patterns) >= 1
 
     def test_matches_test_patterns(self, archive_setup):
         """Should match test patterns."""
         context = gather_archive_context(archive_setup, product_id="test-product")
         patterns = get_applicable_patterns(context, "Write test fixtures")
-        
+
         assert len(patterns) >= 1
 
 
@@ -267,27 +267,27 @@ class TestAnalyzeDecisionConstraints:
     def test_identifies_blocking_decisions(self, runstate_with_decisions):
         """Should identify blocking decisions."""
         constraints = analyze_decision_constraints(runstate_with_decisions)
-        
+
         assert len(constraints.get("blocking_decisions", [])) == 1
 
     def test_counts_pending_decisions(self, runstate_with_decisions):
         """Should count all pending decisions."""
         constraints = analyze_decision_constraints(runstate_with_decisions)
-        
+
         summary = constraints.get("decision_summary", {})
         assert summary.get("total_pending", 0) == 2
 
     def test_marks_safe_when_no_decisions(self, sample_runstate):
         """Should mark safe when no pending decisions."""
         constraints = analyze_decision_constraints(sample_runstate)
-        
-        assert constraints.get("safe_to_proceed", True) == True
+
+        assert constraints.get("safe_to_proceed", True)
 
     def test_marks_unsafe_when_blocking(self, runstate_with_decisions):
         """Should mark unsafe when blocking decisions exist."""
         constraints = analyze_decision_constraints(runstate_with_decisions)
-        
-        assert constraints.get("safe_to_proceed", True) == False
+
+        assert not constraints.get("safe_to_proceed", True)
 
 
 class TestGetDecisionSafeAlternatives:
@@ -300,7 +300,7 @@ class TestGetDecisionSafeAlternatives:
             constraints,
             sample_runstate.get("task_queue", []),
         )
-        
+
         assert len(alternatives) == 2
 
     def test_filters_blocked_tasks(self, runstate_with_decisions):
@@ -310,7 +310,7 @@ class TestGetDecisionSafeAlternatives:
             constraints,
             ["Task related to continue approach", "Independent task"],
         )
-        
+
         assert len(alternatives) >= 1
 
 
@@ -320,21 +320,21 @@ class TestAnalyzeBlockerConstraints:
     def test_identifies_active_blockers(self, runstate_with_blockers):
         """Should identify active blockers."""
         constraints = analyze_blocker_constraints(runstate_with_blockers)
-        
+
         assert len(constraints.get("active_blockers", [])) == 1
 
     def test_provides_recovery_state(self, runstate_with_blockers):
         """Should provide recovery classification."""
         constraints = analyze_blocker_constraints(runstate_with_blockers)
-        
+
         recovery = constraints.get("recovery_state", {})
         assert recovery.get("classification", "") == "blocked"
 
     def test_marks_safe_when_no_blockers(self, sample_runstate):
         """Should mark safe when no blockers."""
         constraints = analyze_blocker_constraints(sample_runstate)
-        
-        assert constraints.get("safe_to_proceed", True) == True
+
+        assert constraints.get("safe_to_proceed", True)
 
 
 class TestGetBlockerSafeAlternatives:
@@ -347,7 +347,7 @@ class TestGetBlockerSafeAlternatives:
             constraints,
             sample_runstate.get("task_queue", []),
         )
-        
+
         assert len(alternatives) == 2
 
     def test_filters_blocked_tasks(self, runstate_with_blockers):
@@ -357,7 +357,7 @@ class TestGetBlockerSafeAlternatives:
             constraints,
             ["Task using external-api", "Independent task"],
         )
-        
+
         assert "Independent task" in alternatives
 
 
@@ -369,7 +369,7 @@ class TestGeneratePlanningRationale:
         archive_context = gather_archive_context(archive_setup, product_id="test-product")
         decision_constraints = analyze_decision_constraints(sample_runstate)
         blocker_constraints = analyze_blocker_constraints(sample_runstate)
-        
+
         rationale = generate_planning_rationale(
             task="Implement CLI",
             archive_context=archive_context,
@@ -378,7 +378,7 @@ class TestGeneratePlanningRationale:
             applicable_lessons=[],
             applicable_patterns=[],
         )
-        
+
         assert rationale.get("primary_reason", "") != ""
 
     def test_includes_warnings_for_blockers(self, runstate_with_blockers, archive_setup):
@@ -386,7 +386,7 @@ class TestGeneratePlanningRationale:
         archive_context = gather_archive_context(archive_setup, product_id="test-product")
         decision_constraints = analyze_decision_constraints(runstate_with_blockers)
         blocker_constraints = analyze_blocker_constraints(runstate_with_blockers)
-        
+
         rationale = generate_planning_rationale(
             task="Some task",
             archive_context=archive_context,
@@ -395,7 +395,7 @@ class TestGeneratePlanningRationale:
             applicable_lessons=[],
             applicable_patterns=[],
         )
-        
+
         warnings = rationale.get("warnings", [])
         assert len(warnings) >= 1
 
@@ -404,7 +404,7 @@ class TestGeneratePlanningRationale:
         archive_context = gather_archive_context(archive_setup, product_id="test-product")
         decision_constraints = analyze_decision_constraints(sample_runstate)
         blocker_constraints = analyze_blocker_constraints(sample_runstate)
-        
+
         rationale = generate_planning_rationale(
             task="Implement CLI",
             archive_context=archive_context,
@@ -413,7 +413,7 @@ class TestGeneratePlanningRationale:
             applicable_lessons=[],
             applicable_patterns=[],
         )
-        
+
         assert rationale.get("confidence", "") == "high"
 
 
@@ -424,28 +424,28 @@ class TestDetermineSafeToExecute:
         """Should be safe when no constraints."""
         decision_constraints = analyze_decision_constraints(sample_runstate)
         blocker_constraints = analyze_blocker_constraints(sample_runstate)
-        
+
         safe = determine_safe_to_execute(decision_constraints, blocker_constraints)
-        
-        assert safe == True
+
+        assert safe
 
     def test_unsafe_when_blocking_decision(self, runstate_with_decisions):
         """Should be unsafe when blocking decision."""
         decision_constraints = analyze_decision_constraints(runstate_with_decisions)
         blocker_constraints = analyze_blocker_constraints(runstate_with_decisions)
-        
+
         safe = determine_safe_to_execute(decision_constraints, blocker_constraints)
-        
-        assert safe == False
+
+        assert not safe
 
     def test_unsafe_when_blocker(self, runstate_with_blockers):
         """Should be unsafe when blocker."""
         decision_constraints = analyze_decision_constraints(runstate_with_blockers)
         blocker_constraints = analyze_blocker_constraints(runstate_with_blockers)
-        
+
         safe = determine_safe_to_execute(decision_constraints, blocker_constraints)
-        
-        assert safe == False
+
+        assert not safe
 
 
 class TestGenerateAwareExecutionPack:
@@ -457,7 +457,7 @@ class TestGenerateAwareExecutionPack:
             runstate=sample_runstate,
             projects_path=archive_setup,
         )
-        
+
         assert "task" in context
         assert "safe_to_execute" in context
         assert "rationale" in context
@@ -469,7 +469,7 @@ class TestGenerateAwareExecutionPack:
             runstate=sample_runstate,
             projects_path=archive_setup,
         )
-        
+
         refs = context.get("archive_references", [])
         assert len(refs) >= 1
 
@@ -479,7 +479,7 @@ class TestGenerateAwareExecutionPack:
             runstate=sample_runstate,
             projects_path=archive_setup,
         )
-        
+
         assert context.get("estimated_scope", "") != ""
 
     def test_provides_alternatives_when_blocked(self, runstate_with_blockers, archive_setup):
@@ -488,7 +488,7 @@ class TestGenerateAwareExecutionPack:
             runstate=runstate_with_blockers,
             projects_path=archive_setup,
         )
-        
+
         alternatives = context.get("alternatives", [])
         assert len(alternatives) >= 1
 
@@ -521,9 +521,9 @@ class TestGetPlanningContextSummary:
             runstate=sample_runstate,
             projects_path=archive_setup,
         )
-        
+
         summary = get_planning_context_summary(context)
-        
+
         assert "Task:" in summary
         assert "Safe to execute:" in summary
 
@@ -538,9 +538,9 @@ class TestIntegration:
             projects_path=archive_setup,
             task="Implement CLI commands",
         )
-        
+
         assert context.get("task") == "Implement CLI commands"
-        assert context.get("safe_to_execute") == True
+        assert context.get("safe_to_execute")
         assert len(context.get("archive_references", [])) >= 1
 
     def test_handles_concurrent_constraints(self, runstate_with_decisions, archive_setup):
@@ -549,6 +549,6 @@ class TestIntegration:
             runstate=runstate_with_decisions,
             projects_path=archive_setup,
         )
-        
-        assert context.get("safe_to_execute") == False
+
+        assert not context.get("safe_to_execute")
         assert len(context.get("preconditions", [])) >= 1

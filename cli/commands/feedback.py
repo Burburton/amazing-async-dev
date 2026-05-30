@@ -19,9 +19,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from runtime.workflow_feedback_store import WorkflowFeedbackStore, create_workflow_feedback_for_review
 from cli.utils.output_formatter import print_next_step
 from cli.utils.path_formatter import get_relative_path
+from runtime.workflow_feedback_store import (
+    WorkflowFeedbackStore,
+)
 
 app = typer.Typer(help="Record, triage, and inspect workflow feedback")
 console = Console()
@@ -492,7 +494,7 @@ def update(
         table.add_row("Requires Followup", str(updated.get("requires_followup", False)))
 
         console.print(table)
-        console.print(f"\n[dim]Feedback updated[/dim]")
+        console.print("\n[dim]Feedback updated[/dim]")
 
         store.close()
 

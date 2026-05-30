@@ -5,19 +5,17 @@ Sends alerts when browser verification fails (MEDIUM severity).
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
+from runtime.email_sender import EmailSender, create_email_config
 from runtime.notification_event import (
     NotificationEvent,
     NotificationEventType,
     NotificationSeverity,
     NotificationStatus,
-    NotificationChannel,
-    generate_event_id,
     generate_dedupe_key,
+    generate_event_id,
 )
 from runtime.notification_store import NotificationStore
-from runtime.email_sender import EmailSender, create_email_config
 from runtime.resend_provider import apply_resend_config_from_file
 
 

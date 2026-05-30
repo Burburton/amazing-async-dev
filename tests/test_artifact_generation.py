@@ -1,24 +1,25 @@
 """Tests for artifact generation and file formats."""
 
+
 import pytest
-from pathlib import Path
 import yaml
-from runtime.state_store import StateStore
+
 from runtime.review_pack_builder import build_daily_review_pack
+from runtime.state_store import StateStore
 
 
 @pytest.fixture
 def temp_store(temp_dir):
     """Create a StateStore with temp project path."""
     from runtime.adapters.filesystem_adapter import FilesystemAdapter
-    
+
     fs = FilesystemAdapter()
     project_path = temp_dir / "test-product"
     fs.ensure_dir(project_path)
     fs.ensure_dir(project_path / "execution-packs")
     fs.ensure_dir(project_path / "execution-results")
     fs.ensure_dir(project_path / "reviews")
-    
+
     yield StateStore(project_path)
 
 

@@ -4,14 +4,14 @@ Ensures email channel is used only at the right moments with proper escalation d
 Integrates with existing execution_policy system.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
 
 class EmailTriggerType(str, Enum):
     """Types of triggers that warrant email."""
-    
+
     ESCALATION_BLOCKER = "escalation_blocker"
     ESCALATION_DECISION_REQUIRED = "escalation_decision_required"
     HUMAN_CHECKPOINT = "human_checkpoint"
@@ -25,7 +25,7 @@ class EmailTriggerType(str, Enum):
 
 class EmailSuppressReason(str, Enum):
     """Reasons to suppress email sending."""
-    
+
     RATE_LIMITED = "rate_limited"
     SIMILAR_PENDING = "similar_pending"
     INFORMATION_ONLY = "information_only"
@@ -37,7 +37,7 @@ class EmailSuppressReason(str, Enum):
 
 class EmailUrgency(str, Enum):
     """Email urgency levels."""
-    
+
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -70,43 +70,43 @@ def should_send_email(
     policy_mode: str | None = None,
 ) -> tuple[bool, EmailSuppressReason | None, str]:
     """Check if email should be sent based on escalation policy.
-    
+
     Args:
         runstate: Current RunState
         trigger_type: Type of trigger
         last_email_sent_at: When last email was sent
         pending_requests: Currently pending decision requests
         policy_mode: Policy mode (conservative/balanced/low_interruption)
-        
+
     Returns:
         (should_send, suppress_reason_if_not, explanation)
     """
     policy_mode = policy_mode or runstate.get("policy_mode", "balanced")
-    
+
     if last_email_sent_at:
         hours_since = (datetime.now() - last_email_sent_at).total_seconds() / 3600
         rate_limit = get_rate_limit_hours(policy_mode, trigger_type)
-        
+
         if hours_since < rate_limit:
             return (
                 False,
                 EmailSuppressReason.RATE_LIMITED,
                 f"Last email sent {hours_since:.1f} hours ago, rate limit is {rate_limit} hours",
             )
-    
+
     if pending_requests:
         for req in pending_requests:
             if req.get("status") == "sent":
                 req_type = req.get("pause_reason_category", "")
                 trigger_category = trigger_type.value.split("_")[0]
-                
+
                 if trigger_category in req_type and trigger_type != EmailTriggerType.MILESTONE_REPORT:
                     return (
                         False,
                         EmailSuppressReason.SIMILAR_PENDING,
                         f"Similar request already pending: {req.get('decision_request_id')}",
                     )
-    
+
     if trigger_type == EmailTriggerType.PROGRESS_DIGEST:
         if policy_mode == "conservative":
             return (
@@ -124,7 +124,7 @@ def should_send_email(
                         EmailSuppressReason.LOW_INTERRUPTION_SKIP,
                         f"Low interruption mode: digest interval {digest_interval} hours",
                     )
-    
+
     if trigger_type == EmailTriggerType.INFORMATION_ONLY:
         if policy_mode == "low_interruption":
             return (
@@ -132,12 +132,12 @@ def should_send_email(
                 EmailSuppressReason.INFORMATION_ONLY,
                 "Low interruption mode: skipping informational emails",
             )
-    
+
     urgency = TRIGGER_TO_URGENCY.get(trigger_type, EmailUrgency.LOW)
-    
+
     if urgency == EmailUrgency.HIGH:
         return (True, None, f"High urgency trigger: {trigger_type.value}")
-    
+
     if policy_mode == "conservative":
         return (True, None, f"Conservative mode: sending for {trigger_type.value}")
     elif policy_mode == "balanced":
@@ -151,7 +151,7 @@ def should_send_email(
             )
     else:
         if urgency == EmailUrgency.HIGH:
-            return (True, None, f"Low interruption mode: only high urgency sent")
+            return (True, None, "Low interruption mode: only high urgency sent")
         return (
             False,
             EmailSuppressReason.LOW_INTERRUPTION_SKIP,
@@ -161,19 +161,19 @@ def should_send_email(
 
 def get_rate_limit_hours(policy_mode: str, trigger_type: EmailTriggerType) -> float:
     """Get rate limit hours based on policy mode and trigger type.
-    
+
     Args:
         policy_mode: Policy mode
         trigger_type: Trigger type
-        
+
     Returns:
         Minimum hours between similar emails
     """
     urgency = TRIGGER_TO_URGENCY.get(trigger_type, EmailUrgency.LOW)
-    
+
     if urgency == EmailUrgency.HIGH:
         return 1.0
-    
+
     if policy_mode == "conservative":
         return 2.0
     elif policy_mode == "balanced":
@@ -189,11 +189,11 @@ def classify_email_type(
     reply_required: bool = False,
 ) -> tuple[str, str]:
     """Classify email as decision request vs status report.
-    
+
     Args:
         trigger_type: Trigger type
         reply_required: Whether reply is required
-        
+
     Returns:
         (email_type, description)
     """
@@ -204,10 +204,10 @@ def classify_email_type(
         EmailTriggerType.HUMAN_CHECKPOINT,
     ]:
         return ("decision_request", "Requires human decision/approval")
-    
+
     if reply_required:
         return ("decision_request", "Explicit reply requested")
-    
+
     return ("status_report", "Informational only, no reply required")
 
 
@@ -221,23 +221,23 @@ def check_timeout_condition(
     timeout_hours: float = DEFAULT_TIMEOUT_WARNING_HOURS,
 ) -> tuple[bool, float, str]:
     """Check if timeout warning should be sent.
-    
+
     Args:
         request_sent_at: When the request was sent
         timeout_hours: Timeout threshold
-        
+
     Returns:
         (needs_warning, hours_elapsed, explanation)
     """
     hours_elapsed = (datetime.now() - request_sent_at).total_seconds() / 3600
-    
+
     if hours_elapsed >= timeout_hours:
         return (
             True,
             hours_elapsed,
             f"Request pending for {hours_elapsed:.1f} hours, exceeds {timeout_hours} threshold",
         )
-    
+
     return (False, hours_elapsed, f"Request pending for {hours_elapsed:.1f} hours, within threshold")
 
 
@@ -246,40 +246,40 @@ def get_appropriate_triggers_for_runstate(
     policy_mode: str | None = None,
 ) -> list[EmailTriggerType]:
     """Get appropriate email triggers for current RunState.
-    
+
     Args:
         runstate: Current RunState
         policy_mode: Policy mode
-        
+
     Returns:
         List of appropriate trigger types
     """
     triggers = []
     policy_mode = policy_mode or runstate.get("policy_mode", "balanced")
-    
+
     blocked_items = runstate.get("blocked_items", [])
     if blocked_items:
         triggers.append(EmailTriggerType.ESCALATION_BLOCKER)
-    
+
     decisions_needed = runstate.get("decisions_needed", [])
     if decisions_needed:
         decision = decisions_needed[0]
         category = decision.get("category", "")
-        
+
         if category in ["critical", "approval", "architecture"]:
             triggers.append(EmailTriggerType.ESCALATION_DECISION_REQUIRED)
         elif category in ["checkpoint", "review"]:
             triggers.append(EmailTriggerType.HUMAN_CHECKPOINT)
-    
+
     pending_risky = runstate.get("pending_risky_actions", [])
     for action in pending_risky:
         if action.get("requires_confirmation"):
             triggers.append(EmailTriggerType.RISKY_ACTION_APPROVAL)
-    
+
     current_phase = runstate.get("current_phase", "")
     if current_phase == "milestone":
         triggers.append(EmailTriggerType.MILESTONE_REPORT)
-    
+
     return triggers
 
 
@@ -290,29 +290,29 @@ def format_escalation_summary(
     explanation: str,
 ) -> str:
     """Format escalation decision as human-readable summary.
-    
+
     Args:
         trigger_type: Trigger type
         should_send: Whether email should be sent
         suppress_reason: Reason if suppressed
         explanation: Explanation
-        
+
     Returns:
         Human-readable summary
     """
     lines = []
-    
+
     lines.append(f"## Email Escalation: {trigger_type.value}")
     lines.append("")
     lines.append(f"**Decision:** {should_send}")
-    
+
     if suppress_reason:
         lines.append(f"**Suppressed:** {suppress_reason.value}")
-    
+
     lines.append(f"**Urgency:** {TRIGGER_TO_URGENCY.get(trigger_type, EmailUrgency.LOW).value}")
     lines.append("")
     lines.append(f"**Explanation:** {explanation}")
-    
+
     return "\n".join(lines)
 
 
@@ -322,12 +322,12 @@ def validate_email_frequency(
     policy_mode: str = "balanced",
 ) -> tuple[bool, str]:
     """Validate if email frequency is within acceptable bounds.
-    
+
     Args:
         emails_today: Number of emails sent today
         max_emails_per_day: Maximum allowed per day
         policy_mode: Policy mode
-        
+
     Returns:
         (within_bounds, explanation)
     """
@@ -335,11 +335,11 @@ def validate_email_frequency(
         max_emails_per_day = 15
     elif policy_mode == "low_interruption":
         max_emails_per_day = 5
-    
+
     if emails_today >= max_emails_per_day:
         return (
             False,
             f"Daily limit reached: {emails_today}/{max_emails_per_day} emails",
         )
-    
+
     return (True, f"Within daily limit: {emails_today}/{max_emails_per_day}")

@@ -7,11 +7,11 @@ parsing structured output into ExecutionResult.
 from pathlib import Path
 from typing import Any
 
-from runtime.engines.base import ExecutionEngine
 from runtime.adapters.llm_adapter import BailianLLMAdapter
+from runtime.api_failure_types import APIFailureClassification
+from runtime.engines.base import ExecutionEngine
 from runtime.execution_event_types import ExecutionEventType
 from runtime.execution_logger import ExecutionLogger
-from runtime.api_failure_types import APIFailureClassification
 
 
 class LiveAPIEngine(ExecutionEngine):
@@ -43,10 +43,10 @@ class LiveAPIEngine(ExecutionEngine):
     ) -> dict[str, Any] | None:
         """Execute via API and return ExecutionResult."""
         logger = self._get_logger()
-        
+
         feature_id = runstate.get("feature_id", "") if runstate else ""
         product_id = runstate.get("project_id", "") if runstate else ""
-        
+
         logger.log_event(
             ExecutionEventType.RUN_DAY_STARTED,
             feature_id=feature_id,

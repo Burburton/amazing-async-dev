@@ -12,33 +12,30 @@ Feature 061: External execution closeout orchestration (primary path).
 Hardening: Added --project parameter for canonical loop consistency.
 """
 
+import subprocess
 from pathlib import Path
 from typing import Any
-import subprocess
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
 
-from runtime.state_store import StateStore
-from runtime.engines.factory import get_engine, get_available_modes
-from runtime.execution_event_types import ExecutionEventType
-from runtime.execution_logger import get_logger
-from runtime.auto_email_trigger import check_and_trigger, TriggerSource
+from cli.utils.output_formatter import print_next_step, print_success_panel
+from runtime.auto_email_trigger import TriggerSource, check_and_trigger
 from runtime.browser_verification_orchestrator import (
-    BrowserVerificationOrchestrator,
-    OrchestrationResult,
     OrchestrationTerminalState,
     orchestrate_for_run_day,
 )
-from runtime.verification_gate import requires_browser_verification
+from runtime.engines.factory import get_available_modes, get_engine
+from runtime.execution_event_types import ExecutionEventType
+from runtime.execution_logger import get_logger
 from runtime.external_execution_closeout import (
-    orchestrate_external_closeout,
-    CloseoutState,
-    CloseoutTerminalClassification,
     CloseoutResult,
+    CloseoutTerminalClassification,
+    orchestrate_external_closeout,
 )
-from cli.utils.output_formatter import print_next_step, print_success_panel
-from cli.utils.path_formatter import get_relative_path
+from runtime.state_store import StateStore
+from runtime.verification_gate import requires_browser_verification
 
 app = typer.Typer(help="Run today's execution task")
 console = Console()
@@ -64,31 +61,31 @@ def _run_frontend_verification(
     result: dict[str, Any],
 ) -> dict[str, Any]:
     verification_type = execution_pack.get("verification_type", "backend_only")
-    
+
     if not requires_browser_verification(verification_type):
         return result
-    
+
     console.print(f"\n[cyan]Frontend verification required (type: {verification_type})[/cyan]")
-    
+
     try:
         orchestration_result = orchestrate_for_run_day(
             project_path=project_path,
             execution_pack=execution_pack,
             project_id=product_id,
         )
-        
+
         result["orchestration_terminal_state"] = orchestration_result.terminal_state.value
         result["browser_verification"] = orchestration_result.to_dict()["browser_verification"]
-        
+
         if orchestration_result.terminal_state == OrchestrationTerminalState.SUCCESS:
-            console.print(f"[green]Frontend verification completed successfully[/green]")
+            console.print("[green]Frontend verification completed successfully[/green]")
         elif orchestration_result.terminal_state == OrchestrationTerminalState.EXCEPTION_ACCEPTED:
             console.print(f"[yellow]Frontend verification skipped: {orchestration_result.exception_details}[/yellow]")
         else:
             console.print(f"[red]Frontend verification failed: {orchestration_result.terminal_state.value}[/red]")
             if result.get("status") == "success":
                 result["status"] = "partial"
-        
+
     except Exception as e:
         console.print(f"[red]Frontend verification orchestration error: {e}[/red]")
         result["browser_verification"] = {
@@ -97,7 +94,7 @@ def _run_frontend_verification(
             "exception_details": str(e),
         }
         result["orchestration_terminal_state"] = OrchestrationTerminalState.EXCEPTION_ACCEPTED.value
-    
+
     return result
 
 
@@ -119,23 +116,23 @@ def _extract_execution_intent(execution_pack: dict[str, Any]) -> dict[str, Any]:
         "prior_doctor_status": execution_pack.get("prior_doctor_status", ""),
         "prior_recommendation": execution_pack.get("prior_recommended_next_action", ""),
     }
-    
+
     if execution_pack.get("planning_mode"):
         intent["has_planning_context"] = True
         intent["intent_summary"] = PLANNING_MODE_INTENT.get(
             execution_pack.get("planning_mode", ""),
             "Execution following daily plan"
         )
-    
+
     if execution_pack.get("plan_recovery_flag"):
         intent["recovery_flag"] = True
-    
+
     if execution_pack.get("plan_closeout_flag"):
         intent["closeout_flag"] = True
-    
+
     if execution_pack.get("safe_to_execute") is False:
         intent["blocked_flag"] = True
-    
+
     return intent
 
 
@@ -143,28 +140,28 @@ def _display_execution_intent(intent: dict[str, Any]) -> None:
     """Display execution intent summary before execution."""
     if not intent.get("has_planning_context"):
         return
-    
+
     console.print("\n[bold cyan]Execution Intent[/bold cyan]")
-    
+
     planning_mode = intent.get("planning_mode", "")
     if planning_mode:
         console.print(f"  Planning Mode: [green]{planning_mode}[/green]")
-    
+
     if intent.get("intent_summary"):
         console.print(f"  Intent: {intent.get('intent_summary')}")
-    
+
     bounded_target = intent.get("bounded_target", "")
     if bounded_target:
         console.print(f"  Bounded Target: {bounded_target}")
-    
+
     prior_status = intent.get("prior_doctor_status", "")
     if prior_status:
         console.print(f"  Prior Doctor Status: {prior_status}")
-    
+
     prior_rec = intent.get("prior_recommendation", "")
     if prior_rec:
         console.print(f"  Prior Recommendation: {prior_rec}")
-    
+
     alignment_status = "aligned"
     if intent.get("blocked_flag"):
         alignment_status = "blocked-context"
@@ -179,13 +176,13 @@ def _display_execution_intent(intent: dict[str, Any]) -> None:
 def _check_drift_warnings(intent: dict[str, Any], execution_pack: dict[str, Any]) -> list[str]:
     """Check for potential drift between planning mode and execution."""
     warnings = []
-    
+
     planning_mode = intent.get("planning_mode", "")
-    
+
     if planning_mode == "blocked_waiting_for_decision":
         warnings.append("Workspace is blocked - forward execution may not be appropriate")
         warnings.append("Consider resolving pending decisions before proceeding")
-    
+
     if planning_mode == "closeout_first":
         task_scope = execution_pack.get("task_scope", [])
         for task in task_scope:
@@ -193,14 +190,14 @@ def _check_drift_warnings(intent: dict[str, Any], execution_pack: dict[str, Any]
             if any(word in task_lower for word in ["implement", "add", "create", "build", "new"]):
                 if "closeout" not in task_lower and "archive" not in task_lower:
                     warnings.append("Closeout-first mode: new expansion work detected before closeout")
-    
+
     if planning_mode == "verification_first":
         task_scope = execution_pack.get("task_scope", [])
         for task in task_scope:
             task_lower = task.lower()
             if "verify" not in task_lower and "check" not in task_lower and "test" not in task_lower:
                 warnings.append("Verification-first mode: non-verification work may be premature")
-    
+
     if planning_mode == "recover_and_continue":
         task_scope = execution_pack.get("task_scope", [])
         has_recovery_task = False
@@ -210,10 +207,10 @@ def _check_drift_warnings(intent: dict[str, Any], execution_pack: dict[str, Any]
                 has_recovery_task = True
         if not has_recovery_task and not intent.get("recovery_flag"):
             warnings.append("Recovery-first mode: ensure recovery concerns are addressed first")
-    
+
     if intent.get("prior_doctor_status") == "BLOCKED" and not intent.get("blocked_flag"):
         warnings.append("Prior doctor status was BLOCKED - verify blockers are resolved")
-    
+
     return warnings
 
 
@@ -221,11 +218,11 @@ def _display_drift_warnings(warnings: list[str]) -> None:
     """Display drift warnings if present."""
     if not warnings:
         return
-    
+
     console.print("\n[bold yellow]Execution Alignment Notes[/bold yellow]")
     for warning in warnings:
         console.print(f"  [yellow]•[/yellow] {warning}")
-    
+
     console.print("\n  [dim]Execution continues under operator control[/dim]")
 
 
@@ -254,9 +251,9 @@ def execute(
         store = StateStore(project_path)
     else:
         store = StateStore()
-    
+
     logger = get_logger(store.project_path)
-    
+
     runstate = store.load_runstate()
     feature_id = runstate.get("feature_id", "") if runstate else ""
     product_id = runstate.get("project_id", "") if runstate else ""
@@ -267,7 +264,7 @@ def execute(
         product_id=product_id,
         event_data={"execution_id": execution_id, "mode": mode, "project": project},
     )
-    
+
     available = get_available_modes()
     if not available.get(mode, False):
         console.print(f"[red]Mode '{mode}' is not available[/red]")
@@ -302,7 +299,7 @@ def _run_external_mode(
 ) -> None:
     """Execute in external tool mode."""
     root = Path.cwd()
-    
+
     if execution_id is None:
         packs = list(store.execution_packs_path.glob("exec-*.md"))
         if not packs:
@@ -316,7 +313,7 @@ def _run_external_mode(
         console.print(f"[red]ExecutionPack not found: {execution_id}[/red]")
         logger.close()
         raise typer.Exit(1)
-    
+
     intent = _extract_execution_intent(execution_pack)
     _display_execution_intent(intent)
     warnings = _check_drift_warnings(intent, execution_pack)
@@ -359,15 +356,15 @@ def _run_external_mode(
 
         if not dry_run:
             console.print("\n[bold cyan]Entering External Closeout Phase (Feature 061)[/bold cyan]")
-            console.print(f"  Waiting for execution result (timeout: 120s)...")
-            
+            console.print("  Waiting for execution result (timeout: 120s)...")
+
             closeout_result = orchestrate_external_closeout(
                 project_path=store.project_path,
                 execution_id=execution_id,
                 execution_pack=execution_pack,
                 project_id=product_id,
             )
-            
+
             _handle_closeout_result(
                 closeout_result,
                 execution_id,
@@ -402,47 +399,47 @@ def _check_acceptance_readiness_and_trigger(
 ) -> None:
     """Check acceptance readiness after closeout success (Feature 077 AC-006)."""
     from runtime.acceptance_readiness import (
-        check_acceptance_readiness,
         AcceptanceReadiness,
         AcceptanceTriggerPolicyMode,
+        check_acceptance_readiness,
     )
     from runtime.acceptance_runner import run_acceptance_from_execution
     from runtime.reacceptance_loop import get_or_create_attempt_history, save_attempt_history
-    
+
     console.print("\n[bold cyan]Checking acceptance readiness...[/bold cyan]")
-    
+
     readiness_result = check_acceptance_readiness(
         project_path,
         execution_id,
         AcceptanceTriggerPolicyMode.FEATURE_COMPLETION_ONLY,
     )
-    
+
     console.print(f"  Readiness: {readiness_result.readiness.value}")
-    
+
     for prereq in readiness_result.prerequisites_checked:
         status_icon = "[green]✓[/green]" if prereq.satisfied else "[yellow]○[/yellow]"
         console.print(f"    {status_icon} {prereq.name}")
-    
+
     if readiness_result.readiness == AcceptanceReadiness.READY:
         console.print("\n[green]Acceptance ready - triggering automatically[/green]")
-        
+
         logger.log_event(
             ExecutionEventType.RUN_DAY_STARTED,
             feature_id=feature_id,
             event_data={"acceptance_triggered": True, "execution_id": execution_id},
         )
-        
+
         result = run_acceptance_from_execution(project_path, execution_id)
-        
+
         if result:
             history = get_or_create_attempt_history(project_path, feature_id, execution_id)
             history.add_attempt(result)
             save_attempt_history(project_path, history)
-            
+
             console.print(f"\n[bold]Acceptance Result: {result.terminal_state.value}[/bold]")
             console.print(f"  Accepted: {len(result.accepted_criteria)}")
             console.print(f"  Failed: {len(result.failed_criteria)}")
-            
+
             if result.terminal_state.value in ["accepted", "conditional"]:
                 console.print("[green]Feature ready for completion[/green]")
             else:
@@ -471,17 +468,17 @@ def _handle_closeout_result(
     console.print(f"\n[bold]Closeout Status:[/bold] {closeout_result.closeout_state.value}")
     console.print(f"  Poll Attempts: {closeout_result.poll_attempts}")
     console.print(f"  Elapsed: {closeout_result.elapsed_seconds:.1f}s")
-    
+
     if closeout_result.execution_result_detected:
-        console.print(f"  Result Detected: [green]Yes[/green]")
+        console.print("  Result Detected: [green]Yes[/green]")
     else:
-        console.print(f"  Result Detected: [red]No[/red]")
-    
+        console.print("  Result Detected: [red]No[/red]")
+
     if closeout_result.verification_required:
-        console.print(f"  Verification Required: [yellow]Yes[/yellow]")
+        console.print("  Verification Required: [yellow]Yes[/yellow]")
         console.print(f"  Verification Completed: {closeout_result.verification_completed}")
         console.print(f"  Verification Terminal: {closeout_result.verification_terminal_state or 'N/A'}")
-    
+
     terminal_classification = closeout_result.terminal_classification
     if terminal_classification:
         if terminal_classification == CloseoutTerminalClassification.SUCCESS:
@@ -492,7 +489,7 @@ def _handle_closeout_result(
                 console.print(f"  [yellow]Reason: {closeout_result.recovery_reason}[/yellow]")
         else:
             console.print(f"\n  [bold red]Terminal Classification: {terminal_classification.value}[/bold red]")
-    
+
     logger.log_event(
         ExecutionEventType.EXTERNAL_EXECUTION_CLOSEOUT,
         feature_id=feature_id,
@@ -505,12 +502,12 @@ def _handle_closeout_result(
             "elapsed_seconds": closeout_result.elapsed_seconds,
         },
     )
-    
+
     execution_result = store.load_execution_result(execution_id) or {}
     execution_result["closeout_state"] = closeout_result.closeout_state.value
     execution_result["closeout_terminal_state"] = terminal_classification.value if terminal_classification else None
     execution_result["closeout_result"] = closeout_result.to_dict()
-    
+
     if closeout_result.execution_result_detected and closeout_result.execution_result_valid:
         if terminal_classification == CloseoutTerminalClassification.SUCCESS:
             execution_result["status"] = "success"
@@ -524,17 +521,17 @@ def _handle_closeout_result(
             "reason": closeout_result.recovery_reason or "External execution did not produce valid result",
             "impact": "Closeout incomplete",
         }]
-    
+
     store.save_execution_result(execution_result)
-    
+
     runstate = store.load_runstate() or {}
     previous_phase = runstate.get("current_phase", "executing")
-    
+
     if terminal_classification == CloseoutTerminalClassification.SUCCESS:
         runstate["current_phase"] = "reviewing"
         runstate["last_action"] = f"External closeout completed: {execution_id}"
         runstate["next_recommended_action"] = "Generate DailyReviewPack"
-        
+
         _check_acceptance_readiness_and_trigger(
             store.project_path,
             execution_id,
@@ -557,12 +554,12 @@ def _handle_closeout_result(
             "reason": f"Closeout terminal: {terminal_classification.value if terminal_classification else 'unknown'}",
             "resolution": "Manual intervention required",
         }]
-    
+
     store.save_runstate(runstate)
-    
+
     if runstate.get("decisions_needed") or runstate.get("blocked_items"):
         _auto_trigger_if_needed(store.project_path, TriggerSource.EXTERNAL_TOOL_AUTO)
-    
+
     logger.log_transition(
         from_phase=previous_phase,
         to_phase=runstate["current_phase"],
@@ -571,12 +568,12 @@ def _handle_closeout_result(
         reason=f"External closeout: {closeout_result.closeout_state.value}",
     )
     logger.close()
-    
+
     result_path = store.execution_results_path / f"{execution_id}.md"
-    
+
     if terminal_classification == CloseoutTerminalClassification.SUCCESS:
         print_success_panel(
-            message=f"External closeout completed successfully",
+            message="External closeout completed successfully",
             title="Closeout Complete",
             paths=[
                 {"label": "ExecutionResult", "path": str(result_path)},
@@ -592,7 +589,7 @@ def _handle_closeout_result(
         )
     elif terminal_classification == CloseoutTerminalClassification.RECOVERY_REQUIRED:
         print_success_panel(
-            message=f"External closeout recovery needed",
+            message="External closeout recovery needed",
             title="Closeout Partial",
             paths=[
                 {"label": "ExecutionResult", "path": str(result_path)},
@@ -607,7 +604,7 @@ def _handle_closeout_result(
             hints=["Closeout interrupted or verification incomplete"],
         )
     else:
-        console.print(f"\n[red]External closeout failed. Check ExecutionResult for details.[/red]")
+        console.print("\n[red]External closeout failed. Check ExecutionResult for details.[/red]")
         print_next_step(
             action="Review failure and decide next action",
             command="asyncdev resume-next-day status",
@@ -627,7 +624,7 @@ def _run_live_mode(
 ) -> None:
     """Execute in live API mode."""
     root = Path.cwd()
-    
+
     runstate = store.load_runstate()
     if runstate is None:
         console.print("[red]No RunState found. Run 'asyncdev plan-day' first.[/red]")
@@ -647,7 +644,7 @@ def _run_live_mode(
         console.print(f"[red]ExecutionPack not found: {execution_id}[/red]")
         logger.close()
         raise typer.Exit(1)
-    
+
     intent = _extract_execution_intent(execution_pack)
     _display_execution_intent(intent)
     warnings = _check_drift_warnings(intent, execution_pack)
@@ -662,7 +659,7 @@ def _run_live_mode(
     console.print(f"\n[cyan]Executing via API (model: {prep.get('model', 'unknown')})...[/cyan]")
 
     result = engine.run(execution_pack)
-    
+
     result = _run_frontend_verification(
         store.project_path,
         execution_pack,
@@ -706,10 +703,10 @@ def _run_live_mode(
         event_data={"phase": "reviewing"},
     )
     engine.close()
-    
+
     if result.get("decisions_required") or result.get("blocked_reasons"):
         _auto_trigger_if_needed(store.project_path, TriggerSource.RUN_DAY_AUTO)
-    
+
     logger.close()
 
     result_path = store.execution_results_path / f"{execution_id}.md"
@@ -743,7 +740,7 @@ def _run_mock_mode(
 ) -> None:
     """Execute in mock mode for testing."""
     root = Path.cwd()
-    
+
     runstate = store.load_runstate()
     if runstate is None:
         console.print("[yellow]Creating minimal RunState for test[/yellow]")
@@ -773,7 +770,7 @@ def _run_mock_mode(
     execution_pack = None
     if execution_id and execution_id != "exec-test-001":
         execution_pack = store.load_execution_pack(execution_id)
-    
+
     if execution_pack:
         intent = _extract_execution_intent(execution_pack)
         _display_execution_intent(intent)
@@ -794,7 +791,7 @@ def _run_mock_mode(
         }
 
     result = engine.run(test_pack)
-    
+
     if execution_pack:
         result = _run_frontend_verification(
             store.project_path,
@@ -823,7 +820,7 @@ def _run_mock_mode(
     previous_phase = runstate.get("current_phase", "executing")
     runstate["current_phase"] = "reviewing"
     store.save_runstate(runstate)
-    
+
     _auto_trigger_if_needed(store.project_path, TriggerSource.RUN_DAY_AUTO)
 
     logger.log_transition(
@@ -863,7 +860,7 @@ def _trigger_external_tool(pack_path: str) -> None:
 
     Uses subprocess to call opencode CLI.
     """
-    console.print(f"\n[cyan]Triggering OpenCode...[/cyan]")
+    console.print("\n[cyan]Triggering OpenCode...[/cyan]")
 
     try:
         result = subprocess.run(

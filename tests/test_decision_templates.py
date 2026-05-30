@@ -1,14 +1,15 @@
 """Tests for Feature 016 - Decision Template System."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
 
 from runtime.decision_templates import (
     DecisionTemplate,
     DecisionTemplateRegistry,
-    get_registry,
     enhance_decision_with_template,
+    get_registry,
 )
 
 runner = CliRunner()
@@ -43,7 +44,7 @@ class TestDecisionTemplate:
     def test_initializes_from_data(self, sample_templates_yaml):
         """DecisionTemplate should initialize from YAML data."""
         template = DecisionTemplate(sample_templates_yaml["templates"][0])
-        
+
         assert template.template_id == "continue-or-change"
         assert template.decision_type == "technical"
         assert template.name == "Continue or Change"
@@ -52,20 +53,20 @@ class TestDecisionTemplate:
     def test_matches_by_keyword(self, sample_templates_yaml):
         """DecisionTemplate should match decisions by keywords."""
         template = DecisionTemplate(sample_templates_yaml["templates"][0])
-        
+
         decision = {"decision": "Should I continue with current approach?"}
-        assert template.matches(decision) == True
-        
+        assert template.matches(decision)
+
         decision2 = {"decision": "Try alternative method"}
-        assert template.matches(decision2) == False
+        assert not template.matches(decision2)
 
     def test_enhances_decision(self, sample_templates_yaml):
         """DecisionTemplate should enhance decision with defaults."""
         template = DecisionTemplate(sample_templates_yaml["templates"][0])
-        
+
         decision = {"decision": "Continue or change approach"}
         enhanced = template.enhance(decision)
-        
+
         assert enhanced.get("template_id") == "continue-or-change"
         assert enhanced.get("decision_type") == "technical"
         assert enhanced.get("urgency") == "medium"
@@ -73,14 +74,14 @@ class TestDecisionTemplate:
     def test_preserves_existing_values(self, sample_templates_yaml):
         """Enhance should preserve existing decision values."""
         template = DecisionTemplate(sample_templates_yaml["templates"][0])
-        
+
         decision = {
             "decision": "Continue approach",
             "urgency": "high",
             "options": ["Option A", "Option B"],
         }
         enhanced = template.enhance(decision)
-        
+
         assert enhanced.get("urgency") == "high"
         assert enhanced.get("options") == ["Option A", "Option B"]
 
@@ -91,7 +92,7 @@ class TestDecisionTemplateRegistry:
     def test_loads_templates_from_yaml(self, temp_dir):
         """Registry should load templates from YAML file."""
         import yaml
-        
+
         yaml_path = temp_dir / "test-templates.yaml"
         with open(yaml_path, "w") as f:
             yaml.dump({
@@ -105,17 +106,17 @@ class TestDecisionTemplateRegistry:
                     }
                 ]
             }, f)
-        
+
         registry = DecisionTemplateRegistry()
         registry.load(yaml_path)
-        
+
         assert registry.is_loaded()
         assert len(registry.templates) == 1
 
     def test_matches_decision_to_template(self, temp_dir):
         """Registry should match decision to best template."""
         import yaml
-        
+
         yaml_path = temp_dir / "test-templates.yaml"
         with open(yaml_path, "w") as f:
             yaml.dump({
@@ -130,20 +131,20 @@ class TestDecisionTemplateRegistry:
                     }
                 ]
             }, f)
-        
+
         registry = DecisionTemplateRegistry()
         registry.load(yaml_path)
-        
+
         decision = {"decision": "Should we retry or defer?"}
         template = registry.match(decision)
-        
+
         assert template is not None
         assert template.template_id == "retry-template"
 
     def test_enhance_decision(self, temp_dir):
         """Registry should enhance decision with template."""
         import yaml
-        
+
         yaml_path = temp_dir / "test-templates.yaml"
         with open(yaml_path, "w") as f:
             yaml.dump({
@@ -159,13 +160,13 @@ class TestDecisionTemplateRegistry:
                     }
                 ]
             }, f)
-        
+
         registry = DecisionTemplateRegistry()
         registry.load(yaml_path)
-        
+
         decision = {"decision": "Which priority should we choose?"}
         enhanced = registry.enhance_decision(decision)
-        
+
         assert enhanced.get("template_id") == "priority-template"
         assert enhanced.get("decision_type") == "priority"
         assert enhanced.get("urgency") == "low"
@@ -173,7 +174,7 @@ class TestDecisionTemplateRegistry:
     def test_returns_none_if_no_match(self, temp_dir):
         """Registry should return None if no template matches."""
         import yaml
-        
+
         yaml_path = temp_dir / "test-templates.yaml"
         with open(yaml_path, "w") as f:
             yaml.dump({
@@ -188,19 +189,19 @@ class TestDecisionTemplateRegistry:
                     }
                 ]
             }, f)
-        
+
         registry = DecisionTemplateRegistry()
         registry.load(yaml_path)
-        
+
         decision = {"decision": "Something unrelated"}
         template = registry.match(decision)
-        
+
         assert template is None
 
     def test_get_template_by_id(self, temp_dir):
         """Registry should get template by ID."""
         import yaml
-        
+
         yaml_path = temp_dir / "test-templates.yaml"
         with open(yaml_path, "w") as f:
             yaml.dump({
@@ -214,19 +215,19 @@ class TestDecisionTemplateRegistry:
                     }
                 ]
             }, f)
-        
+
         registry = DecisionTemplateRegistry()
         registry.load(yaml_path)
-        
+
         template = registry.get_template_by_id("my-template")
-        
+
         assert template is not None
         assert template.name == "My Template"
 
     def test_get_templates_by_type(self, temp_dir):
         """Registry should filter templates by type."""
         import yaml
-        
+
         yaml_path = temp_dir / "test-templates.yaml"
         with open(yaml_path, "w") as f:
             yaml.dump({
@@ -247,19 +248,19 @@ class TestDecisionTemplateRegistry:
                     },
                 ]
             }, f)
-        
+
         registry = DecisionTemplateRegistry()
         registry.load(yaml_path)
-        
+
         tech_templates = registry.get_templates_by_type("technical")
-        
+
         assert len(tech_templates) == 1
         assert tech_templates[0].template_id == "tech-1"
 
     def test_list_templates(self, temp_dir):
         """Registry should list all templates."""
         import yaml
-        
+
         yaml_path = temp_dir / "test-templates.yaml"
         with open(yaml_path, "w") as f:
             yaml.dump({
@@ -273,12 +274,12 @@ class TestDecisionTemplateRegistry:
                     }
                 ]
             }, f)
-        
+
         registry = DecisionTemplateRegistry()
         registry.load(yaml_path)
-        
+
         templates_list = registry.list_templates()
-        
+
         assert len(templates_list) == 1
         assert templates_list[0]["template_id"] == "t1"
 
@@ -289,9 +290,9 @@ class TestDefaultRegistry:
     def test_get_registry_loads_default(self):
         """get_registry should load default templates."""
         registry = get_registry()
-        
+
         assert registry is not None
-        
+
         if Path("templates/decision-templates.yaml").exists():
             assert registry.is_loaded()
 
@@ -299,7 +300,7 @@ class TestDefaultRegistry:
         """enhance_decision_with_template should work."""
         decision = {"decision": "Continue or change approach"}
         enhanced = enhance_decision_with_template(decision)
-        
+
         assert "decision" in enhanced
 
 
@@ -309,33 +310,33 @@ class TestTemplateIntegration:
     def test_convert_decisions_adds_template_fields(self):
         """_convert_decisions should add template fields."""
         from runtime.review_pack_builder import _convert_decisions
-        
+
         execution_result = {
             "decisions_required": [
                 {"decision": "Continue or change approach"}
             ]
         }
-        
+
         decisions = _convert_decisions(execution_result)
-        
+
         assert len(decisions) == 1
         d = decisions[0]
-        
+
         assert "decision_id" in d
         assert "is_template_based" in d
 
     def test_template_match_adds_template_id(self):
         """Template match should add template_id."""
         from runtime.review_pack_builder import _convert_decisions
-        
+
         execution_result = {
             "decisions_required": [
                 {"decision": "Should we retry or defer the task?"}
             ]
         }
-        
+
         decisions = _convert_decisions(execution_result)
-        
+
         if decisions[0].get("is_template_based"):
             assert "template_id" in decisions[0]
 
@@ -346,17 +347,17 @@ class TestSummaryCommandTemplates:
     def test_summary_decisions_shows_template_label(self):
         """summary decisions should show template label."""
         from cli.commands.summary import app
-        
+
         result = runner.invoke(app, ["decisions", "--help"])
-        
+
         assert result.exit_code == 0
 
     def test_summary_today_includes_template_count(self):
         """summary today should include template count."""
         from cli.commands.summary import app
-        
+
         result = runner.invoke(app, ["today", "--help"])
-        
+
         assert result.exit_code == 0
 
 
@@ -370,20 +371,20 @@ class TestTemplateFiles:
     def test_templates_yaml_has_4_templates(self):
         """Templates YAML should have 4 initial templates."""
         import yaml
-        
+
         with open("templates/decision-templates.yaml") as f:
             data = yaml.safe_load(f)
-        
+
         templates = data.get("templates", [])
         assert len(templates) == 4
 
     def test_templates_have_required_fields(self):
         """Each template should have required fields."""
         import yaml
-        
+
         with open("templates/decision-templates.yaml") as f:
             data = yaml.safe_load(f)
-        
+
         for template in data.get("templates", []):
             assert "template_id" in template
             assert "name" in template
@@ -397,21 +398,21 @@ class TestTemplateFiles:
     def test_all_template_ids_unique(self):
         """All template_ids should be unique."""
         import yaml
-        
+
         with open("templates/decision-templates.yaml") as f:
             data = yaml.safe_load(f)
-        
+
         template_ids = [t.get("template_id") for t in data.get("templates", [])]
         assert len(template_ids) == len(set(template_ids))
 
     def test_decision_types_valid(self):
         """All decision_types should be valid enum values."""
         import yaml
-        
+
         valid_types = ["technical", "scope", "priority", "design"]
-        
+
         with open("templates/decision-templates.yaml") as f:
             data = yaml.safe_load(f)
-        
+
         for template in data.get("templates", []):
             assert template.get("decision_type") in valid_types

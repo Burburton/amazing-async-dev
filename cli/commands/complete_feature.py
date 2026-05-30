@@ -7,9 +7,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from runtime.state_store import StateStore
 from cli.utils.output_formatter import print_next_step, print_success_panel
-from cli.utils.path_formatter import get_relative_path
+from runtime.state_store import StateStore
 
 app = typer.Typer(help="Mark feature as completed and prepare for archiving")
 console = Console()

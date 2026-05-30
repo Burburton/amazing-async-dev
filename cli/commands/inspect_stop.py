@@ -7,15 +7,14 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from runtime.state_store import StateStore
-from runtime.sqlite_state_store import SQLiteStateStore
-from runtime.recovery_classifier import (
-    classify_recovery,
-    check_resume_eligibility,
-    get_recovery_guidance,
-    RecoveryClassification,
-)
 from runtime.execution_event_types import ExecutionEventType, get_event_description
+from runtime.recovery_classifier import (
+    check_resume_eligibility,
+    classify_recovery,
+    get_recovery_guidance,
+)
+from runtime.sqlite_state_store import SQLiteStateStore
+from runtime.state_store import StateStore
 
 app = typer.Typer(help="Inspect workflow stop point and recovery options")
 console = Console()
@@ -37,7 +36,7 @@ def show(
         raise typer.Exit(1)
 
     feature_id = feature or runstate.get("feature_id", "")
-    product_id = runstate.get("project_id", "")
+    runstate.get("project_id", "")
 
     console.print(Panel("Stop-Point Inspection", title="inspect-stop", border_style="blue"))
 
@@ -198,15 +197,15 @@ def guidance(
     console.print(f"[bold]Eligibility:[/bold] {eligibility.value}")
     console.print(f"[bold]Explanation:[/bold] {guidance['explanation']}")
 
-    console.print(f"\n[bold cyan]Recommended Action:[/bold cyan]")
+    console.print("\n[bold cyan]Recommended Action:[/bold cyan]")
     console.print(f"  {guidance['recommended_action']}")
 
     if guidance.get("warnings"):
-        console.print(f"\n[bold red]Warnings:[/bold red]")
+        console.print("\n[bold red]Warnings:[/bold red]")
         for w in guidance["warnings"]:
             console.print(f"  - {w}")
 
-    console.print(f"\n[bold]Context:[/bold]")
+    console.print("\n[bold]Context:[/bold]")
     console.print(f"  Blocked items: {guidance['blocked_count']}")
     console.print(f"  Pending decisions: {guidance['decisions_count']}")
     console.print(f"  Current phase: {guidance['phase']}")

@@ -34,45 +34,45 @@ class ProjectLinkContext:
 
 def load_project_link(project_path: Path) -> ProjectLinkContext | None:
     """Load project-link.yaml from project directory.
-    
+
     Args:
         project_path: Path to project directory
-        
+
     Returns:
         ProjectLinkContext if project-link exists, None otherwise
     """
     project_link_path = project_path / "project-link.yaml"
-    
+
     if not project_link_path.exists():
         return None
-    
+
     with open(project_link_path, encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
-    
+
     return parse_project_link_config(config, project_link_path)
 
 
 def parse_project_link_config(config: dict[str, Any], project_link_path: Path) -> ProjectLinkContext:
     """Parse project-link.yaml config into context.
-    
+
     Args:
         config: Raw yaml config
         project_link_path: Path to project-link.yaml
-        
+
     Returns:
         ProjectLinkContext
     """
     product_id = config.get("product_id", project_link_path.parent.name)
-    
+
     mode_str = config.get("ownership_mode", "self_hosted")
     try:
         ownership_mode = OwnershipMode(mode_str)
     except ValueError:
         ownership_mode = OwnershipMode.SELF_HOSTED
-    
+
     product_repo_raw = config.get("product_repo", {})
     orchestrator_repo_raw = config.get("orchestrator_repo", {})
-    
+
     product_repo_path = None
     if isinstance(product_repo_raw, dict):
         path_str = product_repo_raw.get("path", "")
@@ -80,7 +80,7 @@ def parse_project_link_config(config: dict[str, Any], project_link_path: Path) -
             product_repo_path = Path(path_str)
     elif isinstance(product_repo_raw, str):
         product_repo_path = Path(product_repo_raw)
-    
+
     orchestrator_repo_path = None
     if isinstance(orchestrator_repo_raw, dict):
         path_str = orchestrator_repo_raw.get("path", "")
@@ -88,15 +88,15 @@ def parse_project_link_config(config: dict[str, Any], project_link_path: Path) -
             orchestrator_repo_path = Path(path_str)
     elif isinstance(orchestrator_repo_raw, str):
         orchestrator_repo_path = Path(orchestrator_repo_raw)
-    
+
     email_channel = config.get("email_channel", {})
-    
+
     product_artifact_root = None
     if product_repo_path:
         product_artifact_root = product_repo_path
-    
+
     orchestration_artifact_root = project_link_path.parent
-    
+
     return ProjectLinkContext(
         product_id=product_id,
         ownership_mode=ownership_mode,
@@ -116,10 +116,10 @@ def parse_project_link_config(config: dict[str, Any], project_link_path: Path) -
 
 def detect_ownership_mode(project_path: Path) -> OwnershipMode:
     """Detect ownership mode from project directory.
-    
+
     Args:
         project_path: Path to project directory
-        
+
     Returns:
         OwnershipMode (defaults to SELF_HOSTED if no project-link)
     """
@@ -131,45 +131,45 @@ def detect_ownership_mode(project_path: Path) -> OwnershipMode:
 
 def get_product_repo_path(project_path: Path) -> Path:
     """Get product repository path for artifact routing.
-    
+
     Args:
         project_path: Path to project directory in async-dev
-        
+
     Returns:
         Path to product repository
     """
     context = load_project_link(project_path)
-    
+
     if context and context.ownership_mode == OwnershipMode.MANAGED_EXTERNAL:
         if context.product_repo_path:
             return context.product_repo_path
-    
+
     return project_path
 
 
 def get_orchestration_repo_path(project_path: Path) -> Path:
     """Get orchestration repository path for artifact routing.
-    
+
     Args:
         project_path: Path to project directory
-        
+
     Returns:
         Path to orchestration repository (async-dev)
     """
     context = load_project_link(project_path)
-    
+
     if context and context.orchestrator_repo_path:
         return context.orchestrator_repo_path
-    
+
     return project_path
 
 
 def is_mode_b(project_path: Path) -> bool:
     """Check if project is in Mode B (managed_external).
-    
+
     Args:
         project_path: Path to project directory
-        
+
     Returns:
         True if managed_external mode
     """
@@ -178,50 +178,50 @@ def is_mode_b(project_path: Path) -> bool:
 
 def validate_project_link(project_path: Path) -> tuple[bool, list[str]]:
     """Validate project-link.yaml structure.
-    
+
     Args:
         project_path: Path to project directory
-        
+
     Returns:
         Tuple of (is_valid, issues_list)
     """
     issues = []
-    
+
     context = load_project_link(project_path)
-    
+
     if not context:
         return True, []
-    
+
     if not context.product_id:
         issues.append("Missing product_id")
-    
+
     if context.ownership_mode == OwnershipMode.MANAGED_EXTERNAL:
         if not context.product_repo_path:
             issues.append("Mode B requires product_repo path")
         elif not context.product_repo_path.exists():
             issues.append(f"Product repo path not found: {context.product_repo_path}")
-    
+
     return len(issues) == 0, issues
 
 
 def get_project_link_summary(project_path: Path) -> dict[str, Any]:
     """Get summary of project-link for display.
-    
+
     Args:
         project_path: Path to project directory
-        
+
     Returns:
         Dict with summary info
     """
     context = load_project_link(project_path)
-    
+
     if not context:
         return {
             "has_project_link": False,
             "ownership_mode": "self_hosted",
             "product_id": project_path.name,
         }
-    
+
     return {
         "has_project_link": True,
         "ownership_mode": context.ownership_mode.value,

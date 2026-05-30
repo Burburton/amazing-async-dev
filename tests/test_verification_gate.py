@@ -1,19 +1,18 @@
 """Tests for Feature 038: Interactive Frontend Verification Gate."""
 
-import pytest
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
+from runtime.engines.external_tool_engine import ExternalToolEngine
 from runtime.verification_gate import (
-    requires_browser_verification,
-    is_valid_exception_reason,
-    validate_browser_verification,
-    get_completion_gate_status,
-    classify_verification_type,
     BROWSER_REQUIRED_TYPES,
     VALID_EXCEPTION_REASONS,
+    classify_verification_type,
+    get_completion_gate_status,
+    is_valid_exception_reason,
+    requires_browser_verification,
+    validate_browser_verification,
 )
-from runtime.engines.external_tool_engine import ExternalToolEngine
 
 
 class TestVerificationTypeClassification:
@@ -404,10 +403,10 @@ class TestSchemaFieldPresence:
         import yaml
         schema_path = Path("schemas/execution-pack.schema.yaml")
         schema = yaml.safe_load(schema_path.read_text())
-        
+
         assert "verification_type" in schema.get("optional", [])
         assert "verification_type" in schema.get("fields", {})
-        
+
         vt_field = schema["fields"]["verification_type"]
         assert vt_field["type"] == "enum"
         assert "backend_only" in vt_field["values"]
@@ -418,10 +417,10 @@ class TestSchemaFieldPresence:
         import yaml
         schema_path = Path("schemas/execution-result.schema.yaml")
         schema = yaml.safe_load(schema_path.read_text())
-        
+
         assert "browser_verification" in schema.get("optional", [])
         assert "browser_verification" in schema.get("fields", {})
-        
+
         bv_field = schema["fields"]["browser_verification"]
         assert bv_field["type"] == "object"
         assert "executed" in bv_field.get("properties", {})
@@ -430,7 +429,7 @@ class TestSchemaFieldPresence:
         """execution-pack.template.md should mention verification_type."""
         template_path = Path("templates/execution-pack.template.md")
         content = template_path.read_text()
-        
+
         assert "verification_type" in content
         assert "frontend_interactive" in content
 
@@ -438,7 +437,7 @@ class TestSchemaFieldPresence:
         """execution-result.template.md should mention browser_verification."""
         template_path = Path("templates/execution-result.template.md")
         content = template_path.read_text()
-        
+
         assert "browser_verification" in content
         assert "executed" in content
 
@@ -450,14 +449,14 @@ class TestAgentsMdSection9:
         """AGENTS.md should have Section 9."""
         agents_path = Path("AGENTS.md")
         content = agents_path.read_text(encoding='utf-8')
-        
+
         assert "## 9. Interactive Frontend Verification Gate" in content
 
     def test_agents_md_has_fr7_completion_gate(self):
         """AGENTS.md should have FR-7 Completion Gate."""
         agents_path = Path("AGENTS.md")
         content = agents_path.read_text(encoding='utf-8')
-        
+
         assert "FR-7" in content
         assert "Completion Gate" in content
 
@@ -465,7 +464,7 @@ class TestAgentsMdSection9:
         """AGENTS.md should have FR-9 Playwright invocation policy."""
         agents_path = Path("AGENTS.md")
         content = agents_path.read_text(encoding='utf-8')
-        
+
         assert "FR-9" in content
         assert "/playwright" in content
 
@@ -473,7 +472,7 @@ class TestAgentsMdSection9:
         """AGENTS.md should have exception reasons table."""
         agents_path = Path("AGENTS.md")
         content = agents_path.read_text(encoding='utf-8')
-        
+
         assert "playwright_unavailable" in content
         assert "environment_blocked" in content
 
@@ -481,5 +480,5 @@ class TestAgentsMdSection9:
         """AGENTS.md should have core principle statement."""
         agents_path = Path("AGENTS.md")
         content = agents_path.read_text(encoding='utf-8')
-        
+
         assert "environment setup is not verification" in content

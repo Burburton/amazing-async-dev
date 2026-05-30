@@ -6,17 +6,16 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from runtime.execution_policy import PolicyMode, get_policy_mode
 from runtime.decision_request_store import (
     DecisionRequestStore,
-    DecisionRequestStatus,
     DecisionType,
     DeliveryChannel,
 )
-from runtime.email_sender import create_email_config, EmailSender
 from runtime.decision_sync import sync_decision_to_runstate
-from runtime.state_store import StateStore
+from runtime.email_sender import EmailSender, create_email_config
+from runtime.execution_policy import PolicyMode, get_policy_mode
 from runtime.latest_pointer_manager import read_latest_pointer
+from runtime.state_store import StateStore
 
 
 class TriggerSource(str, Enum):
@@ -58,35 +57,35 @@ def should_auto_trigger(
     pause_category: str | None = None,
 ) -> tuple[bool, str | None]:
     """Determine if auto-trigger should happen based on policy mode.
-    
+
     Args:
         runstate: Current RunState
         pause_category: Category of the pause reason
-        
+
     Returns:
         Tuple of (should_trigger, skip_reason)
     """
     policy_mode = get_policy_mode(runstate)
-    
+
     pending_request_id = runstate.get("decision_request_pending")
     if pending_request_id:
         return False, "Decision request already pending: " + pending_request_id
-    
+
     decisions_needed = runstate.get("decisions_needed", [])
     if not decisions_needed:
         return False, "No decisions_needed in RunState"
-    
+
     if policy_mode == PolicyMode.CONSERVATIVE:
         return True, None
-    
+
     if policy_mode == PolicyMode.LOW_INTERRUPTION:
         return True, None
-    
+
     if policy_mode == PolicyMode.BALANCED:
         if pause_category and pause_category in PAUSE_CATEGORIES_SKIP_IN_BALANCED:
             return False, f"Balanced mode skips '{pause_category}' category"
         return True, None
-    
+
     return True, None
 
 
@@ -94,10 +93,10 @@ def _get_execution_context(
     project_path: Path,
 ) -> dict[str, Any]:
     """Get execution context from latest execution result for email enrichment.
-    
+
     Args:
         project_path: Project path
-        
+
     Returns:
         Dict with execution context (completed_items, artifacts, issues, etc.)
     """
@@ -105,12 +104,12 @@ def _get_execution_context(
         exec_id, exec_path = read_latest_pointer(project_path, "execution_result")
         if not exec_id:
             return {}
-        
+
         state_store = StateStore(project_path)
         execution_result = state_store.load_execution_result(exec_id)
         if not execution_result:
             return {}
-        
+
         return {
             "execution_id": execution_result.get("execution_id", ""),
             "status": execution_result.get("status", ""),
@@ -126,10 +125,10 @@ def _get_execution_context(
 
 def _get_project_progress(project_path: Path) -> dict[str, Any]:
     """Get project progress summary from runstate for email enrichment.
-    
+
     Args:
         project_path: Project path
-        
+
     Returns:
         Dict with project progress info
     """
@@ -138,21 +137,21 @@ def _get_project_progress(project_path: Path) -> dict[str, Any]:
         runstate = state_store.load_runstate()
         if not runstate:
             return {}
-        
+
         project_status = runstate.get("project_status", "")
         phases_complete = runstate.get("phases_complete", [])
         current_phase = runstate.get("current_phase", "")
         current_feature = runstate.get("current_feature", "")
         health_status = runstate.get("health_status", "")
-        
+
         total_phases = len(phases_complete)
-        
+
         progress_pct = "0%"
         if "COMPLETE" in project_status.upper():
             progress_pct = "100%"
         elif total_phases > 0:
             progress_pct = f"{min(100, total_phases * 10)}%"
-        
+
         return {
             "project_status": project_status,
             "current_phase": current_phase,
@@ -173,25 +172,25 @@ def create_auto_decision_request(
     policy_mode: PolicyMode = PolicyMode.BALANCED,
 ) -> dict[str, Any] | None:
     """Create a decision request from a decisions_needed entry.
-    
+
     Args:
         project_path: Project path
         decision_entry: Entry from RunState.decisions_needed
         trigger_source: Source of trigger
         policy_mode: Policy mode at trigger time
-        
+
     Returns:
         Created decision request dict or None on failure
     """
     import os
-    
+
     store = DecisionRequestStore(project_path)
-    
+
     product_id = decision_entry.get("product_id", project_path.name)
     feature_id = decision_entry.get("feature_id", decision_entry.get("decision_id", "unknown"))
     question = decision_entry.get("decision", "Decision required")
     options_raw = decision_entry.get("options", [])
-    
+
     parsed_options = []
     for i, opt in enumerate(options_raw):
         if isinstance(opt, str):
@@ -202,13 +201,13 @@ def create_auto_decision_request(
             })
         elif isinstance(opt, dict):
             parsed_options.append(opt)
-    
+
     recommendation = decision_entry.get("recommendation", "")
     recommendation_id = ""
-    
+
     if recommendation and parsed_options:
         rec_lower = recommendation.lower().strip()
-        
+
         if rec_lower in ["a", "b", "c"]:
             recommendation_id = rec_lower.upper()
         else:
@@ -217,13 +216,13 @@ def create_auto_decision_request(
                 if rec_lower in opt_label_lower or opt_label_lower in rec_lower:
                     recommendation_id = opt.get("id", "A")
                     break
-            
+
             if not recommendation_id:
                 recommendation_id = "A"
-    
+
     elif parsed_options:
         recommendation_id = "A"
-    
+
     delivery_mode = os.getenv("ASYNCDEV_DELIVERY_MODE", "mock_file")
     if delivery_mode == "resend":
         delivery_channel = DeliveryChannel.RESEND
@@ -231,13 +230,13 @@ def create_auto_decision_request(
         delivery_channel = DeliveryChannel.CONSOLE
     else:
         delivery_channel = DeliveryChannel.MOCK_FILE
-    
+
     pause_category = decision_entry.get("pause_reason_category", "decision_required")
     try:
         dt = DecisionType(decision_entry.get("decision_type", "technical"))
     except ValueError:
         dt = DecisionType.TECHNICAL
-    
+
     request = store.create_request(
         product_id=product_id,
         feature_id=feature_id,
@@ -248,27 +247,27 @@ def create_auto_decision_request(
         recommendation=recommendation_id,
         delivery_channel=delivery_channel,
     )
-    
+
     if recommendation_id and parsed_options:
         for opt in parsed_options:
             if opt.get("id") == recommendation_id:
                 request["recommendation"] = opt.get("label", recommendation_id)
                 break
-    
+
     request["trigger_source"] = trigger_source.value
     request["policy_mode_at_trigger"] = policy_mode.value
     request["auto_triggered"] = True
-    
+
     exec_context = _get_execution_context(project_path)
     if exec_context:
         request["execution_context"] = exec_context
-    
+
     project_progress = _get_project_progress(project_path)
     if project_progress:
         request["project_progress"] = project_progress
-    
+
     store.save_request(request)
-    
+
     return request
 
 
@@ -277,27 +276,27 @@ def send_auto_decision_email(
     request: dict[str, Any],
 ) -> tuple[bool, str | None]:
     """Send email for auto-created decision request.
-    
+
     Args:
         project_path: Project path
         request: Decision request dict
-        
+
     Returns:
         Tuple of (success, message_id_or_error)
     """
     from runtime.resend_provider import apply_resend_config_from_file
-    
+
     apply_resend_config_from_file()
     config = create_email_config(project_path)
     sender = EmailSender(config)
-    
+
     success, message_id = sender.send_decision_request(request)
-    
+
     if success:
         store = DecisionRequestStore(project_path)
         store.mark_sent(request["decision_request_id"], mock_path=message_id)
         return True, message_id
-    
+
     return False, "Failed to send email"
 
 
@@ -307,17 +306,17 @@ def auto_trigger_decision_email(
     trigger_source: TriggerSource = TriggerSource.RUN_DAY_AUTO,
 ) -> TriggerResult:
     """Auto-trigger decision email based on RunState.
-    
+
     Args:
         project_path: Project path
         runstate: Current RunState
         trigger_source: Source of trigger
-        
+
     Returns:
         TriggerResult with outcome
     """
     policy_mode = get_policy_mode(runstate)
-    
+
     decisions_needed = runstate.get("decisions_needed", [])
     if not decisions_needed:
         return TriggerResult(
@@ -326,7 +325,7 @@ def auto_trigger_decision_email(
             policy_mode_at_trigger=policy_mode,
             skipped_reason="No decisions_needed in RunState",
         )
-    
+
     pending_request_id = runstate.get("decision_request_pending")
     if pending_request_id:
         return TriggerResult(
@@ -335,12 +334,12 @@ def auto_trigger_decision_email(
             policy_mode_at_trigger=policy_mode,
             skipped_reason="Decision request already pending: " + pending_request_id,
         )
-    
+
     first_decision = decisions_needed[0]
     pause_category = first_decision.get("pause_reason_category", "decision_required")
-    
+
     should_trigger, skip_reason = should_auto_trigger(runstate, pause_category)
-    
+
     if not should_trigger:
         return TriggerResult(
             triggered=False,
@@ -348,14 +347,14 @@ def auto_trigger_decision_email(
             policy_mode_at_trigger=policy_mode,
             skipped_reason=skip_reason,
         )
-    
+
     request = create_auto_decision_request(
         project_path,
         first_decision,
         trigger_source=trigger_source,
         policy_mode=policy_mode,
     )
-    
+
     if not request:
         return TriggerResult(
             triggered=False,
@@ -363,9 +362,9 @@ def auto_trigger_decision_email(
             policy_mode_at_trigger=policy_mode,
             error_message="Failed to create decision request",
         )
-    
+
     success, message_id = send_auto_decision_email(project_path, request)
-    
+
     if not success:
         return TriggerResult(
             triggered=False,
@@ -374,11 +373,11 @@ def auto_trigger_decision_email(
             policy_mode_at_trigger=policy_mode,
             error_message=message_id or "Failed to send email",
         )
-    
+
     state_store = StateStore(project_path)
     runstate = sync_decision_to_runstate(request, runstate)
     state_store.save_runstate(runstate)
-    
+
     return TriggerResult(
         triggered=True,
         request_id=request["decision_request_id"],
@@ -392,24 +391,24 @@ def check_and_trigger(
     trigger_source: TriggerSource = TriggerSource.RUN_DAY_AUTO,
 ) -> TriggerResult:
     """Check RunState and trigger if needed.
-    
+
     Convenience function that loads RunState and triggers.
-    
+
     Args:
         project_path: Project path
         trigger_source: Source of trigger
-        
+
     Returns:
         TriggerResult with outcome
     """
     state_store = StateStore(project_path)
     runstate = state_store.load_runstate()
-    
+
     if not runstate:
         return TriggerResult(
             triggered=False,
             trigger_source=trigger_source,
             skipped_reason="No RunState found",
         )
-    
+
     return auto_trigger_decision_email(project_path, runstate, trigger_source)

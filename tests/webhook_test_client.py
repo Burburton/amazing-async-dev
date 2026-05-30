@@ -1,8 +1,9 @@
 """Test script to simulate Resend webhook POST request."""
 
 import json
-import urllib.request
 import sys
+import urllib.request
+
 sys.stdout.reconfigure(encoding='utf-8')
 
 
@@ -22,10 +23,10 @@ def send_test_webhook():
             ]
         }
     }
-    
+
     url = 'http://localhost:8080/webhooks/resend'
     data = json.dumps(payload).encode('utf-8')
-    
+
     try:
         req = urllib.request.Request(
             url,
@@ -33,10 +34,10 @@ def send_test_webhook():
             headers={'Content-Type': 'application/json'},
             method='POST'
         )
-        
+
         with urllib.request.urlopen(req, timeout=5) as response:
             result = response.read().decode('utf-8')
-            print(f"Webhook sent successfully!")
+            print("Webhook sent successfully!")
             print(f"Server response: {result}")
             return True
     except Exception as e:

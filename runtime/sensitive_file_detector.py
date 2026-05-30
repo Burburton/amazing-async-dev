@@ -7,7 +7,6 @@ import fnmatch
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 
 class RiskLevel(Enum):
@@ -86,7 +85,7 @@ DEFAULT_SENSITIVE_PATTERNS: list[SensitivePattern] = [
         description="Credentials directory",
         category="credentials",
     ),
-    
+
     # High-risk files
     SensitivePattern(
         pattern="*.env",
@@ -123,7 +122,7 @@ DEFAULT_SENSITIVE_PATTERNS: list[SensitivePattern] = [
         description="Resend API config (hidden)",
         category="provider_config",
     ),
-    
+
     # Medium-risk patterns
     SensitivePattern(
         pattern="*secret*",
@@ -146,7 +145,7 @@ DEFAULT_SENSITIVE_PATTERNS: list[SensitivePattern] = [
         description="File with 'credentials' in name",
         category="named_credentials",
     ),
-    
+
     # Nested patterns
     SensitivePattern(
         pattern="**/secrets/**",
@@ -167,7 +166,7 @@ DEFAULT_SENSITIVE_PATTERNS: list[SensitivePattern] = [
 
 class SensitiveFileDetector:
     """Detects sensitive files matching defined patterns."""
-    
+
     def __init__(
         self,
         patterns: list[SensitivePattern] | None = None,
@@ -175,15 +174,15 @@ class SensitiveFileDetector:
     ):
         self.patterns = patterns or DEFAULT_SENSITIVE_PATTERNS
         self.root_path = root_path or Path.cwd()
-    
+
     def detect_sensitive_files(self) -> list[DetectedFile]:
         """Scan for files matching sensitive patterns.
-        
+
         Returns:
             List of detected sensitive files
         """
         detected = []
-        
+
         for pattern in self.patterns:
             matches = self._find_matching_files(pattern)
             for match in matches:
@@ -192,7 +191,7 @@ class SensitiveFileDetector:
                     pattern=pattern,
                     exists=True,
                 ))
-        
+
         # Also check for pattern matches that don't exist yet
         # (for directories that should be gitignored even if empty)
         for pattern in self.patterns:
@@ -204,43 +203,43 @@ class SensitiveFileDetector:
                         pattern=pattern,
                         exists=False,
                     ))
-        
+
         return detected
-    
+
     def _find_matching_files(self, pattern: SensitivePattern) -> list[Path]:
         """Find files matching a pattern.
-        
+
         Args:
             pattern: Sensitive pattern to match
-            
+
         Returns:
             List of matching file paths
         """
         matches = []
-        
+
         if pattern.pattern_type == PatternType.FILE:
             # Exact file match
             file_path = self.root_path / pattern.pattern
             if file_path.exists():
                 matches.append(file_path)
-        
+
         elif pattern.pattern_type == PatternType.DIRECTORY:
             # Directory match
             dir_path = self.root_path / pattern.pattern.rstrip("/")
             if dir_path.exists() and dir_path.is_dir():
                 matches.append(dir_path)
-        
+
         elif pattern.pattern_type == PatternType.GLOB:
             # Glob pattern match
             for path in self.root_path.rglob("*"):
                 if fnmatch.fnmatch(str(path.relative_to(self.root_path)), pattern.pattern):
                     matches.append(path)
-        
+
         return matches
-    
+
     def get_patterns_by_category(self) -> dict[str, list[SensitivePattern]]:
         """Group patterns by category.
-        
+
         Returns:
             Dict mapping category to patterns
         """
@@ -250,10 +249,10 @@ class SensitiveFileDetector:
                 categories[pattern.category] = []
             categories[pattern.category].append(pattern)
         return categories
-    
+
     def get_patterns_by_risk(self) -> dict[RiskLevel, list[SensitivePattern]]:
         """Group patterns by risk level.
-        
+
         Returns:
             Dict mapping risk level to patterns
         """
@@ -265,53 +264,53 @@ class SensitiveFileDetector:
         for pattern in self.patterns:
             risks[pattern.risk_level].append(pattern)
         return risks
-    
+
     def check_pattern_excluded(
         self,
         pattern: str,
         gitignore_entries: list[str],
     ) -> bool:
         """Check if a pattern is excluded by gitignore.
-        
+
         Args:
             pattern: Pattern to check
             gitignore_entries: List of gitignore entries
-            
+
         Returns:
             True if pattern is excluded
         """
         # Normalize pattern
         normalized = pattern.rstrip("/")
-        
+
         for entry in gitignore_entries:
             # Normalize entry
             entry_normalized = entry.strip().rstrip("/")
-            
+
             # Direct match
             if entry_normalized == normalized:
                 return True
-            
+
             # Pattern covers entry (e.g., *.env covers .env.local)
             if fnmatch.fnmatch(normalized, entry_normalized):
                 return True
-            
+
             # Entry covers pattern (e.g., .runtime/ covers resend-config.json inside)
             if entry_normalized.endswith("/") and normalized.startswith(entry_normalized.rstrip("/")):
                 return True
-        
+
         return False
-    
+
     def run_safety_check(
         self,
         gitignore_entries: list[str],
         tracked_files: list[str] | None = None,
     ) -> SafetyCheckResult:
         """Run a comprehensive safety check.
-        
+
         Args:
             gitignore_entries: Current gitignore entries
             tracked_files: Files currently tracked by git
-            
+
         Returns:
             SafetyCheckResult with findings
         """
@@ -319,17 +318,17 @@ class SensitiveFileDetector:
         tracked_sensitive = []
         missing_entries = []
         warnings = []
-        
+
         tracked_files = tracked_files or []
-        
+
         for detected in detected_files:
             # Check if pattern is excluded
             pattern_str = detected.pattern.pattern
             is_excluded = self.check_pattern_excluded(pattern_str, gitignore_entries)
-            
+
             if is_excluded:
                 continue
-            
+
             # Pattern not in gitignore
             if detected.pattern.pattern_type == PatternType.DIRECTORY:
                 # Add directory pattern
@@ -337,7 +336,7 @@ class SensitiveFileDetector:
             elif detected.exists:
                 # Add file pattern if file exists
                 missing_entries.append(detected.pattern.pattern)
-            
+
             # Check if file is tracked by git
             relative_path = str(detected.path.relative_to(self.root_path))
             if detected.exists and relative_path in tracked_files:
@@ -347,16 +346,16 @@ class SensitiveFileDetector:
                     f"🚨 {relative_path} is TRACKED BY GIT (danger!) - "
                     f"Pattern: {pattern_str}"
                 )
-        
+
         # Deduplicate missing entries
         missing_entries = list(set(missing_entries))
-        
+
         # Count correctly excluded
         excluded_count = len(detected_files) - len(tracked_sensitive) - len([
-            d for d in detected_files 
+            d for d in detected_files
             if not self.check_pattern_excluded(d.pattern.pattern, gitignore_entries)
         ])
-        
+
         return SafetyCheckResult(
             safe=len(tracked_sensitive) == 0 and len(missing_entries) == 0,
             detected_files=detected_files,
@@ -366,15 +365,15 @@ class SensitiveFileDetector:
             checked_patterns=len(self.patterns),
             excluded_correctly=excluded_count,
         )
-    
+
     def get_recommended_gitignore_entries(self) -> list[str]:
         """Get recommended gitignore entries for all patterns.
-        
+
         Returns:
             List of gitignore entries to add
         """
         entries = []
-        
+
         # Add directory patterns
         for pattern in self.patterns:
             if pattern.pattern_type == PatternType.DIRECTORY:
@@ -385,17 +384,17 @@ class SensitiveFileDetector:
             elif pattern.risk_level == RiskLevel.HIGH:
                 # Add high-risk file patterns
                 entries.append(pattern.pattern)
-        
+
         # Deduplicate
         return list(set(entries))
 
 
 def detect_sensitive_patterns(root_path: Path | None = None) -> list[DetectedFile]:
     """Convenience function to detect sensitive files.
-    
+
     Args:
         root_path: Root path to scan
-        
+
     Returns:
         List of detected sensitive files
     """
@@ -409,12 +408,12 @@ def run_safety_check(
     tracked_files: list[str] | None = None,
 ) -> SafetyCheckResult:
     """Convenience function to run safety check.
-    
+
     Args:
         root_path: Root path to check
         gitignore_entries: Current gitignore entries
         tracked_files: Files tracked by git
-        
+
     Returns:
         SafetyCheckResult
     """

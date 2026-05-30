@@ -10,18 +10,18 @@ Canonical entry point for frontend verification that enforces:
 This is the preferred path for external agents performing frontend verification work.
 """
 
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from runtime.frontend_verification_recipe import execute_frontend_verification_recipe
-from runtime.frontend_recipe_state import FrontendRecipeStage
-from runtime.project_link_loader import get_product_repo_path, is_mode_b
 from cli.utils.output_formatter import print_next_step, print_success_panel
-from cli.utils.path_formatter import get_relative_path
+from runtime.frontend_recipe_state import FrontendRecipeStage
+from runtime.frontend_verification_recipe import execute_frontend_verification_recipe
+from runtime.project_link_loader import get_product_repo_path, is_mode_b
 
 app = typer.Typer(help="Controlled frontend verification execution (Feature 062)")
 console = Console()
@@ -38,20 +38,20 @@ def execute(
     dry_run: bool = typer.Option(False, help="Show recipe plan without executing"),
 ):
     """Execute controlled frontend verification recipe.
-    
+
     This command runs a deterministic frontend verification flow:
     1. Detect framework and start dev server in controlled mode
     2. Probe for server readiness (not stopping at "server ready")
     3. Run browser verification via Playwright
     4. Persist structured execution result
-    
+
     External agents should use this instead of ad hoc shell commands like:
     - npm run dev (foreground-blocking)
     - manual port guessing
     - stopping after seeing "server ready"
     """
     root = Path.cwd() if path == Path("projects") else path
-    
+
     if project:
         # Resolve orchestration workspace path first
         orchestration_path = path / project
@@ -59,19 +59,19 @@ def execute(
             console.print(f"[red]Project not found: {project}[/red]")
             console.print(f"[yellow]Path checked: {orchestration_path}[/yellow]")
             raise typer.Exit(1)
-        
+
         # For Mode B (managed_external), use product repo path from project-link.yaml
         # For Mode A (self_hosted), use the orchestration path directly
         project_path = get_product_repo_path(orchestration_path)
-        
+
         if is_mode_b(orchestration_path):
             console.print(f"[dim]Mode B: Using product repo at {project_path}[/dim]")
     else:
         project_path = Path.cwd()
-    
+
     if not execution_id:
         execution_id = f"frontend-verify-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    
+
     console.print(Panel(
         f"Project: {project_path.name}\n"
         f"Execution ID: {execution_id}\n"
@@ -81,7 +81,7 @@ def execute(
         title="Frontend Verification Recipe",
         border_style="cyan"
     ))
-    
+
     if dry_run:
         console.print("\n[yellow]Dry run - recipe plan:[/yellow]")
         console.print("  1. INITIALIZING - Detect frontend framework")
@@ -92,9 +92,9 @@ def execute(
         console.print("  6. COMPLETED_SUCCESS - Terminal outcome")
         console.print("\n[dim]Execution would proceed through these stages[/dim]")
         return
-    
+
     console.print("\n[cyan]Executing frontend verification recipe...[/cyan]")
-    
+
     result = execute_frontend_verification_recipe(
         project_path=project_path,
         execution_id=execution_id,
@@ -102,7 +102,7 @@ def execute(
         readiness_probe_timeout=readiness_timeout,
         browser_verification_timeout=browser_timeout,
     )
-    
+
     _display_result(result, project_path, root)
 
 
@@ -113,46 +113,46 @@ def _display_result(result, project_path: Path, root: Path) -> None:
         FrontendRecipeStage.COMPLETED_FAILURE: "red",
         FrontendRecipeStage.COMPLETED_TIMEOUT: "yellow",
     }
-    
+
     color = stage_color.get(result.stage, "blue")
-    
+
     console.print(f"\n[bold]Recipe Stage:[/bold] [{color}]{result.stage.value}[/{color}]")
     console.print(f"[bold]Framework:[/bold] {result.framework}")
     console.print(f"[bold]Duration:[/bold] {result.total_duration_seconds:.1f}s")
-    
+
     if result.server_startup:
-        console.print(f"\n[cyan]Server Startup:[/cyan]")
+        console.print("\n[cyan]Server Startup:[/cyan]")
         console.print(f"  Command: {' '.join(result.server_startup.command)}")
         console.print(f"  Detected Port: {result.server_startup.detected_port or 'N/A'}")
         console.print(f"  Detected URL: {result.server_startup.detected_url or 'N/A'}")
         console.print(f"  Process ID: {result.server_startup.process_id or 'N/A'}")
         console.print(f"  Startup Duration: {result.server_startup.startup_duration_seconds:.1f}s")
-    
+
     if result.readiness_probe:
-        console.print(f"\n[cyan]Readiness Probe:[/cyan]")
+        console.print("\n[cyan]Readiness Probe:[/cyan]")
         console.print(f"  Target URL: {result.readiness_probe.target_url}")
         console.print(f"  Probe Attempts: {result.readiness_probe.probe_attempts}")
         console.print(f"  Successful: {'Yes' if result.readiness_probe.successful_probe else 'No'}")
         console.print(f"  HTTP Status: {result.readiness_probe.http_status_code or 'N/A'}")
-    
-    console.print(f"\n[cyan]Browser Verification:[/cyan]")
+
+    console.print("\n[cyan]Browser Verification:[/cyan]")
     console.print(f"  Executed: {'Yes' if result.browser_verification_executed else 'No'}")
-    
+
     if result.browser_verification_result:
         console.print(f"  Status: {result.browser_verification_result.get('status', 'N/A')}")
         console.print(f"  Passed: {result.browser_verification_result.get('passed', 0)}")
         console.print(f"  Failed: {result.browser_verification_result.get('failed', 0)}")
-    
+
     if result.failure_reason:
         console.print(f"\n[bold red]Failure Reason:[/bold red] {result.failure_reason.value}")
         if result.error_message:
             console.print(f"[red]Error: {result.error_message}[/red]")
-    
+
     if result.result_persisted:
         console.print(f"\n[green]Result persisted: {result.result_artifact_path}[/green]")
-    
+
     console.print()
-    
+
     if result.stage == FrontendRecipeStage.COMPLETED_SUCCESS:
         print_success_panel(
             message="Frontend verification completed successfully",
@@ -182,12 +182,12 @@ def _display_result(result, project_path: Path, root: Path) -> None:
 def stages():
     """Show recipe stage definitions."""
     console.print(Panel("Recipe Stage Definitions", title="Feature 062", border_style="cyan"))
-    
+
     table = Table(title="Execution Stages")
     table.add_column("Stage", style="cyan")
     table.add_column("Type", style="yellow")
     table.add_column("Transition", style="green")
-    
+
     stages = [
         ("INITIALIZING", "Execution", "→ SERVER_STARTING"),
         ("SERVER_STARTING", "Execution", "→ READINESS_PROBING"),
@@ -198,12 +198,12 @@ def stages():
         ("COMPLETED_FAILURE", "Terminal", "✗ Failure"),
         ("COMPLETED_TIMEOUT", "Terminal", "⏱ Timeout"),
     ]
-    
+
     for stage, type_, transition in stages:
         table.add_row(stage, type_, transition)
-    
+
     console.print(table)
-    
+
     console.print("\n[dim]Recipe guarantees: No stopping at 'server ready', mandatory browser verification[/dim]")
 
 

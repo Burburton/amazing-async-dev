@@ -1,19 +1,24 @@
 """Tests for execution logging and recovery classification."""
 
-import pytest
-from pathlib import Path
-import tempfile
 import shutil
+import tempfile
+from pathlib import Path
 
-from runtime.execution_event_types import ExecutionEventType, get_event_description, get_recovery_hint
-from runtime.recovery_classifier import (
-    classify_recovery,
-    check_resume_eligibility,
-    get_recovery_guidance,
-    RecoveryClassification,
-    ResumeEligibility,
+import pytest
+
+from runtime.execution_event_types import (
+    ExecutionEventType,
+    get_event_description,
+    get_recovery_hint,
 )
 from runtime.execution_logger import ExecutionLogger
+from runtime.recovery_classifier import (
+    RecoveryClassification,
+    ResumeEligibility,
+    check_resume_eligibility,
+    classify_recovery,
+    get_recovery_guidance,
+)
 
 
 @pytest.fixture
@@ -199,8 +204,8 @@ class TestInspectStopCLI:
     def test_show_command_works(self, temp_project_dir):
         """inspect-stop show should display recovery info."""
         from typer.testing import CliRunner
-        from cli.commands.inspect_stop import app
 
+        from cli.commands.inspect_stop import app
         from runtime.state_store import StateStore
         store = StateStore(temp_project_dir)
         runstate = {
@@ -228,8 +233,8 @@ class TestInspectStopCLI:
     def test_guidance_command_works(self, temp_project_dir):
         """inspect-stop guidance should provide recovery advice."""
         from typer.testing import CliRunner
-        from cli.commands.inspect_stop import app
 
+        from cli.commands.inspect_stop import app
         from runtime.state_store import StateStore
         store = StateStore(temp_project_dir)
         runstate = {

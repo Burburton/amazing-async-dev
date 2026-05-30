@@ -1,30 +1,29 @@
 """Tests for report_quality_rubric module (Feature 046)."""
 
-import pytest
 
 from runtime.report_quality_rubric import (
+    ANTI_PATTERN_SEVERITY,
+    QUALITY_LEVELS,
+    compare_format_to_best_practice,
+    evaluate_blocker_risk_separated,
     evaluate_bluf_compliance,
-    evaluate_one_screen_fit,
-    evaluate_format_consistency,
-    evaluate_explicit_ask,
-    evaluate_options_provided,
-    evaluate_recommendation_stated,
+    evaluate_changed_items_only,
     evaluate_deadline_included,
+    evaluate_explicit_ask,
+    evaluate_format_consistency,
+    evaluate_no_hedging_language,
+    evaluate_no_vanity_metrics,
+    evaluate_one_screen_fit,
+    evaluate_options_provided,
     evaluate_outcomes_not_activities,
     evaluate_quantified_claims,
-    evaluate_blocker_risk_separated,
-    evaluate_no_hedging_language,
-    evaluate_changed_items_only,
-    evaluate_no_vanity_metrics,
-    evaluate_truncation_applied,
+    evaluate_recommendation_stated,
     evaluate_report_quality,
+    evaluate_truncation_applied,
     format_evaluation_summary,
-    get_quality_level_for_score,
-    get_improvement_priorities,
-    compare_format_to_best_practice,
     get_future_improvements,
-    QUALITY_LEVELS,
-    ANTI_PATTERN_SEVERITY,
+    get_improvement_priorities,
+    get_quality_level_for_score,
 )
 
 
@@ -347,7 +346,7 @@ class TestEvaluateReportQuality:
             "metrics": {"tests_passed": 10},
         }
         result = evaluate_report_quality(report)
-        
+
         assert "total_score" in result
         assert "quality_level" in result
         assert "category_scores" in result
@@ -367,7 +366,7 @@ class TestEvaluateReportQuality:
             "recommendation_type": "required_decision",
         }
         result = evaluate_report_quality(report)
-        
+
         assert result["total_score"] >= 40
 
     def test_poor_quality_report(self):
@@ -383,7 +382,7 @@ class TestEvaluateReportQuality:
             "recommendation_type": "recommendation",
         }
         result = evaluate_report_quality(report)
-        
+
         assert result["total_score"] <= 85
         assert len(result["gaps"]) >= 3
         assert "hedging_language" in result["anti_patterns_detected"]
@@ -403,7 +402,7 @@ class TestFormatEvaluationSummary:
             "anti_patterns_detected": [],
         }
         summary = format_evaluation_summary(result)
-        
+
         assert "75/100" in summary
         assert "good" in summary
 
@@ -440,14 +439,14 @@ class TestGetImprovementPriorities:
             ]
         }
         priorities = get_improvement_priorities(result)
-        
+
         assert len(priorities) <= 5
         assert priorities[0]["priority"] in ["high", "medium"]
 
     def test_empty_gaps_returns_empty(self):
         result = {"gaps": []}
         priorities = get_improvement_priorities(result)
-        
+
         assert len(priorities) == 0
 
 
@@ -463,7 +462,7 @@ class TestCompareFormatToBestPractice:
             "metrics": {},
         }
         comparison = compare_format_to_best_practice(report)
-        
+
         assert "current_format" in comparison
         assert "best_practice_targets" in comparison
         assert "alignment" in comparison
@@ -472,32 +471,32 @@ class TestCompareFormatToBestPractice:
     def test_identifies_missing_options(self):
         report = {"report_type": "blocker"}
         comparison = compare_format_to_best_practice(report)
-        
+
         assert comparison["alignment"]["options_structure"] == "missing"
 
     def test_identifies_missing_deadline(self):
         report = {"report_type": "blocker"}
         comparison = compare_format_to_best_practice(report)
-        
+
         assert comparison["alignment"]["deadline_included"] == "missing"
 
 
 class TestGetFutureImprovements:
     def test_returns_improvement_list(self):
         improvements = get_future_improvements()
-        
+
         assert len(improvements) >= 5
         assert improvements[0]["id"].startswith("046-")
 
     def test_high_priority_improvements_first(self):
         improvements = get_future_improvements()
         high_priority = [i for i in improvements if i["priority"] == "high"]
-        
+
         assert len(high_priority) >= 3
 
     def test_all_have_required_fields(self):
         improvements = get_future_improvements()
-        
+
         for imp in improvements:
             assert "id" in imp
             assert "description" in imp

@@ -9,7 +9,7 @@ from runtime.sqlite_state_store import SQLiteStateStore
 
 class ExecutionLogger:
     """Logger for execution lifecycle events.
-    
+
     Provides a simple interface for logging workflow events to SQLite,
     supporting recovery diagnosis and operational debugging.
     """
@@ -31,7 +31,7 @@ class ExecutionLogger:
         event_data: dict[str, Any] | None = None,
     ) -> None:
         """Log an execution lifecycle event.
-        
+
         Args:
             event_type: Type of event from ExecutionEventType enum
             feature_id: Feature ID (optional, will infer from runstate)
@@ -39,10 +39,10 @@ class ExecutionLogger:
             event_data: Additional event metadata
         """
         store = self._get_store()
-        
+
         data = event_data or {}
         data["event_type_enum"] = event_type.value
-        
+
         store.log_event(
             event_type=event_type.value,
             feature_id=feature_id,
@@ -59,7 +59,7 @@ class ExecutionLogger:
         reason: str | None = None,
     ) -> None:
         """Log a phase transition.
-        
+
         Args:
             from_phase: Phase before transition
             to_phase: Phase after transition

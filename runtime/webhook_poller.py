@@ -7,8 +7,8 @@ syncs them to RunState, enabling true async human decision channel.
 import json
 import signal
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -82,7 +82,7 @@ def get_polling_config(project_path: Path) -> PollingConfig:
     Returns:
         PollingConfig with settings
     """
-    from runtime.resend_provider import load_resend_config, RESEND_CONFIG_FILE
+    from runtime.resend_provider import RESEND_CONFIG_FILE, load_resend_config
 
     config_path = project_path / ".runtime" / "resend-config.json"
     if not config_path.exists():
@@ -221,10 +221,10 @@ def process_pending_decision(
     Returns:
         Tuple of (success, message)
     """
-    from runtime.decision_request_store import DecisionRequestStore, DecisionRequestStatus
+    from runtime.decision_request_store import DecisionRequestStatus, DecisionRequestStore
     from runtime.decision_sync import sync_reply_to_runstate
+    from runtime.resend_provider import RESEND_CONFIG_FILE, load_resend_config
     from runtime.state_store import StateStore
-    from runtime.resend_provider import load_resend_config, RESEND_CONFIG_FILE
 
     request_id = decision.id
 
@@ -463,7 +463,7 @@ def listen_for_decisions(
     Returns:
         PollResult if once=True, None for continuous mode
     """
-    from runtime.resend_provider import load_resend_config, RESEND_CONFIG_FILE
+    from runtime.resend_provider import RESEND_CONFIG_FILE, load_resend_config
 
     config_path = project_path / ".runtime" / "resend-config.json"
     if not config_path.exists():

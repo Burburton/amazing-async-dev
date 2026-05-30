@@ -2,24 +2,22 @@
 
 from datetime import datetime, timedelta
 
-import pytest
-
 from runtime.email_escalation_policy import (
-    EmailTriggerType,
-    EmailSuppressReason,
-    EmailUrgency,
-    should_send_email,
-    get_rate_limit_hours,
-    classify_email_type,
-    get_email_urgency,
-    check_timeout_condition,
-    get_appropriate_triggers_for_runstate,
-    format_escalation_summary,
-    validate_email_frequency,
-    DEFAULT_RATE_LIMIT_HOURS,
     DEFAULT_DIGEST_INTERVAL_HOURS,
+    DEFAULT_RATE_LIMIT_HOURS,
     DEFAULT_TIMEOUT_WARNING_HOURS,
     TRIGGER_TO_URGENCY,
+    EmailSuppressReason,
+    EmailTriggerType,
+    EmailUrgency,
+    check_timeout_condition,
+    classify_email_type,
+    format_escalation_summary,
+    get_appropriate_triggers_for_runstate,
+    get_email_urgency,
+    get_rate_limit_hours,
+    should_send_email,
+    validate_email_frequency,
 )
 
 
@@ -59,75 +57,75 @@ class TestShouldSendEmail:
             runstate,
             EmailTriggerType.ESCALATION_BLOCKER,
         )
-        assert should == True
+        assert should
         assert reason is None
         assert "High urgency" in explanation
 
     def test_rate_limit_suppresses(self):
         runstate = {"policy_mode": "balanced"}
         last_sent = datetime.now() - timedelta(hours=2)
-        
+
         should, reason, explanation = should_send_email(
             runstate,
             EmailTriggerType.MILESTONE_REPORT,
             last_email_sent_at=last_sent,
         )
-        assert should == False
+        assert not should
         assert reason == EmailSuppressReason.RATE_LIMITED
         assert "rate limit" in explanation.lower()
 
     def test_similar_pending_suppresses(self):
         runstate = {"policy_mode": "balanced"}
         pending = [{"status": "sent", "pause_reason_category": "escalation"}]
-        
+
         should, reason, explanation = should_send_email(
             runstate,
             EmailTriggerType.ESCALATION_BLOCKER,
             pending_requests=pending,
         )
-        assert should == False
+        assert not should
         assert reason == EmailSuppressReason.SIMILAR_PENDING
         assert "Similar" in explanation
 
     def test_conservative_mode_sends_more(self):
         runstate = {"policy_mode": "conservative"}
-        
+
         should, reason, explanation = should_send_email(
             runstate,
             EmailTriggerType.PROGRESS_DIGEST,
         )
-        assert should == True
+        assert should
         assert reason is None
         assert "Conservative" in explanation
 
     def test_low_interruption_skips_digest(self):
         runstate = {"policy_mode": "low_interruption", "digest_interval_hours": 24}
-        
+
         should, reason, explanation = should_send_email(
             runstate,
             EmailTriggerType.PROGRESS_DIGEST,
         )
-        assert should == False
+        assert not should
         assert reason in [EmailSuppressReason.LOW_INTERRUPTION_SKIP, EmailSuppressReason.INFORMATION_ONLY]
 
     def test_balanced_mode_medium_urgency_sent(self):
         runstate = {"policy_mode": "balanced"}
-        
+
         should, reason, explanation = should_send_email(
             runstate,
             EmailTriggerType.BLOCKER_REPORT,
         )
-        assert should == True
+        assert should
         assert "Medium" in explanation or "Balanced" in explanation
 
     def test_balanced_mode_low_urgency_skipped(self):
         runstate = {"policy_mode": "balanced"}
-        
+
         should, reason, explanation = should_send_email(
             runstate,
             EmailTriggerType.PROGRESS_DIGEST,
         )
-        assert should == False
+        assert not should
         assert reason == EmailSuppressReason.LOW_INTERRUPTION_SKIP
 
 
@@ -188,14 +186,14 @@ class TestCheckTimeoutCondition:
     def test_timeout_triggers_warning(self):
         sent_at = datetime.now() - timedelta(hours=50)
         needs_warning, hours, explanation = check_timeout_condition(sent_at, timeout_hours=48)
-        assert needs_warning == True
+        assert needs_warning
         assert hours >= 48
         assert "exceeds" in explanation
 
     def test_within_threshold_no_warning(self):
         sent_at = datetime.now() - timedelta(hours=24)
         needs_warning, hours, explanation = check_timeout_condition(sent_at, timeout_hours=48)
-        assert needs_warning == False
+        assert not needs_warning
         assert hours < 48
         assert "within" in explanation
 
@@ -279,22 +277,22 @@ class TestFormatEscalationSummary:
 class TestValidateEmailFrequency:
     def test_within_daily_limit(self):
         within, explanation = validate_email_frequency(3, max_emails_per_day=10)
-        assert within == True
+        assert within
         assert "3/10" in explanation
 
     def test_exceeds_daily_limit(self):
         within, explanation = validate_email_frequency(10, max_emails_per_day=10)
-        assert within == False
+        assert not within
         assert "limit" in explanation.lower()
 
     def test_conservative_higher_limit(self):
         within, explanation = validate_email_frequency(12, max_emails_per_day=10, policy_mode="conservative")
-        assert within == True
+        assert within
         assert "conservative" not in explanation.lower()
 
     def test_low_interruption_lower_limit(self):
         within, explanation = validate_email_frequency(6, max_emails_per_day=10, policy_mode="low_interruption")
-        assert within == False
+        assert not within
 
 
 class TestTriggerToUrgencyMapping:
@@ -315,34 +313,33 @@ class TestTriggerToUrgencyMapping:
 class TestEndToEndEscalationPolicy:
     def test_full_policy_flow_blocker(self):
         runstate = {"policy_mode": "balanced", "blocked_items": [{"item": "test"}]}
-        
+
         triggers = get_appropriate_triggers_for_runstate(runstate)
         assert EmailTriggerType.ESCALATION_BLOCKER in triggers
-        
+
         should, reason, explanation = should_send_email(runstate, EmailTriggerType.ESCALATION_BLOCKER)
-        assert should == True
-        
+        assert should
+
         type, desc = classify_email_type(EmailTriggerType.ESCALATION_BLOCKER)
         assert type == "decision_request"
 
     def test_full_policy_flow_milestone_digest_suppressed(self):
         runstate = {"policy_mode": "low_interruption"}
         last_sent = datetime.now() - timedelta(hours=6)
-        
-        triggers = get_appropriate_triggers_for_runstate(runstate)
+
+        get_appropriate_triggers_for_runstate(runstate)
         should, reason, explanation = should_send_email(
             runstate,
             EmailTriggerType.PROGRESS_DIGEST,
             last_email_sent_at=last_sent,
         )
-        assert should == False
+        assert not should
         assert reason in [EmailSuppressReason.LOW_INTERRUPTION_SKIP, EmailSuppressReason.RATE_LIMITED]
 
     def test_frequency_limit_applies(self):
-        runstate = {"policy_mode": "balanced"}
-        
+
         within, explanation = validate_email_frequency(9, max_emails_per_day=10)
-        assert within == True
-        
+        assert within
+
         within, explanation = validate_email_frequency(11, max_emails_per_day=10)
-        assert within == False
+        assert not within

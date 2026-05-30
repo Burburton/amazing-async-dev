@@ -1,24 +1,18 @@
 """Tests for Feature 061 - External Execution Closeout Orchestration."""
 
-import pytest
-from pathlib import Path
-from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
 import tempfile
-import yaml
-import time
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 from runtime.external_closeout_state import (
+    CloseoutResult,
     CloseoutState,
     CloseoutTerminalClassification,
-    CloseoutResult,
-    DEFAULT_CLOSEOUT_TIMEOUT_SECONDS,
-    DEFAULT_POLL_INTERVAL_SECONDS,
 )
 from runtime.external_execution_closeout import (
     ExternalExecutionCloseoutOrchestrator,
-    orchestrate_external_closeout,
     check_closeout_recovery_needed,
+    orchestrate_external_closeout,
 )
 
 
@@ -102,7 +96,7 @@ class TestCloseoutResult:
             finished_at="2026-04-20T10:00:45",
         )
         dict_result = result.to_dict()
-        
+
         assert dict_result["closeout_state"] == "closeout_completed_success"
         assert dict_result["closeout_terminal_state"] == "success"
         assert dict_result["execution_result_detected"] is True
@@ -112,7 +106,7 @@ class TestCloseoutResult:
     def test_is_complete(self):
         result = CloseoutResult(closeout_state=CloseoutState.CLOSEOUT_COMPLETED_SUCCESS)
         assert result.is_complete() is True
-        
+
         result = CloseoutResult(closeout_state=CloseoutState.EXTERNAL_EXECUTION_PENDING)
         assert result.is_complete() is False
 
@@ -122,13 +116,13 @@ class TestCloseoutResult:
             terminal_classification=CloseoutTerminalClassification.SUCCESS,
         )
         assert result.allows_success_progression() is True
-        
+
         result = CloseoutResult(
             closeout_state=CloseoutState.CLOSEOUT_COMPLETED_FAILURE,
             terminal_classification=CloseoutTerminalClassification.FAILURE,
         )
         assert result.allows_success_progression() is False
-        
+
         result = CloseoutResult(closeout_state=CloseoutState.EXTERNAL_EXECUTION_PENDING)
         assert result.allows_success_progression() is False
 
@@ -138,7 +132,7 @@ class TestCloseoutResult:
             terminal_classification=CloseoutTerminalClassification.SUCCESS,
         )
         assert result.get_gate_status() == "allowed"
-        
+
         result = CloseoutResult(
             closeout_state=CloseoutState.CLOSEOUT_TIMEOUT,
             terminal_classification=CloseoutTerminalClassification.CLOSEOUT_TIMEOUT,
@@ -164,24 +158,24 @@ class TestExternalExecutionCloseoutOrchestrator:
             project_path = Path(tmpdir)
             results_dir = project_path / "execution-results"
             results_dir.mkdir(parents=True)
-            
+
             orchestrator = ExternalExecutionCloseoutOrchestrator(
                 project_path=project_path,
                 timeout_seconds=1,
                 poll_interval_seconds=1,
             )
-            
+
             execution_pack = {
                 "execution_id": "exec-test-001",
                 "verification_type": "backend_only",
             }
-            
+
             result = orchestrator.orchestrate_external_closeout(
                 execution_id="exec-test-001",
                 execution_pack=execution_pack,
                 project_id="test-project",
             )
-            
+
             assert result.closeout_state == CloseoutState.CLOSEOUT_TIMEOUT
             assert result.terminal_classification == CloseoutTerminalClassification.CLOSEOUT_TIMEOUT
             assert result.stall_detected is True
@@ -192,7 +186,7 @@ class TestExternalExecutionCloseoutOrchestrator:
             project_path = Path(tmpdir)
             results_dir = project_path / "execution-results"
             results_dir.mkdir(parents=True)
-            
+
             execution_result_content = """# ExecutionResult: exec-test-002
 
 ```yaml
@@ -215,24 +209,24 @@ recommended_next_step: "Done"
 """
             result_path = results_dir / "exec-test-002.md"
             result_path.write_text(execution_result_content)
-            
+
             orchestrator = ExternalExecutionCloseoutOrchestrator(
                 project_path=project_path,
                 timeout_seconds=5,
                 poll_interval_seconds=1,
             )
-            
+
             execution_pack = {
                 "execution_id": "exec-test-002",
                 "verification_type": "backend_only",
             }
-            
+
             result = orchestrator.orchestrate_external_closeout(
                 execution_id="exec-test-002",
                 execution_pack=execution_pack,
                 project_id="test-project",
             )
-            
+
             assert result.closeout_state == CloseoutState.CLOSEOUT_COMPLETED_SUCCESS
             assert result.terminal_classification == CloseoutTerminalClassification.SUCCESS
             assert result.execution_result_detected is True
@@ -241,12 +235,12 @@ recommended_next_step: "Done"
     def test_check_closeout_recovery_needed_no_result(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
-            
+
             recovery_check = check_closeout_recovery_needed(
                 project_path=project_path,
                 execution_id="exec-no-result",
             )
-            
+
             assert recovery_check["recovery_needed"] is True
             assert recovery_check["reason"] == "execution_result_not_found"
 
@@ -255,7 +249,7 @@ recommended_next_step: "Done"
             project_path = Path(tmpdir)
             results_dir = project_path / "execution-results"
             results_dir.mkdir(parents=True)
-            
+
             execution_result_content = """# ExecutionResult: exec-success
 
 ```yaml
@@ -277,12 +271,12 @@ recommended_next_step: "Done"
 """
             result_path = results_dir / "exec-success.md"
             result_path.write_text(execution_result_content)
-            
+
             recovery_check = check_closeout_recovery_needed(
                 project_path=project_path,
                 execution_id="exec-success",
             )
-            
+
             assert recovery_check["recovery_needed"] is False
             assert recovery_check["reason"] == "closeout_complete"
 
@@ -291,7 +285,7 @@ recommended_next_step: "Done"
             project_path = Path(tmpdir)
             results_dir = project_path / "execution-results"
             results_dir.mkdir(parents=True)
-            
+
             execution_result_content = """# ExecutionResult: exec-interrupted
 
 ```yaml
@@ -312,12 +306,12 @@ recommended_next_step: "Resume"
 """
             result_path = results_dir / "exec-interrupted.md"
             result_path.write_text(execution_result_content)
-            
+
             recovery_check = check_closeout_recovery_needed(
                 project_path=project_path,
                 execution_id="exec-interrupted",
             )
-            
+
             assert recovery_check["recovery_needed"] is True
             assert "closeout_interrupted" in recovery_check["reason"]
 
@@ -328,7 +322,7 @@ class TestConvenienceFunctions:
             project_path = Path(tmpdir)
             results_dir = project_path / "execution-results"
             results_dir.mkdir(parents=True)
-            
+
             execution_result_content = """# ExecutionResult: exec-conv-test
 
 ```yaml
@@ -351,9 +345,9 @@ recommended_next_step: "Done"
 """
             result_path = results_dir / "exec-conv-test.md"
             result_path.write_text(execution_result_content)
-            
+
             assert result_path.exists()
-            
+
             result = orchestrate_external_closeout(
                 project_path=project_path,
                 execution_id="exec-conv-test",
@@ -362,7 +356,7 @@ recommended_next_step: "Done"
                 timeout_seconds=30,
                 poll_interval_seconds=1,
             )
-            
+
             assert result.closeout_state == CloseoutState.CLOSEOUT_COMPLETED_SUCCESS
             assert result.execution_result_detected is True
 
@@ -377,12 +371,12 @@ class TestMissingVerificationDetection:
             "browser_verification": {"executed": True, "passed": 1, "failed": 0}
         }
         mock_orchestrate.return_value = mock_result
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             project_path = Path(tmpdir)
             results_dir = project_path / "execution-results"
             results_dir.mkdir(parents=True)
-            
+
             execution_result_content = """# ExecutionResult: exec-frontend
 
 ```yaml
@@ -402,23 +396,23 @@ recommended_next_step: "Done"
 """
             result_path = results_dir / "exec-frontend.md"
             result_path.write_text(execution_result_content)
-            
+
             orchestrator = ExternalExecutionCloseoutOrchestrator(
                 project_path=project_path,
                 timeout_seconds=5,
                 poll_interval_seconds=1,
             )
-            
+
             execution_pack = {
                 "execution_id": "exec-frontend",
                 "verification_type": "frontend_interactive",
             }
-            
+
             result = orchestrator.orchestrate_external_closeout(
                 execution_id="exec-frontend",
                 execution_pack=execution_pack,
                 project_id="test-project",
             )
-            
+
             assert result.verification_required is True
             mock_orchestrate.assert_called_once()

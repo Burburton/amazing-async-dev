@@ -1,11 +1,9 @@
 """Tests for asyncdev new-product command."""
 
-import pytest
-from pathlib import Path
 import yaml
 from typer.testing import CliRunner
-from cli.commands.new_product import app
 
+from cli.commands.new_product import app
 
 runner = CliRunner()
 
@@ -27,7 +25,7 @@ class TestNewProductCreate:
 
     def test_creates_product_brief_yaml(self, temp_dir):
         """new-product should create product-brief.yaml."""
-        result = runner.invoke(app, [
+        runner.invoke(app, [
             "create",
             "--product-id", "test-product",
             "--name", "Test Product",
@@ -45,7 +43,7 @@ class TestNewProductCreate:
 
     def test_creates_runstate_md(self, temp_dir):
         """new-product should create runstate.md."""
-        result = runner.invoke(app, [
+        runner.invoke(app, [
             "create",
             "--product-id", "test-product",
             "--name", "Test Product",
@@ -57,7 +55,7 @@ class TestNewProductCreate:
 
     def test_creates_subdirectories(self, temp_dir):
         """new-product should create required subdirectories."""
-        result = runner.invoke(app, [
+        runner.invoke(app, [
             "create",
             "--product-id", "test-product",
             "--name", "Test Product",
@@ -89,7 +87,7 @@ class TestNewProductCreate:
         """new-product should set RunState phase to planning."""
         from runtime.state_store import StateStore
 
-        result = runner.invoke(app, [
+        runner.invoke(app, [
             "create",
             "--product-id", "test-product",
             "--name", "Test Product",
@@ -119,7 +117,7 @@ class TestNewProductGovernance:
 
     def test_no_project_link_for_self_hosted(self, temp_dir):
         """self_hosted mode should not create project-link.yaml."""
-        result = runner.invoke(app, [
+        runner.invoke(app, [
             "create",
             "--product-id", "test-product",
             "--name", "Test Product",
@@ -193,7 +191,7 @@ class TestNewProductGovernance:
 
     def test_repo_name_defaults_to_product_id(self, temp_dir):
         """--repo-name should default to product_id if not provided."""
-        result = runner.invoke(app, [
+        runner.invoke(app, [
             "create",
             "--product-id", "visual-map",
             "--name", "Visual Map",
@@ -210,7 +208,7 @@ class TestNewProductGovernance:
 
     def test_repo_name_can_be_customized(self, temp_dir):
         """--repo-name can be set to different value."""
-        result = runner.invoke(app, [
+        runner.invoke(app, [
             "create",
             "--product-id", "visual-map",
             "--name", "Visual Map",

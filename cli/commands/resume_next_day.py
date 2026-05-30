@@ -16,41 +16,26 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from runtime.state_store import StateStore, generate_execution_id
+from cli.utils.output_formatter import print_next_step, print_success_panel
+from runtime.decision_sync import (
+    apply_email_resolution_to_runstate,
+    reconcile_decision_sources,
+)
 from runtime.execution_event_types import ExecutionEventType
 from runtime.execution_logger import get_logger
-from runtime.recovery_classifier import (
-    classify_recovery,
-    check_resume_eligibility,
-    get_recovery_guidance,
-    RecoveryClassification,
-    ResumeEligibility,
-)
-from runtime.continuation_evaluator import (
-    evaluate_continuation,
-    apply_continuation_decision_to_runstate,
-    get_continuation_summary,
-    should_auto_proceed_to_next_stage,
-)
-from runtime.continuation_types import ExecutionState
-from runtime.decision_sync import (
-    reconcile_decision_sources,
-    get_decision_status_summary,
-    apply_email_resolution_to_runstate,
-)
-from runtime.browser_verification_orchestrator import (
-    orchestrate_post_external,
-    OrchestrationTerminalState,
-)
-from runtime.verification_gate import requires_browser_verification
 from runtime.external_execution_closeout import (
+    CloseoutState,
     check_closeout_recovery_needed,
     orchestrate_external_closeout,
-    CloseoutState,
-    CloseoutTerminalClassification,
 )
-from cli.utils.output_formatter import print_next_step, print_success_panel
-from cli.utils.path_formatter import get_relative_path
+from runtime.recovery_classifier import (
+    RecoveryClassification,
+    ResumeEligibility,
+    check_resume_eligibility,
+    classify_recovery,
+    get_recovery_guidance,
+)
+from runtime.state_store import StateStore
 
 app = typer.Typer(help="Resume from human decisions, start next day loop")
 console = Console()
@@ -62,10 +47,10 @@ def _run_post_external_verification(
     current_phase: str,
 ) -> dict[str, Any] | None:
     """Fallback path for post-external verification (Feature 061 AC-006).
-    
+
     This function is now the fallback recovery path, not the primary.
     Primary path is in run-day external closeout (--trigger mode).
-    
+
     Only runs if:
     - current_phase is reviewing
     - closeout recovery is needed (check_closeout_recovery_needed)
@@ -73,21 +58,21 @@ def _run_post_external_verification(
     """
     if current_phase != "reviewing":
         return None
-    
+
     store = StateStore(project_path)
     packs = list(store.execution_packs_path.glob("exec-*.md"))
     if not packs:
         return None
-    
+
     execution_id = packs[-1].stem
     execution_pack = store.load_execution_pack(execution_id)
     execution_result = store.load_execution_result(execution_id)
-    
+
     if not execution_pack or not execution_result:
         return None
-    
+
     closeout_state_str = execution_result.get("closeout_state", "")
-    
+
     if closeout_state_str:
         try:
             closeout_state = CloseoutState(closeout_state_str)
@@ -95,33 +80,33 @@ def _run_post_external_verification(
                 return None
         except ValueError:
             pass
-    
+
     recovery_check = check_closeout_recovery_needed(project_path, execution_id)
-    
+
     if not recovery_check.get("recovery_needed"):
         return None
-    
-    console.print(f"\n[bold cyan]Closeout Recovery (Fallback Path)[/bold cyan]")
+
+    console.print("\n[bold cyan]Closeout Recovery (Fallback Path)[/bold cyan]")
     console.print(f"  Execution: {execution_id}")
     console.print(f"  Recovery Reason: {recovery_check.get('reason', 'unknown')}")
-    console.print(f"  [yellow]Primary closeout path did not complete[/yellow]")
-    
+    console.print("  [yellow]Primary closeout path did not complete[/yellow]")
+
     closeout_result = orchestrate_external_closeout(
         project_path=project_path,
         execution_id=execution_id,
         execution_pack=execution_pack,
         project_id=product_id,
     )
-    
+
     console.print(f"  Closeout State: [green]{closeout_result.closeout_state.value}[/green]")
-    
+
     if closeout_result.closeout_state == CloseoutState.CLOSEOUT_COMPLETED_SUCCESS:
         console.print("[green]Closeout recovery completed[/green]")
     elif closeout_result.closeout_state == CloseoutState.CLOSEOUT_RECOVERY_REQUIRED:
         console.print(f"[yellow]Closeout still requires recovery: {closeout_result.recovery_reason}[/yellow]")
     else:
-        console.print(f"[red]Closeout failed[/red]")
-    
+        console.print("[red]Closeout failed[/red]")
+
     return {
         "execution_id": execution_id,
         "closeout_result": closeout_result,
@@ -133,7 +118,7 @@ def _run_post_external_verification(
 
 def _load_latest_review_pack(project_path: Path) -> dict[str, Any] | None:
     """Load latest enriched review pack if available and not stale.
-    
+
     Returns None if:
     - No reviews directory
     - No review files
@@ -143,31 +128,31 @@ def _load_latest_review_pack(project_path: Path) -> dict[str, Any] | None:
     reviews_dir = project_path / "reviews"
     if not reviews_dir.exists():
         return None
-    
+
     review_files = sorted(reviews_dir.glob("*-review.md"), reverse=True)
     if not review_files:
         return None
-    
+
     latest_review = review_files[0]
-    
+
     store = StateStore(project_path)
     review_date = latest_review.stem.replace("-review", "")
     review_pack = store.load_daily_review_pack(review_date)
-    
+
     if review_pack is None:
         return None
-    
+
     today = datetime.now().strftime("%Y-%m-%d")
     if review_pack.get("date") != today:
         review_pack["is_stale"] = True
         review_pack["stale_date"] = review_pack.get("date")
-    
+
     return review_pack
 
 
 def _extract_continuation_context(review_pack: dict[str, Any]) -> dict[str, Any]:
     """Extract continuation-relevant fields from review pack.
-    
+
     Returns concise context for resume display.
     """
     context: dict[str, Any] = {
@@ -175,7 +160,7 @@ def _extract_continuation_context(review_pack: dict[str, Any]) -> dict[str, Any]
         "prior_review_status": "found",
         "is_stale": review_pack.get("is_stale", False),
     }
-    
+
     doctor_assessment = review_pack.get("doctor_assessment")
     if doctor_assessment:
         context["prior_doctor_status"] = doctor_assessment.get("doctor_status", "")
@@ -184,67 +169,67 @@ def _extract_continuation_context(review_pack: dict[str, Any]) -> dict[str, Any]
         context["prior_current_phase"] = doctor_assessment.get("current_phase", "")
         context["prior_recommended_action"] = doctor_assessment.get("recommended_action", "")
         context["prior_suggested_command"] = doctor_assessment.get("suggested_command", "")
-        
+
         if doctor_assessment.get("recovery_summary"):
             context["prior_recovery_summary"] = doctor_assessment["recovery_summary"]
-        
+
         if doctor_assessment.get("feedback_handoff"):
             context["prior_feedback_handoff"] = doctor_assessment["feedback_handoff"]
-        
+
         if doctor_assessment.get("closeout_reminder"):
             context["prior_closeout_reminder"] = doctor_assessment["closeout_reminder"]
-    
+
     if review_pack.get("tomorrow_plan"):
         context["prior_tomorrow_plan"] = review_pack.get("tomorrow_plan")
-    
+
     return context
 
 
 def _display_prior_context(context: dict[str, Any]) -> None:
     """Display prior-night context in resume output.
-    
+
     Passive display - user chooses to act on the information.
     """
     if context.get("is_stale"):
         console.print(f"\n[dim yellow]Prior review from {context.get('stale_date')} may be outdated[/dim yellow]")
         return
-    
+
     console.print("\n[bold cyan]Prior Night Context[/bold cyan]")
-    
+
     console.print(f"  Review Date: {context.get('prior_review_timestamp', 'N/A')}")
-    
+
     doctor_status = context.get("prior_doctor_status", "")
     if doctor_status:
         status_color = _get_status_color(doctor_status)
         console.print(f"  Doctor Status: [{status_color}]{doctor_status}[/{status_color}]")
-    
+
     if context.get("prior_initialization_mode"):
         console.print(f"  Initialization: {context['prior_initialization_mode']}")
-    
+
     if context.get("prior_current_phase"):
         console.print(f"  Prior Phase: {context['prior_current_phase']}")
-    
+
     if context.get("prior_recommended_action"):
         console.print(f"\n  [bold]Prior Recommended Action:[/bold] {context['prior_recommended_action']}")
-    
+
     if context.get("prior_suggested_command"):
         console.print(f"  [green]Prior Suggested: {context['prior_suggested_command']}[/green]")
-    
+
     recovery = context.get("prior_recovery_summary")
     if recovery:
-        console.print(f"\n  [bold yellow]Prior Recovery Guidance[/bold yellow]")
+        console.print("\n  [bold yellow]Prior Recovery Guidance[/bold yellow]")
         console.print(f"  Likely Cause: {recovery.get('likely_cause', '')}")
         if recovery.get("recovery_steps"):
             console.print(f"  Steps: {len(recovery['recovery_steps'])} actions pending")
-    
+
     feedback = context.get("prior_feedback_handoff")
     if feedback:
-        console.print(f"\n  [bold magenta]Prior Feedback Handoff[/bold magenta]")
+        console.print("\n  [bold magenta]Prior Feedback Handoff[/bold magenta]")
         console.print(f"  {feedback.get('suggestion', '')}")
-    
+
     closeout = context.get("prior_closeout_reminder")
     if closeout:
-        console.print(f"\n  [bold blue]Prior Closeout Reminder[/bold blue]")
+        console.print("\n  [bold blue]Prior Closeout Reminder[/bold blue]")
         console.print(f"  {closeout.get('status', '')}")
         console.print(f"  Action: {closeout.get('action', '')}")
 
@@ -272,7 +257,7 @@ def continue_loop(
     force: bool = typer.Option(False, help="Force resume even if eligibility check fails"),
 ):
     """Process human decision and continue day loop (Feature 077 integration).
-    
+
     Handles acceptance-related blocking states:
     - acceptance_recovery_pending: Failed acceptance requires remediation
     - acceptance_terminal_state failure: Re-acceptance needed after recovery
@@ -286,7 +271,7 @@ def continue_loop(
                 if p.is_dir() and (p / "runstate.md").exists():
                     console.print(f"  - {p.name}")
         raise typer.Exit(1)
-    
+
     project_path = path / project
     store = StateStore(project_path)
     logger = get_logger(project_path)
@@ -306,24 +291,24 @@ def continue_loop(
         _display_prior_context(context)
 
     unified_decisions = reconcile_decision_sources(project_path)
-    
+
     if unified_decisions.get("has_discrepancies"):
         console.print("\n[bold yellow]Decision Discrepancies Detected[/bold yellow]")
         for disc in unified_decisions.get("discrepancies", []):
             console.print(f"  [yellow]• {disc.get('message', disc.get('type', 'Unknown'))}[/yellow]")
-    
+
     if unified_decisions.get("pending_email_decisions"):
         console.print("\n[bold cyan]Email Decisions Pending[/bold cyan]")
         for req in unified_decisions["pending_email_decisions"]:
             req_id = req.get("decision_request_id", "")
             question = req.get("question", "")
             console.print(f"  [cyan]• {req_id}: {question[:50]}[/cyan]")
-    
+
     if unified_decisions.get("email_decision_resolved"):
         console.print("\n[bold green]Email Decision Resolved[/bold green]")
         console.print(f"  [green]• Request: {unified_decisions.get('resolved_request_id', 'unknown')}[/green]")
         console.print(f"  [green]• Reply: {unified_decisions.get('resolved_reply', {}).get('reply_value', '')}[/green]")
-        
+
         updated_runstate = apply_email_resolution_to_runstate(project_path)
         if updated_runstate:
             runstate = updated_runstate
@@ -332,21 +317,21 @@ def continue_loop(
     feature_id = runstate.get("feature_id", "")
     product_id = runstate.get("project_id", "")
     previous_phase = runstate.get("current_phase", "planning")
-    
+
     post_external_result = _run_post_external_verification(
         project_path,
         product_id,
         previous_phase,
     )
-    
+
     if post_external_result:
         execution_id = post_external_result["execution_id"]
         store = StateStore(project_path)
         execution_result = store.load_execution_result(execution_id) or {}
-        
+
         execution_result["browser_verification"] = post_external_result.get("browser_verification", {})
         execution_result["orchestration_terminal_state"] = post_external_result.get("closeout_terminal_state", "not_required")
-        
+
         store.save_execution_result(execution_result)
         console.print("[cyan]Updated ExecutionResult with verification data[/cyan]")
 
@@ -362,12 +347,12 @@ def continue_loop(
 
     if eligibility not in (ResumeEligibility.ELIGIBLE, ResumeEligibility.NEEDS_DECISION) and not force:
         guidance = get_recovery_guidance(runstate)
-        
+
         if eligibility == ResumeEligibility.NEEDS_ACCEPTANCE:
             console.print(Panel("Resume Blocked - Acceptance Required", title="Recovery Check", border_style="yellow"))
             console.print(f"[yellow]Classification: {classification.value}[/yellow]")
             console.print(f"[yellow]Acceptance terminal state: {runstate.get('acceptance_terminal_state', 'unknown')}[/yellow]")
-            console.print(f"\n[bold]Acceptance recovery is pending[/bold]")
+            console.print("\n[bold]Acceptance recovery is pending[/bold]")
             console.print("[cyan]Run 'asyncdev acceptance recovery' for remediation guidance[/cyan]")
             console.print("[cyan]After fixes: 'asyncdev acceptance retry'[/cyan]")
         else:
@@ -380,7 +365,7 @@ def continue_loop(
                 for w in guidance["warnings"]:
                     console.print(f"[red]Warning: {w}[/red]")
             console.print("\n[cyan]Use --force to override, or follow recommended action above[/cyan]")
-        
+
         logger.log_event(
             ExecutionEventType.RESUME_BLOCKED,
             feature_id=feature_id,
@@ -456,13 +441,13 @@ def continue_loop(
     else:
         runstate["next_recommended_action"] = "Add tasks to queue or complete feature"
 
-    console.print(Panel(f"Resume Summary", title="resume-next-day", border_style="blue"))
+    console.print(Panel("Resume Summary", title="resume-next-day", border_style="blue"))
 
     console.print(f"[bold]Current Phase:[/bold] {runstate['current_phase']}")
     console.print(f"[bold]Next Task:[/bold] {runstate.get('active_task', 'None')}")
     console.print(f"[bold]Queue:[/bold] {len(runstate.get('task_queue', []))} pending")
     console.print(f"[bold]Completed:[/bold] {len(runstate.get('completed_outputs', []))} outputs")
-    
+
     continuity_context = runstate.get("continuity_context", {})
     if continuity_context:
         console.print("\n[bold cyan]Continuation Status[/bold cyan]")
@@ -518,7 +503,7 @@ def status(
     if project is None:
         console.print("[yellow]Specify --project <id> to see status[/yellow]")
         return
-    
+
     project_path = path / project
     store = StateStore(project_path)
     runstate = store.load_runstate()
@@ -531,22 +516,22 @@ def status(
     if review_pack:
         context = _extract_continuation_context(review_pack)
         console.print(Panel("Prior Review Summary", title="review-night alignment", border_style="cyan"))
-        
+
         doctor_status = context.get("prior_doctor_status", "")
         if doctor_status:
             status_color = _get_status_color(doctor_status)
             console.print(f"Prior Doctor Status: [{status_color}]{doctor_status}[/{status_color}]")
-        
+
         console.print(f"Prior Review Date: {context.get('prior_review_timestamp', 'N/A')}")
-        
+
         if context.get("prior_recommended_action"):
             console.print(f"Prior Recommended: {context['prior_recommended_action']}")
-        
+
         if context.get("prior_suggested_command"):
             console.print(f"[green]Prior Suggested: {context['prior_suggested_command']}[/green]")
-        
+
         if context.get("is_stale"):
-            console.print(f"\n[dim yellow]Note: Prior review may be outdated[/dim yellow]")
+            console.print("\n[dim yellow]Note: Prior review may be outdated[/dim yellow]")
 
     console.print(Panel("Current State", title="resume-status"))
 
@@ -598,7 +583,7 @@ def unblock(
     if project is None:
         console.print("[red]Must specify --project <id>[/red]")
         raise typer.Exit(1)
-    
+
     project_path = path / project
     store = StateStore(project_path)
     logger = get_logger(project_path)
@@ -691,7 +676,7 @@ def handle_failed(
     if project is None:
         console.print("[red]Must specify --project <id>[/red]")
         raise typer.Exit(1)
-    
+
     project_path = path / project
     store = StateStore(project_path)
     logger = get_logger(project_path)

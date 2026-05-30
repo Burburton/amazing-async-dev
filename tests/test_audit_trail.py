@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 
 from runtime.audit_trail_store import (
+    CHAIN_TYPES,
     AuditTrailStore,
-    reconstruct_audit_trail,
     detect_missing_links,
     format_audit_summary,
-    CHAIN_TYPES,
+    reconstruct_audit_trail,
 )
 
 
@@ -40,7 +40,7 @@ class TestAuditTrailStore:
             channel="mock_file",
             artifact_path=".runtime/email-outbox/dr-001.md",
         )
-        
+
         assert audit["audit_id"].startswith("audit-")
         assert audit["chain_type"] == "decision_request_chain"
         assert audit["outbound_request_id"] == "dr-001"
@@ -54,19 +54,19 @@ class TestAuditTrailStore:
             channel="mock_file",
             artifact_path=".runtime/email-outbox/sr-001.md",
         )
-        
+
         assert audit["chain_type"] == "status_report_chain"
         assert audit["outbound_report_id"] == "sr-001"
 
     def test_record_inbound_reply(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         store.record_outbound_request(
             request_id="dr-001",
             project_id="test",
             channel="mock_file",
         )
-        
+
         audit = store.record_inbound_reply(
             request_id="dr-001",
             reply_raw="DECISION A",
@@ -74,7 +74,7 @@ class TestAuditTrailStore:
             parsed_argument="A",
             validation_status="valid",
         )
-        
+
         assert audit is not None
         assert audit["inbound_reply_raw"] == "DECISION A"
         assert audit["inbound_parsed_command"] == "DECISION"
@@ -82,30 +82,30 @@ class TestAuditTrailStore:
 
     def test_record_inbound_reply_no_request(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_inbound_reply(
             request_id="dr-nonexistent",
             reply_raw="DECISION A",
         )
-        
+
         assert audit is None
 
     def test_record_decision_applied(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         store.record_outbound_request(
             request_id="dr-001",
             project_id="test",
             channel="mock_file",
         )
-        
+
         store.record_inbound_reply(
             request_id="dr-001",
             reply_raw="DECISION A",
             parsed_command="DECISION",
             parsed_argument="A",
         )
-        
+
         audit = store.record_decision_applied(
             request_id="dr-001",
             applied_action="select_option",
@@ -113,7 +113,7 @@ class TestAuditTrailStore:
             runstate_after={"current_phase": "planning", "decisions_needed": []},
             continuation_phase="planning",
         )
-        
+
         assert audit is not None
         assert audit["decision_applied_action"] == "select_option"
         assert audit["decision_continuation_phase"] == "planning"
@@ -122,45 +122,45 @@ class TestAuditTrailStore:
 
     def test_find_audit_by_request_id(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         store.record_outbound_request(
             request_id="dr-001",
             project_id="test",
             channel="mock_file",
         )
-        
+
         audit = store.find_audit_by_request_id("dr-001")
-        
+
         assert audit is not None
         assert audit["outbound_request_id"] == "dr-001"
 
     def test_find_audit_by_report_id(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         store.record_outbound_report(
             report_id="sr-001",
             project_id="test",
             channel="mock_file",
         )
-        
+
         audit = store.find_audit_by_report_id("sr-001")
-        
+
         assert audit is not None
         assert audit["outbound_report_id"] == "sr-001"
 
     def test_list_audits(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         store.record_outbound_request("dr-001", "test", "mock")
         store.record_outbound_request("dr-002", "test", "mock")
         store.record_outbound_report("sr-001", "test", "mock")
-        
+
         audits = store.list_audits()
         assert len(audits) == 3
-        
+
         decision_audits = store.list_audits(chain_type="decision_request_chain")
         assert len(decision_audits) == 2
-        
+
         report_audits = store.list_audits(chain_type="status_report_chain")
         assert len(report_audits) == 1
 
@@ -168,14 +168,14 @@ class TestAuditTrailStore:
 class TestReconstructAuditTrail:
     def test_reconstruct_decision_chain(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_outbound_request("dr-001", "test", "mock")
         store.record_inbound_reply("dr-001", "DECISION A", "DECISION", "A", "valid")
         store.record_decision_applied("dr-001", "select_option")
-        
+
         loaded = store.load_audit(audit["audit_id"])
         trail = reconstruct_audit_trail(loaded)
-        
+
         assert trail["chain_type"] == "decision_request_chain"
         assert len(trail["stages"]) == 3
         assert trail["stages"][0]["stage"] == "request_sent"
@@ -184,84 +184,84 @@ class TestReconstructAuditTrail:
 
     def test_reconstruct_report_chain(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_outbound_report("sr-001", "test", "mock")
-        
+
         loaded = store.load_audit(audit["audit_id"])
         trail = reconstruct_audit_trail(loaded)
-        
+
         assert trail["chain_type"] == "status_report_chain"
         assert len(trail["stages"]) == 1
         assert trail["stages"][0]["stage"] == "report_sent"
 
     def test_reconstruct_empty_audit(self):
         trail = reconstruct_audit_trail({})
-        
+
         assert trail["stages"] == []
-        assert trail["complete"] == False
+        assert not trail["complete"]
 
 
 class TestDetectMissingLinks:
     def test_no_missing_links_complete_chain(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_outbound_request("dr-001", "test", "mock")
         store.record_inbound_reply("dr-001", "DECISION A", "DECISION", "A", "valid")
         store.record_decision_applied("dr-001", "select_option")
-        
+
         loaded = store.load_audit(audit["audit_id"])
         missing = detect_missing_links(loaded)
-        
-        assert missing["missing_links_detected"] == False
+
+        assert not missing["missing_links_detected"]
 
     def test_missing_reply_for_old_request(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_outbound_request("dr-001", "test", "mock")
-        
+
         loaded = store.load_audit(audit["audit_id"])
         loaded["outbound_sent_at"] = "2026-04-01T10:00:00"
-        
+
         missing = detect_missing_links(loaded)
-        
-        assert missing["missing_links_detected"] == True
+
+        assert missing["missing_links_detected"]
         assert len(missing["missing_links_details"]) > 0
 
     def test_missing_decision_application(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_outbound_request("dr-001", "test", "mock")
         store.record_inbound_reply("dr-001", "DECISION A", "DECISION", "A", "valid")
-        
+
         loaded = store.load_audit(audit["audit_id"])
         missing = detect_missing_links(loaded)
-        
-        assert missing["missing_links_detected"] == True
+
+        assert missing["missing_links_detected"]
         assert any(d["stage"] == "decision_applied" for d in missing["missing_links_details"])
 
 
 class TestFormatAuditSummary:
     def test_format_includes_chain_type(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_outbound_request("dr-001", "test-project", "mock")
-        
+
         summary = format_audit_summary(audit)
-        
+
         assert "decision_request_chain" in summary
         assert "dr-001" in summary
         assert "test-project" in summary
 
     def test_format_includes_stages(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_outbound_request("dr-001", "test", "mock")
         store.record_inbound_reply("dr-001", "DECISION A", "DECISION", "A")
         store.record_decision_applied("dr-001", "select")
-        
+
         loaded = store.load_audit(audit["audit_id"])
         summary = format_audit_summary(loaded)
-        
+
         assert "request_sent" in summary
         assert "reply_received" in summary
         assert "decision_applied" in summary
@@ -273,12 +273,12 @@ class TestFormatAuditSummary:
             "outbound_request_id": "dr-001",
             "outbound_sent_at": "2026-04-01T10:00:00",
         }
-        
+
         missing = detect_missing_links(audit)
         audit.update(missing)
-        
+
         summary = format_audit_summary(audit)
-        
+
         assert "Missing Links" in summary
 
 
@@ -291,14 +291,14 @@ class TestChainTypes:
 class TestEndToEndAuditLoop:
     def test_full_decision_loop_auditable(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_outbound_request(
             request_id="dr-20260416-001",
             project_id="amazing-async-dev",
             channel="mock_file",
             artifact_path=".runtime/email-outbox/dr-001.md",
         )
-        
+
         audit = store.record_inbound_reply(
             request_id="dr-20260416-001",
             reply_raw="DECISION A",
@@ -306,7 +306,7 @@ class TestEndToEndAuditLoop:
             parsed_argument="A",
             validation_status="valid",
         )
-        
+
         audit = store.record_decision_applied(
             request_id="dr-20260416-001",
             applied_action="select_option",
@@ -314,13 +314,13 @@ class TestEndToEndAuditLoop:
             runstate_after={"current_phase": "planning", "decisions_needed": []},
             continuation_phase="planning",
         )
-        
+
         trail = reconstruct_audit_trail(audit)
         missing = detect_missing_links(audit)
-        
+
         assert len(trail["stages"]) == 3
-        assert missing["missing_links_detected"] == False
-        
+        assert not missing["missing_links_detected"]
+
         summary = format_audit_summary(audit)
         assert "dr-20260416-001" in summary
         assert "DECISION A" in summary
@@ -328,29 +328,29 @@ class TestEndToEndAuditLoop:
 
     def test_report_chain_auditable(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_outbound_report(
             report_id="sr-20260416-001",
             project_id="amazing-async-dev",
             channel="mock_file",
             artifact_path=".runtime/email-outbox/sr-001.md",
         )
-        
+
         trail = reconstruct_audit_trail(audit)
-        
+
         assert len(trail["stages"]) == 1
         assert trail["stages"][0]["stage"] == "report_sent"
 
     def test_auditor_can_reconstruct_what_happened(self, temp_dir):
         store = AuditTrailStore(temp_dir)
-        
+
         audit = store.record_outbound_request("dr-001", "test", "mock", ".runtime/outbox")
         store.record_inbound_reply("dr-001", "DECISION A", "DECISION", "A", "valid")
         store.record_decision_applied("dr-001", "proceed", {"current_phase": "blocked"}, {"current_phase": "executing"}, "executing")
-        
+
         loaded = store.load_audit(audit["audit_id"])
         summary = format_audit_summary(loaded)
-        
+
         assert "Request sent" in summary or "request_sent" in summary.lower()
         assert "Reply received" in summary or "reply_received" in summary.lower()
         assert "Decision applied" in summary or "decision_applied" in summary.lower()

@@ -1,13 +1,12 @@
 """Tests for asyncdev plan-day command."""
 
-import pytest
 from datetime import datetime
-from pathlib import Path
-import yaml
+
+import pytest
 from typer.testing import CliRunner
+
 from cli.commands.plan_day import app
 from runtime.state_store import StateStore
-
 
 runner = CliRunner()
 
@@ -16,14 +15,14 @@ runner = CliRunner()
 def setup_product(temp_dir):
     """Create a product with runstate for testing."""
     from cli.commands.new_product import app as new_product_app
-    
+
     runner.invoke(new_product_app, [
         "create",
         "--product-id", "test-product",
         "--name", "Test Product",
         "--path", str(temp_dir),
     ])
-    
+
     yield temp_dir / "test-product"
 
 
@@ -121,9 +120,9 @@ class TestPlanDayCreate:
 
         store = StateStore(setup_product)
         packs = list(store.execution_packs_path.glob("exec-*.md"))
-        
+
         pack = store.load_execution_pack(packs[0].stem)
-        
+
         assert pack["execution_id"] is not None
         assert pack["feature_id"] is not None
         assert pack["task_id"] == "Implement feature X"
@@ -198,7 +197,7 @@ class TestPlanDayResumeContextAlignment:
     def test_plan_with_healthy_resume_context(self, setup_product):
         """plan-day should infer continue_work mode from healthy resume context."""
         store = StateStore(setup_product)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -209,21 +208,21 @@ class TestPlanDayResumeContextAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "create",
             "--project", "test-product",
             "--task", "Implement feature X",
             "--path", str(setup_product.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "Resume Context" in result.output or "planning_mode" in result.output
 
     def test_plan_with_blocked_resume_context(self, setup_product):
         """plan-day should infer blocked_waiting mode from blocked resume context."""
         store = StateStore(setup_product)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -233,21 +232,21 @@ class TestPlanDayResumeContextAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "create",
             "--project", "test-product",
             "--task", "Resume work",
             "--path", str(setup_product.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "blocked_waiting" in result.output or "BLOCKED" in result.output
 
     def test_plan_with_closeout_resume_context(self, setup_product):
         """plan-day should infer closeout_first mode from closeout resume context."""
         store = StateStore(setup_product)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -260,21 +259,21 @@ class TestPlanDayResumeContextAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "create",
             "--project", "test-product",
             "--task", "Archive feature",
             "--path", str(setup_product.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "closeout_first" in result.output or "closeout" in result.output.lower()
 
     def test_plan_with_recovery_resume_context(self, setup_product):
         """plan-day should infer recover_and_continue mode from recovery resume context."""
         store = StateStore(setup_product)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -287,14 +286,14 @@ class TestPlanDayResumeContextAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "create",
             "--project", "test-product",
             "--task", "Fix verification issue",
             "--path", str(setup_product.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "recover_and_continue" in result.output or "Recovery" in result.output
 
@@ -306,14 +305,14 @@ class TestPlanDayResumeContextAlignment:
             "--task", "New task",
             "--path", str(setup_product.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "ExecutionPack created" in result.output
 
     def test_plan_with_stale_resume_context(self, setup_product):
         """plan-day should handle stale resume context gracefully."""
         store = StateStore(setup_product)
-        
+
         yesterday_date = "2026-04-12"
         review_pack = {
             "date": yesterday_date,
@@ -323,21 +322,21 @@ class TestPlanDayResumeContextAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "create",
             "--project", "test-product",
             "--task", "Continue work",
             "--path", str(setup_product.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "outdated" in result.output.lower() or "stale" in result.output.lower() or "ExecutionPack" in result.output
 
     def test_execution_pack_includes_planning_mode(self, setup_product):
         """ExecutionPack should include planning_mode when resume context exists."""
         store = StateStore(setup_product)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -346,24 +345,24 @@ class TestPlanDayResumeContextAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         runner.invoke(app, [
             "create",
             "--project", "test-product",
             "--task", "Implement feature",
             "--path", str(setup_product.parent),
         ])
-        
+
         store = StateStore(setup_product)
         packs = list(store.execution_packs_path.glob("exec-*.md"))
         pack = store.load_execution_pack(packs[0].stem)
-        
+
         assert pack.get("planning_mode") is not None
 
     def test_execution_pack_includes_prior_doctor_status(self, setup_product):
         """ExecutionPack should include prior_doctor_status when resume context exists."""
         store = StateStore(setup_product)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -372,18 +371,18 @@ class TestPlanDayResumeContextAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         runner.invoke(app, [
             "create",
             "--project", "test-product",
             "--task", "Fix issue",
             "--path", str(setup_product.parent),
         ])
-        
+
         store = StateStore(setup_product)
         packs = list(store.execution_packs_path.glob("exec-*.md"))
         pack = store.load_execution_pack(packs[0].stem)
-        
+
         assert pack.get("prior_doctor_status") == "ATTENTION_NEEDED"
 
 
@@ -393,54 +392,54 @@ class TestPlanningModeInference:
     def test_healthy_infers_continue_work(self):
         """HEALTHY doctor status should infer continue_work mode."""
         from cli.commands.plan_day import _infer_planning_mode
-        
+
         resume_context = {"prior_doctor_status": "HEALTHY"}
-        
+
         mode = _infer_planning_mode(resume_context)
-        
+
         assert mode == "continue_work"
 
     def test_blocked_infers_blocked_waiting(self):
         """BLOCKED doctor status should infer blocked_waiting_for_decision mode."""
         from cli.commands.plan_day import _infer_planning_mode
-        
+
         resume_context = {"prior_doctor_status": "BLOCKED"}
-        
+
         mode = _infer_planning_mode(resume_context)
-        
+
         assert mode == "blocked_waiting_for_decision"
 
     def test_completed_pending_closeout_infers_closeout_first(self):
         """COMPLETED_PENDING_CLOSEOUT should infer closeout_first mode."""
         from cli.commands.plan_day import _infer_planning_mode
-        
+
         resume_context = {"prior_doctor_status": "COMPLETED_PENDING_CLOSEOUT"}
-        
+
         mode = _infer_planning_mode(resume_context)
-        
+
         assert mode == "closeout_first"
 
     def test_recovery_summary_infers_recover_and_continue(self):
         """prior_recovery_summary should infer recover_and_continue mode."""
         from cli.commands.plan_day import _infer_planning_mode
-        
+
         resume_context = {
             "prior_doctor_status": "ATTENTION_NEEDED",
             "prior_recovery_summary": {"likely_cause": "test"},
         }
-        
+
         mode = _infer_planning_mode(resume_context)
-        
+
         assert mode == "recover_and_continue"
 
     def test_default_is_continue_work(self):
         """Empty context should default to continue_work mode."""
         from cli.commands.plan_day import _infer_planning_mode
-        
+
         resume_context = {}
-        
+
         mode = _infer_planning_mode(resume_context)
-        
+
         assert mode == "continue_work"
 
 
@@ -450,42 +449,42 @@ class TestPlanningRationale:
     def test_rationale_includes_mode(self):
         """Rationale should include the planning mode."""
         from cli.commands.plan_day import _get_planning_rationale
-        
+
         resume_context = {"prior_doctor_status": "HEALTHY"}
-        
+
         rationale = _get_planning_rationale("continue_work", resume_context)
-        
+
         assert rationale.get("mode") == "continue_work"
 
     def test_rationale_includes_doctor_status(self):
         """Rationale should include prior doctor status as reason."""
         from cli.commands.plan_day import _get_planning_rationale
-        
+
         resume_context = {"prior_doctor_status": "BLOCKED"}
-        
+
         rationale = _get_planning_rationale("blocked_waiting_for_decision", resume_context)
-        
+
         assert any("BLOCKED" in r for r in rationale.get("reasons", []))
 
     def test_rationale_includes_prior_recommendation(self):
         """Rationale should include prior recommendation when present."""
         from cli.commands.plan_day import _get_planning_rationale
-        
+
         resume_context = {
             "prior_doctor_status": "HEALTHY",
             "prior_recommended_action": "Continue execution",
         }
-        
+
         rationale = _get_planning_rationale("continue_work", resume_context)
-        
+
         assert rationale.get("prior_recommendation") == "Continue execution"
 
     def test_rationale_includes_stale_warning(self):
         """Rationale should include warning when context is stale."""
         from cli.commands.plan_day import _get_planning_rationale
-        
+
         resume_context = {"prior_doctor_status": "HEALTHY", "is_stale": True}
-        
+
         rationale = _get_planning_rationale("continue_work", resume_context)
-        
+
         assert rationale.get("warnings") is not None

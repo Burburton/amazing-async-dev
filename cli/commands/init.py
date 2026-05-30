@@ -34,7 +34,7 @@ def create(
 
     gitignore_manager = GitignoreManager(root_path=Path.cwd())
     result = gitignore_manager.ensure_safe(auto_fix=True)
-    
+
     if result.missing_gitignore_entries:
         console.print(f"\n[green]Added {len(result.missing_gitignore_entries)} gitignore entries[/green]")
         for entry in result.missing_gitignore_entries:

@@ -1,18 +1,16 @@
 """Tests for Feature 052 - Future Adapter Readiness."""
 
-import pytest
-from pathlib import Path
 
 from runtime.channel_adapter import (
-    ChannelType,
+    ChannelAdapter,
     ChannelConfig,
     ChannelMessage,
-    ChannelResult,
-    ChannelAdapter,
     ChannelRegistry,
+    ChannelResult,
+    ChannelType,
+    get_canonical_channel,
     get_message_for_channel,
     is_channel_portable,
-    get_canonical_channel,
 )
 
 

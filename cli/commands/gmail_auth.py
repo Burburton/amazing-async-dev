@@ -7,12 +7,9 @@ from rich.console import Console
 from rich.panel import Panel
 
 from runtime.gmail_oauth2_token_generator import (
-    generate_authorization_url,
-    exchange_code_for_tokens,
-    create_token_file,
+    format_setup_guide,
     interactive_token_generation,
     validate_oauth2_credentials,
-    format_setup_guide,
 )
 
 app = typer.Typer(help="Gmail OAuth2 authentication setup")
@@ -30,10 +27,10 @@ def setup(
     ),
 ):
     """Interactive Gmail OAuth2 token setup.
-    
+
     This command will guide you through obtaining OAuth2 tokens
     for Gmail SMTP authentication.
-    
+
     Example:
         asyncdev gmail-auth setup
         asyncdev gmail-auth setup --client-id xxx --client-secret xxx --email you@gmail.com
@@ -44,7 +41,7 @@ def setup(
         email=email,
         token_path=token_path,
     )
-    
+
     if result["status"] == "success":
         console.print(Panel(
             f"Token saved: {result['token_path']}\n"
@@ -53,7 +50,7 @@ def setup(
             title="OAuth2 Setup Complete",
             border_style="green"
         ))
-        
+
         console.print("\n[bold]Next steps:[/bold]")
         console.print("  1. [cyan]export ASYNCDEV_USE_OAUTH2=true[/cyan]")
         console.print("  2. [cyan]export ASYNCDEV_DELIVERY_MODE=smtp[/cyan]")
@@ -70,7 +67,7 @@ def setup(
 @app.command()
 def guide():
     """Display detailed Gmail OAuth2 setup guide.
-    
+
     Example:
         asyncdev gmail-auth guide
     """
@@ -84,12 +81,12 @@ def validate(
     client_secret: str = typer.Option(..., help="Google OAuth2 client secret"),
 ):
     """Validate OAuth2 credentials format.
-    
+
     Example:
         asyncdev gmail-auth validate --client-id xxx --client-secret xxx
     """
     is_valid, explanation = validate_oauth2_credentials(client_id, client_secret)
-    
+
     if is_valid:
         console.print(f"[green]Valid: {explanation}[/green]")
     else:
@@ -105,23 +102,23 @@ def status(
     ),
 ):
     """Check current OAuth2 token status.
-    
+
     Example:
         asyncdev gmail-auth status
         asyncdev gmail-auth status --token-path custom/path.json
     """
     from runtime.gmail_oauth2 import GmailOAuth2Config
-    
+
     config = GmailOAuth2Config(token_path)
-    
+
     if not token_path.exists():
         console.print("[yellow]No token file found[/yellow]")
         console.print(f"[dim]Expected path: {token_path}[/dim]")
         console.print("\n[cyan]Run 'asyncdev gmail-auth setup' to generate tokens[/cyan]")
         return
-    
+
     token_data = config.load()
-    
+
     console.print(Panel(
         f"Email: {token_data.get('email', 'N/A')}\n"
         f"Has access token: {bool(token_data.get('access_token'))}\n"
@@ -131,7 +128,7 @@ def status(
         title="OAuth2 Token Status",
         border_style="blue"
     ))
-    
+
     if config.is_configured():
         console.print("[green]Token is valid and ready to use[/green]")
     else:
@@ -147,18 +144,18 @@ def refresh(
     ),
 ):
     """Refresh OAuth2 access token using refresh token.
-    
+
     Example:
         asyncdev gmail-auth refresh
     """
     from runtime.gmail_oauth2 import GmailOAuth2Config
-    
+
     config = GmailOAuth2Config(token_path)
-    
+
     if not token_path.exists():
         console.print("[red]No token file found[/red]")
         raise typer.Exit(1)
-    
+
     if config.refresh():
         console.print(Panel(
             f"Token refreshed successfully\n"
@@ -185,20 +182,20 @@ def test_send(
     ),
 ):
     """Send test email using OAuth2.
-    
+
     Example:
         asyncdev gmail-auth test-send --to-email recipient@example.com
     """
     from runtime.email_sender import EmailConfig, EmailSender
-    
+
     config = EmailConfig()
     config.use_oauth2 = True
     config.oauth2_token_path = token_path
     config.delivery_mode = "smtp"
     config.to_address = to_email
-    
+
     sender = EmailSender(config)
-    
+
     test_request = {
         "decision_request_id": "test-oauth2",
         "product_id": "test",
@@ -208,9 +205,9 @@ def test_send(
         "recommendation": "A",
         "sent_at": "test",
     }
-    
+
     success, _ = sender.send_decision_request(test_request)
-    
+
     if success:
         console.print(Panel(
             f"Test email sent to: {to_email}\n"

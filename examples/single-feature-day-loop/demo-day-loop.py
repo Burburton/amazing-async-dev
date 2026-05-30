@@ -19,16 +19,15 @@ Produces:
 """
 
 import argparse
-import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from runtime.state_store import StateStore, generate_execution_id, update_runstate_from_result
-from runtime.review_pack_builder import build_daily_review_pack
 from runtime.adapters.llm_adapter import MockLLMAdapter
+from runtime.review_pack_builder import build_daily_review_pack
+from runtime.state_store import StateStore, generate_execution_id
 
 
 def setup_demo_project():
@@ -112,7 +111,7 @@ def phase_plan_day(verbose: bool = False):
         print(f"  Deliverables: {execution_pack['deliverables']}")
 
     print(f"[OK] ExecutionPack saved: execution-packs/{execution_id}.md")
-    print(f"[OK] RunState updated: current_phase = executing")
+    print("[OK] RunState updated: current_phase = executing")
 
     return execution_id, execution_pack
 
@@ -146,8 +145,8 @@ def phase_run_day(execution_id: str, execution_pack: dict, verbose: bool = False
         print(f"  Completed: {execution_result['completed_items']}")
         print(f"  Verification: {execution_result['verification_result']}")
 
-    print(f"[OK] Mock execution complete")
-    print(f"[OK] Output file created: hello-world.txt")
+    print("[OK] Mock execution complete")
+    print("[OK] Output file created: hello-world.txt")
     print(f"[OK] ExecutionResult saved: execution-results/{execution_id}.md")
 
     return execution_result
@@ -193,7 +192,7 @@ def phase_review_night(execution_result: dict, verbose: bool = False):
         print(f"  Evidence: {review_pack['evidence']}")
 
     print(f"[OK] DailyReviewPack saved: reviews/{review_pack['date']}-review.md")
-    print(f"[OK] RunState updated: current_phase = reviewing")
+    print("[OK] RunState updated: current_phase = reviewing")
 
     return review_pack
 
@@ -219,10 +218,10 @@ def phase_resume_next_day(verbose: bool = False):
 
     if verbose:
         print(f"  Phase: {runstate['current_phase']}")
-        print(f"  Status: Feature complete")
+        print("  Status: Feature complete")
 
-    print(f"[OK] RunState updated: current_phase = completed")
-    print(f"[OK] Feature marked as complete")
+    print("[OK] RunState updated: current_phase = completed")
+    print("[OK] Feature marked as complete")
 
 
 def print_summary():
@@ -249,11 +248,11 @@ def print_summary():
 
     runstate = demo_path / "runstate.md"
     if runstate.exists():
-        print(f"  RunState: runstate.md")
+        print("  RunState: runstate.md")
 
     output = demo_path / "hello-world.txt"
     if output.exists():
-        print(f"  Output: hello-world.txt")
+        print("  Output: hello-world.txt")
 
     print("\nDay loop phases completed:")
     print("  1. plan-day    -> ExecutionPack created")
@@ -276,7 +275,7 @@ def main():
 
     execution_result = phase_run_day(execution_id, execution_pack, verbose=args.verbose)
 
-    review_pack = phase_review_night(execution_result, verbose=args.verbose)
+    phase_review_night(execution_result, verbose=args.verbose)
 
     phase_resume_next_day(verbose=args.verbose)
 

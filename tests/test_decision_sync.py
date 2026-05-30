@@ -5,18 +5,17 @@ from pathlib import Path
 
 import pytest
 
-from runtime.decision_sync import (
-    sync_decision_to_runstate,
-    sync_reply_to_runstate,
-    reconcile_decision_sources,
-    get_pending_decision_count,
-    get_decision_status_summary,
-)
 from runtime.decision_request_store import (
     DecisionRequestStore,
-    DecisionRequestStatus,
     DecisionType,
     DeliveryChannel,
+)
+from runtime.decision_sync import (
+    get_decision_status_summary,
+    get_pending_decision_count,
+    reconcile_decision_sources,
+    sync_decision_to_runstate,
+    sync_reply_to_runstate,
 )
 
 
@@ -38,9 +37,9 @@ class TestSyncDecisionToRunstate:
             "sent_at": "2026-04-16T10:00:00",
         }
         runstate = {"decisions_needed": [], "current_phase": "executing"}
-        
+
         result = sync_decision_to_runstate(request, runstate)
-        
+
         assert len(result["decisions_needed"]) == 1
         assert result["decisions_needed"][0]["request_id"] == "dr-20260416-001"
         assert result["decision_request_pending"] == "dr-20260416-001"
@@ -56,9 +55,9 @@ class TestSyncDecisionToRunstate:
             "sent_at": "2026-04-16T10:00:00",
         }
         runstate = {"decisions_needed": [], "current_phase": "executing"}
-        
+
         result = sync_decision_to_runstate(request, runstate)
-        
+
         assert result["current_phase"] == "blocked"
 
     def test_sync_does_not_duplicate_existing_decision(self, temp_dir):
@@ -74,9 +73,9 @@ class TestSyncDecisionToRunstate:
             "decisions_needed": [{"request_id": "dr-001", "decision": "Existing"}],
             "current_phase": "blocked",
         }
-        
+
         result = sync_decision_to_runstate(request, runstate)
-        
+
         assert len(result["decisions_needed"]) == 1
 
 
@@ -96,9 +95,9 @@ class TestSyncReplyToRunstate:
             "continuation_phase": "planning",
             "next_recommended": "Proceed",
         }
-        
+
         result = sync_reply_to_runstate("dr-001", reply, runstate, action)
-        
+
         assert len(result["decisions_needed"]) == 0
         assert result["decision_request_pending"] is None
         assert result["last_decision_resolution"]["request_id"] == "dr-001"
@@ -108,27 +107,27 @@ class TestSyncReplyToRunstate:
         runstate = {"decisions_needed": [], "current_phase": "blocked"}
         reply = {"reply_value": "CONTINUE", "parsed_result": {"command": "CONTINUE"}}
         action = {"continuation_phase": "executing", "next_recommended": "Go"}
-        
+
         result = sync_reply_to_runstate("dr-001", reply, runstate, action)
-        
+
         assert result["current_phase"] == "executing"
 
     def test_sync_without_action_uses_default_phase(self, temp_dir):
         runstate = {"decisions_needed": [], "current_phase": "blocked"}
         reply = {"reply_value": "DECISION A", "parsed_result": {"command": "DECISION"}}
-        
+
         result = sync_reply_to_runstate("dr-001", reply, runstate)
-        
+
         assert result["current_phase"] == "planning"
 
 
 class TestReconcileDecisionSources:
     def test_reconcile_with_no_decisions(self, temp_dir):
         result = reconcile_decision_sources(temp_dir)
-        
+
         assert result["pending_count"] == 0
         assert result["resolved_count"] == 0
-        assert result["has_discrepancies"] == False
+        assert not result["has_discrepancies"]
 
     def test_reconcile_with_pending_email_request(self, temp_dir):
         store = DecisionRequestStore(temp_dir)
@@ -143,9 +142,9 @@ class TestReconcileDecisionSources:
             delivery_channel=DeliveryChannel.MOCK_FILE,
         )
         store.mark_sent(request["decision_request_id"])
-        
+
         result = reconcile_decision_sources(temp_dir)
-        
+
         assert result["pending_count"] == 1
         assert len(result["pending_email_decisions"]) == 1
 
@@ -168,7 +167,7 @@ class TestGetPendingDecisionCount:
             delivery_channel=DeliveryChannel.MOCK_FILE,
         )
         store.mark_sent(request["decision_request_id"])
-        
+
         count = get_pending_decision_count(temp_dir)
         assert count == 1
 
@@ -176,7 +175,7 @@ class TestGetPendingDecisionCount:
 class TestGetDecisionStatusSummary:
     def test_summary_with_no_decisions(self, temp_dir):
         summary = get_decision_status_summary(temp_dir)
-        
+
         assert summary["total_pending"] == 0
         assert summary["total_resolved"] == 0
-        assert summary["has_discrepancies"] == False
+        assert not summary["has_discrepancies"]

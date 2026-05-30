@@ -1,11 +1,12 @@
-import typer
-from rich.console import Console
-from rich.panel import Panel
 from datetime import datetime
 from pathlib import Path
 
-from runtime.project_link_loader import load_project_link, is_mode_b, get_product_repo_path
+import typer
+from rich.console import Console
+from rich.panel import Panel
+
 from runtime.artifact_router import route_new_feature
+from runtime.project_link_loader import load_project_link
 
 app = typer.Typer(help="Create new feature")
 console = Console()
@@ -19,10 +20,10 @@ def create(
     goal: str = typer.Option("", help="Feature goal"),
     path: str = typer.Option("projects", help="Root directory for projects"),
 ):
-    from pathlib import Path
+    import yaml
+
     from runtime.adapters.filesystem_adapter import FilesystemAdapter
     from runtime.state_store import StateStore
-    import yaml
 
     fs = FilesystemAdapter()
     root = Path(path)
@@ -36,10 +37,10 @@ def create(
     console.print(Panel(f"Create Feature: {name}", border_style="green"))
 
     context = load_project_link(product_dir)
-    
+
     if context and context.ownership_mode.value == "managed_external":
         spec_path, feature_dir = route_new_feature(product_dir, feature_id)
-        console.print(f"[cyan]Mode B: Routing FeatureSpec to product repo[/cyan]")
+        console.print("[cyan]Mode B: Routing FeatureSpec to product repo[/cyan]")
     else:
         feature_dir = product_dir / "docs" / "features" / feature_id
         spec_path = feature_dir / "feature-spec.md"
@@ -93,9 +94,9 @@ def create(
     console.print(f"[green]Updated:[/green] {product_dir}/runstate.md")
 
     console.print("\n[green]Feature created successfully![/green]")
-    console.print(f"RunState phase: planning")
+    console.print("RunState phase: planning")
     console.print(f"FeatureSpec: {spec_file}")
-    console.print(f"Next: asyncdev plan-day to create ExecutionPack")
+    console.print("Next: asyncdev plan-day to create ExecutionPack")
 
 
 @app.command()
@@ -104,14 +105,13 @@ def list(
     path: str = typer.Option("projects", help="Root directory for projects"),
 ):
     """List all features for a product."""
-    from pathlib import Path
     import yaml
 
     root = Path(path)
     product_dir = root / product_id
-    
+
     features_dir = product_dir / "docs" / "features"
-    
+
     if not features_dir.exists():
         features_dir = product_dir / "features"
 
@@ -131,18 +131,18 @@ def list(
         spec_path = f / "feature-spec.md"
         if not spec_path.exists():
             spec_path = f / "feature-spec.yaml"
-        
+
         if spec_path.exists():
             content = spec_path.read_text(encoding="utf-8")
-            
+
             yaml_start = content.find("```yaml")
             yaml_end = content.find("```", yaml_start + 7) if yaml_start != -1 else -1
-            
+
             if yaml_start != -1 and yaml_end != -1:
                 spec = yaml.safe_load(content[yaml_start + 7:yaml_end])
             else:
                 spec = yaml.safe_load(content)
-            
+
             console.print(f"[bold]{f.name}[/bold]: {spec.get('name', 'N/A')}")
             console.print(f"  Goal: {spec.get('goal', 'N/A')[:50]}...")
         else:

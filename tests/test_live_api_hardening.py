@@ -1,19 +1,18 @@
 """Tests for Live API hardening - failure classification and retry logic."""
 
-import pytest
-from pathlib import Path
-import tempfile
 import shutil
+import tempfile
+from pathlib import Path
 
+import pytest
+
+from runtime.adapters.llm_adapter import BailianLLMAdapter, MockLLMAdapter
 from runtime.api_failure_types import (
     APIFailureClassification,
-    is_retryable,
-    get_recovery_hint,
     classify_api_error,
-    RETRYABLE_FAILURES,
-    NO_RETRY_FAILURES,
+    get_recovery_hint,
+    is_retryable,
 )
-from runtime.adapters.llm_adapter import BailianLLMAdapter, MockLLMAdapter
 from runtime.engines.live_api_engine import LiveAPIEngine
 
 

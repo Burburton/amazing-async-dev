@@ -11,9 +11,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from runtime.execution_observer import (
-    ExecutionObserver,
-    ObserverFindingType,
     FindingSeverity,
+    ObserverFindingType,
     run_observer,
 )
 
@@ -28,7 +27,7 @@ def run(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Run execution observation on project(s).
-    
+
     Detects:
     - Stalled executions
     - Timeout issues
@@ -38,9 +37,9 @@ def run(
     - Decision overdue
     """
     console.print(Panel("Execution Observer", title="observer run", border_style="cyan"))
-    
+
     projects_to_observe = []
-    
+
     if project:
         project_path = path / project
         if not project_path.exists():
@@ -52,35 +51,35 @@ def run(
     else:
         if path.exists():
             projects_to_observe = [p for p in path.iterdir() if p.is_dir() and not p.name.startswith(".")]
-    
+
     if not projects_to_observe:
         console.print("[yellow]No projects found to observe[/yellow]")
         return
-    
+
     total_findings = 0
     critical_count = 0
     high_count = 0
-    
+
     for project_path in projects_to_observe:
         result = run_observer(project_path)
-        
+
         console.print(f"\n[bold]{project_path.name}[/bold]")
         console.print(f"  Findings: {len(result.findings)}")
-        
+
         if result.has_critical_findings():
-            console.print(f"  [red]CRITICAL findings detected[/red]")
+            console.print("  [red]CRITICAL findings detected[/red]")
             critical_count += 1
-        
+
         if result.findings:
             total_findings += len(result.findings)
             high_count += sum(1 for f in result.findings if f.severity == FindingSeverity.HIGH)
-            
+
             table = Table(show_header=True, header_style="bold")
             table.add_column("Type", style="cyan")
             table.add_column("Severity", style="yellow")
             table.add_column("Reason")
             table.add_column("Action")
-            
+
             for finding in result.findings:
                 severity_style = {
                     FindingSeverity.CRITICAL: "red",
@@ -89,37 +88,37 @@ def run(
                     FindingSeverity.LOW: "dim",
                     FindingSeverity.INFO: "dim",
                 }.get(finding.severity, "")
-                
+
                 table.add_row(
                     finding.finding_type.value,
                     f"[{severity_style}]{finding.severity.value}[/{severity_style}]",
                     finding.reason[:50] + "..." if len(finding.reason) > 50 else finding.reason,
                     finding.suggested_action[:40] + "..." if len(finding.suggested_action) > 40 else finding.suggested_action,
                 )
-            
+
             console.print(table)
-    
-    console.print(f"\n[bold]Summary[/bold]")
+
+    console.print("\n[bold]Summary[/bold]")
     console.print(f"  Projects observed: {len(projects_to_observe)}")
     console.print(f"  Total findings: {total_findings}")
     console.print(f"  Projects with critical: {critical_count}")
     console.print(f"  Projects with high: {high_count}")
-    
+
     if total_findings > 0:
-        console.print(f"\n[yellow]Recommended: Use 'asyncdev recovery list' to see recovery actions[/yellow]")
-        
+        console.print("\n[yellow]Recommended: Use 'asyncdev recovery list' to see recovery actions[/yellow]")
+
         from runtime.cross_surface_links import (
-            get_observer_to_recovery_link,
-            get_observer_to_decision_link,
             format_cross_link,
+            get_observer_to_decision_link,
+            get_observer_to_recovery_link,
         )
         from runtime.state_store import StateStore
-        
+
         for project_path in projects_to_observe:
             project_findings = run_observer(project_path)
             recovery_links = []
             decision_links = []
-            
+
             for f in project_findings.findings:
                 if f.recovery_significant:
                     link = get_observer_to_recovery_link(
@@ -129,7 +128,7 @@ def run(
                     )
                     if link:
                         recovery_links.append(link)
-                
+
                 if f.finding_type.value == "DECISION_OVERDUE":
                     store = StateStore(project_path)
                     runstate = store.load_runstate()
@@ -143,7 +142,7 @@ def run(
                         )
                         if link:
                             decision_links.append(link)
-            
+
             if recovery_links or decision_links:
                 console.print(f"\n[bold magenta]Cross-Surface Links ({project_path.name}):[/bold magenta]")
                 all_links = recovery_links + decision_links
@@ -158,7 +157,7 @@ def status(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Show observer status for a project.
-    
+
     Quick check without full observation run.
     """
     if project:
@@ -169,13 +168,13 @@ def status(
             console.print("[yellow]No projects found[/yellow]")
             return
         project_path = projects[0]
-    
+
     if not project_path.exists():
-        console.print(f"[red]Project not found[/red]")
+        console.print("[red]Project not found[/red]")
         raise typer.Exit(1)
-    
+
     result = run_observer(project_path)
-    
+
     console.print(Panel(
         f"Project: {project_path.name}\n"
         f"Findings: {len(result.findings)}\n"
@@ -191,11 +190,11 @@ def status(
 def types():
     """List all observer finding types."""
     console.print(Panel("Observer Finding Types", title="observer types", border_style="cyan"))
-    
+
     table = Table(show_header=True, header_style="bold")
     table.add_column("Finding Type")
     table.add_column("Description")
-    
+
     type_descriptions = {
         ObserverFindingType.RUN_TIMEOUT: "Execution exceeded maximum duration",
         ObserverFindingType.VERIFICATION_STALL: "Verification not progressing or overdue",
@@ -206,10 +205,10 @@ def types():
         ObserverFindingType.BLOCKED_STATE: "Execution blocked by external issue",
         ObserverFindingType.STALLED_EXECUTION: "No progress for threshold duration",
     }
-    
+
     for finding_type, description in type_descriptions.items():
         table.add_row(finding_type.value, description)
-    
+
     console.print(table)
 
 
@@ -217,11 +216,11 @@ def types():
 def severities():
     """List all finding severity levels."""
     console.print(Panel("Finding Severities", title="observer severities", border_style="cyan"))
-    
+
     table = Table(show_header=True, header_style="bold")
     table.add_column("Severity")
     table.add_column("Style")
-    
+
     for severity in FindingSeverity:
         style = {
             FindingSeverity.CRITICAL: "red bold",
@@ -230,7 +229,7 @@ def severities():
             FindingSeverity.LOW: "dim",
             FindingSeverity.INFO: "dim",
         }.get(severity, "")
-        
+
         table.add_row(f"[{style}]{severity.value}[/{style}]", style)
-    
+
     console.print(table)

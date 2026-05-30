@@ -4,15 +4,13 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-import pytest
-
 from runtime.operator_home_adapter import (
+    AcceptanceQueueItem,
     ActiveRunItem,
     AttentionItem,
-    AcceptanceQueueItem,
     ObserverHighlight,
-    QuickLink,
     OperatorHomeOverview,
+    QuickLink,
     build_operator_home_overview,
 )
 from runtime.state_store import StateStore
@@ -25,11 +23,11 @@ class TestOperatorHomeOverview:
             healthy_count=2,
             blocked_count=1,
         )
-        
+
         assert overview.total_projects == 3
         assert overview.healthy_count == 2
         assert overview.blocked_count == 1
-    
+
     def test_overview_to_dict(self):
         overview = OperatorHomeOverview(
             total_projects=5,
@@ -42,12 +40,12 @@ class TestOperatorHomeOverview:
                 destination="recovery",
             )],
         )
-        
+
         data = overview.to_dict()
-        
+
         assert data["total_projects"] == 5
         assert len(data["attention_items"]) == 1
-    
+
     def test_is_calm(self):
         calm = OperatorHomeOverview(attention_items=[], blocked_items=[], blocked_count=0)
         active = OperatorHomeOverview(
@@ -61,10 +59,10 @@ class TestOperatorHomeOverview:
             )],
             blocked_count=1,
         )
-        
+
         assert calm.is_calm() is True
         assert active.is_calm() is False
-    
+
     def test_has_critical(self):
         critical = OperatorHomeOverview(
             attention_items=[AttentionItem(
@@ -86,7 +84,7 @@ class TestOperatorHomeOverview:
                 destination="recovery",
             )],
         )
-        
+
         assert critical.has_critical() is True
         assert normal.has_critical() is False
 
@@ -102,10 +100,10 @@ class TestActiveRunItem:
             health_summary="healthy",
             detail_path="asyncdev evidence summary",
         )
-        
+
         assert item.project_id == "test-project"
         assert item.health_summary == "healthy"
-    
+
     def test_item_to_dict(self):
         item = ActiveRunItem(
             project_id="test",
@@ -116,9 +114,9 @@ class TestActiveRunItem:
             health_summary="healthy",
             detail_path="cmd",
         )
-        
+
         data = item.to_dict()
-        
+
         assert data["project_id"] == "test"
         assert data["phase"] == "planning"
 
@@ -133,7 +131,7 @@ class TestAttentionItem:
             suggested_action="asyncdev recovery list",
             destination="recovery show",
         )
-        
+
         assert item.category == "recovery"
         assert item.severity == "high"
 
@@ -149,7 +147,7 @@ class TestAcceptanceQueueItem:
             attempt_count=2,
             destination="acceptance status",
         )
-        
+
         assert item.completion_blocked is True
         assert item.attempt_count == 2
 
@@ -164,7 +162,7 @@ class TestObserverHighlight:
             project_id="test",
             destination="observer",
         )
-        
+
         assert item.finding_type == "blocked_state"
         assert item.severity == "high"
 
@@ -176,7 +174,7 @@ class TestQuickLink:
             command="asyncdev recovery list",
             description="View executions needing recovery",
         )
-        
+
         assert link.label == "Recovery Console"
         assert link.command == "asyncdev recovery list"
 
@@ -186,29 +184,29 @@ class TestBuildOperatorHomeOverview:
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_path = Path(tmpdir) / "projects"
             projects_path.mkdir()
-            
+
             overview = build_operator_home_overview(projects_path)
-            
+
             assert overview.total_projects == 0
             assert overview.is_calm() is True
-    
+
     def test_single_project_no_runstate(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_path = Path(tmpdir) / "projects"
             project_dir = projects_path / "test-project"
             project_dir.mkdir(parents=True)
-            
+
             overview = build_operator_home_overview(projects_path)
-            
+
             assert overview.total_projects == 1
             assert len(overview.active_runs) == 0
-    
+
     def test_single_project_with_runstate(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_path = Path(tmpdir) / "projects"
             project_dir = projects_path / "test-project"
             project_dir.mkdir(parents=True)
-            
+
             store = StateStore(project_dir)
             store.save_runstate({
                 "project_id": "test-project",
@@ -216,20 +214,20 @@ class TestBuildOperatorHomeOverview:
                 "current_phase": "executing",
                 "updated_at": datetime.now().isoformat(),
             })
-            
+
             overview = build_operator_home_overview(projects_path)
-            
+
             assert overview.total_projects == 1
             assert len(overview.active_runs) == 1
             assert overview.active_runs[0].feature_id == "001-test"
-    
+
     def test_quick_links_populated(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_path = Path(tmpdir) / "projects"
             projects_path.mkdir()
-            
+
             overview = build_operator_home_overview(projects_path)
-            
+
             assert len(overview.quick_links) == 5
             assert overview.quick_links[0].label == "Recovery Console"
 
@@ -238,11 +236,11 @@ class TestHomeIntegration:
     def test_aggregates_from_multiple_projects(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_path = Path(tmpdir) / "projects"
-            
+
             for i in range(3):
                 project_dir = projects_path / f"project-{i}"
                 project_dir.mkdir(parents=True)
-                
+
                 store = StateStore(project_dir)
                 store.save_runstate({
                     "project_id": f"project-{i}",
@@ -250,8 +248,8 @@ class TestHomeIntegration:
                     "current_phase": "planning",
                     "updated_at": datetime.now().isoformat(),
                 })
-            
+
             overview = build_operator_home_overview(projects_path)
-            
+
             assert overview.total_projects == 3
             assert len(overview.active_runs) == 3

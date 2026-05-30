@@ -1,12 +1,10 @@
 """Tests for asyncdev new-feature command."""
 
-import pytest
-from pathlib import Path
 import yaml
 from typer.testing import CliRunner
+
 from cli.commands.new_feature import app
 from cli.commands.new_product import app as product_app
-
 
 runner = CliRunner()
 
@@ -45,7 +43,7 @@ class TestNewFeatureCreate:
             "--path", str(temp_dir),
         ])
 
-        result = runner.invoke(app, [
+        runner.invoke(app, [
             "create",
             "--product-id", "test-product",
             "--feature-id", "001-test",
@@ -60,10 +58,10 @@ class TestNewFeatureCreate:
         content = spec_path.read_text(encoding="utf-8")
         yaml_start = content.find("```yaml")
         yaml_end = content.find("```", yaml_start + 7)
-        
+
         assert yaml_start != -1
         assert yaml_end != -1
-        
+
         yaml_content = content[yaml_start + 7:yaml_end]
         spec = yaml.safe_load(yaml_content)
 

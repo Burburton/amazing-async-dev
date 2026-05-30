@@ -2,14 +2,16 @@
 
 """Tests for workspace doctor functionality (Feature 029)."""
 
-from pathlib import Path
-import pytest
 import yaml
 from typer.testing import CliRunner
 
-from runtime.workspace_doctor import DoctorDiagnosis, diagnose_workspace, format_diagnosis_markdown, format_diagnosis_yaml
 from cli.asyncdev import app as asyncdev_app
-
+from runtime.workspace_doctor import (
+    DoctorDiagnosis,
+    diagnose_workspace,
+    format_diagnosis_markdown,
+    format_diagnosis_yaml,
+)
 
 runner = CliRunner()
 
@@ -18,7 +20,7 @@ class TestDoctorDiagnosisDataclass:
     def test_default_values(self):
         """DoctorDiagnosis should have sensible defaults."""
         diagnosis = DoctorDiagnosis()
-        
+
         assert diagnosis.doctor_status == "UNKNOWN"
         assert diagnosis.health_status == "unknown"
         assert diagnosis.initialization_mode == "unknown"
@@ -47,7 +49,7 @@ class TestDoctorDiagnosisDataclass:
             suggested_command="asyncdev plan-day create",
             rationale="Workspace is in planning phase"
         )
-        
+
         assert diagnosis.doctor_status == "HEALTHY"
         assert diagnosis.product_id == "my-app"
         assert diagnosis.recommended_action == "Plan a task"
@@ -58,9 +60,9 @@ class TestDiagnoseWorkspace:
         """Empty project should return UNKNOWN status."""
         empty_project = tmp_path / "empty-project"
         empty_project.mkdir()
-        
+
         diagnosis = diagnose_workspace(empty_project)
-        
+
         assert diagnosis.doctor_status == "UNKNOWN"
         assert diagnosis.recommended_action != ""
         assert "init" in diagnosis.suggested_command.lower()
@@ -68,9 +70,9 @@ class TestDiagnoseWorkspace:
     def test_missing_project_returns_unknown(self, tmp_path):
         """Missing project path should return UNKNOWN."""
         missing = tmp_path / "nonexistent"
-        
+
         diagnosis = diagnose_workspace(missing)
-        
+
         assert diagnosis.doctor_status == "UNKNOWN"
         assert diagnosis.workspace_path == str(missing)
 
@@ -78,7 +80,7 @@ class TestDiagnoseWorkspace:
         """Pending decisions should return BLOCKED status."""
         project = tmp_path / "blocked-project"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: blocked-test
@@ -102,14 +104,14 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: blocked-test
 name: Blocked Test
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "BLOCKED"
         assert diagnosis.pending_decisions == 1
         assert "resume" in diagnosis.suggested_command.lower()
@@ -119,7 +121,7 @@ name: Blocked Test
         """Blocked phase should return BLOCKED status."""
         project = tmp_path / "blocked-phase-project"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: blocked-phase-test
@@ -141,14 +143,14 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: blocked-phase-test
 name: Blocked Phase Test
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "BLOCKED"
         assert diagnosis.blocked_items_count >= 1
         assert "unblock" in diagnosis.suggested_command.lower()
@@ -157,10 +159,10 @@ name: Blocked Phase Test
         """Verification failure should return ATTENTION_NEEDED."""
         project = tmp_path / "verify-failed-project"
         project.mkdir()
-        
+
         results_dir = project / "execution-results"
         results_dir.mkdir()
-        
+
         result_content = """---
 ```yaml
 execution_id: exec-failed
@@ -172,7 +174,7 @@ issues_found:
 ---
 """
         (results_dir / "exec-001.md").write_text(result_content)
-        
+
         runstate_content = """---
 ```yaml
 project_id: verify-failed
@@ -189,14 +191,14 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: verify-failed
 name: Verify Failed Test
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "ATTENTION_NEEDED"
         assert diagnosis.verification_status == "failed"
 
@@ -204,7 +206,7 @@ name: Verify Failed Test
         """No active feature should return ATTENTION_NEEDED."""
         project = tmp_path / "no-feature-project"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: no-feature
@@ -221,14 +223,14 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: no-feature
 name: No Feature Test
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "ATTENTION_NEEDED"
         assert "feature" in diagnosis.recommended_action.lower()
 
@@ -236,7 +238,7 @@ name: No Feature Test
         """Completed feature should return COMPLETED_PENDING_CLOSEOUT."""
         project = tmp_path / "completed-project"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: completed-test
@@ -254,14 +256,14 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: completed-test
 name: Completed Test
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT"
         assert "archive" in diagnosis.suggested_command.lower()
 
@@ -269,7 +271,7 @@ name: Completed Test
         """Archived feature should return COMPLETED_PENDING_CLOSEOUT."""
         project = tmp_path / "archived-project"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: archived-test
@@ -287,21 +289,21 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: archived-test
 name: Archived Test
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT"
 
     def test_healthy_planning_returns_healthy(self, tmp_path):
         """Planning phase with no issues should return HEALTHY."""
         project = tmp_path / "healthy-planning"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: healthy-planning
@@ -319,14 +321,14 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: healthy-planning
 name: Healthy Planning Test
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "HEALTHY"
         assert "plan" in diagnosis.suggested_command.lower()
 
@@ -334,10 +336,10 @@ name: Healthy Planning Test
         """Executing phase should return HEALTHY."""
         project = tmp_path / "healthy-executing"
         project.mkdir()
-        
+
         results_dir = project / "execution-results"
         results_dir.mkdir()
-        
+
         result_content = """---
 ```yaml
 execution_id: exec-001
@@ -348,7 +350,7 @@ completed_items:
 ---
 """
         (results_dir / "exec-001.md").write_text(result_content)
-        
+
         runstate_content = """---
 ```yaml
 project_id: healthy-executing
@@ -366,14 +368,14 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: healthy-executing
 name: Healthy Executing Test
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "HEALTHY"
         assert diagnosis.verification_status == "success"
 
@@ -381,10 +383,10 @@ name: Healthy Executing Test
         """Reviewing phase should return HEALTHY."""
         project = tmp_path / "healthy-reviewing"
         project.mkdir()
-        
+
         reviews_dir = project / "reviews"
         reviews_dir.mkdir()
-        
+
         review_content = """---
 ```yaml
 review_id: review-001
@@ -393,7 +395,7 @@ status: pending_review
 ---
 """
         (reviews_dir / "2026-04-12-review.md").write_text(review_content)
-        
+
         runstate_content = """---
 ```yaml
 project_id: healthy-reviewing
@@ -411,21 +413,21 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: healthy-reviewing
 name: Healthy Reviewing Test
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "HEALTHY"
 
     def test_starter_pack_healthy_returns_healthy(self, tmp_path):
         """Starter-pack mode healthy should return HEALTHY with provider linkage."""
         project = tmp_path / "starter-pack-healthy"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: starter-healthy
@@ -446,7 +448,7 @@ workflow_hints:
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: starter-healthy
 name: Starter Pack Healthy Test
 starter_pack_context:
@@ -455,22 +457,22 @@ starter_pack_context:
   - 'Team mode: solo'
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "HEALTHY"
         assert diagnosis.initialization_mode == "starter-pack"
-        assert diagnosis.provider_linkage.get("detected") == True
+        assert diagnosis.provider_linkage.get("detected")
         assert diagnosis.provider_linkage.get("product_type") == "ai_tooling"
 
     def test_starter_pack_verify_failed_mentions_provider(self, tmp_path):
         """Starter-pack verification failed should mention provider issue."""
         project = tmp_path / "starter-pack-verify-failed"
         project.mkdir()
-        
+
         results_dir = project / "execution-results"
         results_dir.mkdir()
-        
+
         result_content = """---
 ```yaml
 execution_id: exec-failed
@@ -482,7 +484,7 @@ issues_found:
 ---
 """
         (results_dir / "exec-001.md").write_text(result_content)
-        
+
         runstate_content = """---
 ```yaml
 project_id: starter-verify-failed
@@ -499,16 +501,16 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """
         (project / "runstate.md").write_text(runstate_content)
-        
+
         brief_content = """product_id: starter-verify-failed
 name: Starter Pack Verify Failed Test
 starter_pack_context:
   - 'Product type: web_app'
 """
         (project / "product-brief.yaml").write_text(brief_content)
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "ATTENTION_NEEDED"
         assert diagnosis.initialization_mode == "starter-pack"
         assert "starter-pack" in diagnosis.suggested_command.lower() or "compatibility" in diagnosis.rationale.lower()
@@ -527,9 +529,9 @@ class TestFormatDiagnosis:
             suggested_command="asyncdev plan-day create",
             rationale="Workspace is healthy"
         )
-        
+
         output = format_diagnosis_markdown(diagnosis)
-        
+
         assert "HEALTHY" in output
         assert "my-app" in output
         assert "feature-001" in output
@@ -547,9 +549,9 @@ class TestFormatDiagnosis:
             suggested_command="asyncdev resume",
             rationale="2 decisions pending"
         )
-        
+
         output = format_diagnosis_yaml(diagnosis)
-        
+
         assert "doctor_status: BLOCKED" in output
         assert "product_id: blocked-app" in output
         assert "pending_decisions: 2" in output
@@ -560,9 +562,9 @@ class TestFormatDiagnosis:
             doctor_status="BLOCKED",
             warnings=["Do not proceed", "Contact admin"]
         )
-        
+
         output = format_diagnosis_markdown(diagnosis)
-        
+
         assert "Do not proceed" in output
         assert "Contact admin" in output
 
@@ -572,9 +574,9 @@ class TestFormatDiagnosis:
             doctor_status="HEALTHY",
             product_id="test-app"
         )
-        
+
         output = format_diagnosis_yaml(diagnosis)
-        
+
         parsed = yaml.safe_load(output)
         assert parsed["doctor_status"] == "HEALTHY"
         assert parsed["execution_state"]["product_id"] == "test-app"
@@ -584,21 +586,21 @@ class TestDoctorCLI:
     def test_doctor_help_works(self):
         """Doctor command help should work."""
         result = runner.invoke(asyncdev_app, ["doctor", "--help"])
-        
+
         assert result.exit_code == 0
         assert "diagnose" in result.output.lower() or "health" in result.output.lower()
 
     def test_doctor_show_empty_workspace(self):
         """Doctor show on empty workspace should return UNKNOWN."""
         result = runner.invoke(asyncdev_app, ["doctor", "show", "--path", "nonexistent"])
-        
+
         assert result.exit_code == 0
         assert "UNKNOWN" in result.output
 
     def test_doctor_yaml_format(self):
         """Doctor with --format yaml should output YAML."""
         result = runner.invoke(asyncdev_app, ["doctor", "show", "--format", "yaml", "--path", "nonexistent"])
-        
+
         assert result.exit_code == 0
         assert "doctor_status:" in result.output
 
@@ -608,7 +610,7 @@ class TestRecoveryPlaybooks:
         """BLOCKED + pending decision should include recovery hints."""
         project = tmp_path / "blocked-decision"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: blocked-decision
@@ -630,9 +632,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: blocked-decision\nname: Blocked Decision\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "BLOCKED"
         assert diagnosis.likely_cause != ""
         assert len(diagnosis.what_to_check) >= 1
@@ -644,7 +646,7 @@ updated_at: 2026-04-12T10:00:00Z
         """BLOCKED phase should include recovery hints."""
         project = tmp_path / "blocked-phase"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: blocked-phase
@@ -664,9 +666,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: blocked-phase\nname: Blocked Phase\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "BLOCKED"
         assert diagnosis.likely_cause != ""
         assert len(diagnosis.what_to_check) >= 1
@@ -678,7 +680,7 @@ updated_at: 2026-04-12T10:00:00Z
         """ATTENTION_NEEDED + verification not_run should include recovery hints."""
         project = tmp_path / "attention-not-run"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: attention-not-run
@@ -696,9 +698,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: attention-not-run\nname: Attention Not Run\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "ATTENTION_NEEDED"
         assert diagnosis.verification_status == "not_run"
         assert diagnosis.likely_cause != ""
@@ -711,7 +713,7 @@ updated_at: 2026-04-12T10:00:00Z
         """ATTENTION_NEEDED + verification failed should include recovery hints."""
         project = tmp_path / "attention-failed"
         project.mkdir()
-        
+
         (project / "execution-results").mkdir()
         (project / "execution-results" / "exec-001.md").write_text("""---
 ```yaml
@@ -723,7 +725,7 @@ issues_found:
 ```
 ---
 """)
-        
+
         runstate_content = """---
 ```yaml
 project_id: attention-failed
@@ -741,9 +743,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: attention-failed\nname: Attention Failed\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "ATTENTION_NEEDED"
         assert diagnosis.verification_status == "failed"
         assert diagnosis.likely_cause != ""
@@ -756,7 +758,7 @@ updated_at: 2026-04-12T10:00:00Z
         """COMPLETED_PENDING_CLOSEOUT should include recovery hints."""
         project = tmp_path / "completed-closeout"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: completed-closeout
@@ -775,9 +777,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: completed-closeout\nname: Completed Closeout\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT"
         assert diagnosis.likely_cause != ""
         assert len(diagnosis.what_to_check) >= 1
@@ -789,9 +791,9 @@ updated_at: 2026-04-12T10:00:00Z
         """UNKNOWN status should include recovery hints."""
         project = tmp_path / "unknown-state"
         project.mkdir()
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "UNKNOWN"
         assert diagnosis.likely_cause != ""
         assert len(diagnosis.what_to_check) >= 1
@@ -803,7 +805,7 @@ updated_at: 2026-04-12T10:00:00Z
         """HEALTHY status should NOT include recovery hints."""
         project = tmp_path / "healthy-no-hints"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: healthy-no-hints
@@ -822,9 +824,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: healthy-no-hints\nname: Healthy No Hints\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "HEALTHY"
         assert diagnosis.likely_cause == ""
         assert diagnosis.what_to_check == []
@@ -842,9 +844,9 @@ class TestRecoveryOutputIntegration:
             recovery_steps=["Inspect decision", "Resolve"],
             fallback_next_step="Check nightly pack"
         )
-        
+
         output = format_diagnosis_markdown(diagnosis)
-        
+
         assert "Recovery Hints" in output
         assert "Likely Cause" in output
         assert "What To Check" in output
@@ -861,9 +863,9 @@ class TestRecoveryOutputIntegration:
             recovery_steps=["Inspect failure", "Fix mismatch"],
             fallback_next_step="Check docs"
         )
-        
+
         output = format_diagnosis_yaml(diagnosis)
-        
+
         assert "likely_cause:" in output
         assert "what_to_check:" in output
         assert "recovery_steps:" in output
@@ -876,9 +878,9 @@ class TestRecoveryOutputIntegration:
             doctor_status="HEALTHY",
             product_id="healthy-app"
         )
-        
+
         output = format_diagnosis_yaml(diagnosis)
-        
+
         assert "likely_cause:" not in output
         assert "what_to_check:" not in output
         assert "recovery_steps:" not in output
@@ -889,7 +891,7 @@ class TestRecoveryBoundary:
         """Doctor should not modify any workspace state."""
         project = tmp_path / "boundary-no-mutate"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: boundary-no-mutate
@@ -907,11 +909,11 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: boundary-no-mutate\nname: Boundary\n")
-        
+
         original_mtime = (project / "runstate.md").stat().st_mtime
-        
+
         diagnose_workspace(project)
-        
+
         new_mtime = (project / "runstate.md").stat().st_mtime
         assert original_mtime == new_mtime
 
@@ -921,7 +923,7 @@ class TestFeedbackHandoff:
         """ATTENTION_NEEDED + verification failed should suggest feedback handoff."""
         project = tmp_path / "feedback-verify-failed"
         project.mkdir()
-        
+
         (project / "execution-results").mkdir()
         (project / "execution-results" / "exec-001.md").write_text("""---
 ```yaml
@@ -933,7 +935,7 @@ issues_found:
 ```
 ---
 """)
-        
+
         runstate_content = """---
 ```yaml
 project_id: feedback-verify-failed
@@ -951,9 +953,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: feedback-verify-failed\nname: Feedback Verify Failed\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "ATTENTION_NEEDED"
         assert diagnosis.verification_status == "failed"
         assert diagnosis.feedback_suggestion != ""
@@ -966,9 +968,9 @@ updated_at: 2026-04-12T10:00:00Z
         """UNKNOWN status should suggest feedback handoff."""
         project = tmp_path / "feedback-unknown"
         project.mkdir()
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "UNKNOWN"
         assert diagnosis.feedback_suggestion != ""
         assert diagnosis.feedback_reason != ""
@@ -980,7 +982,7 @@ updated_at: 2026-04-12T10:00:00Z
         """HEALTHY status should NOT suggest feedback handoff."""
         project = tmp_path / "feedback-healthy"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: feedback-healthy
@@ -999,9 +1001,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: feedback-healthy\nname: Feedback Healthy\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "HEALTHY"
         assert diagnosis.feedback_suggestion == ""
         assert diagnosis.feedback_reason == ""
@@ -1011,7 +1013,7 @@ updated_at: 2026-04-12T10:00:00Z
         """COMPLETED_PENDING_CLOSEOUT should NOT suggest feedback handoff."""
         project = tmp_path / "feedback-completed"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: feedback-completed
@@ -1030,9 +1032,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: feedback-completed\nname: Feedback Completed\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT"
         assert diagnosis.feedback_suggestion == ""
         assert diagnosis.feedback_reason == ""
@@ -1042,7 +1044,7 @@ updated_at: 2026-04-12T10:00:00Z
         """BLOCKED status should NOT suggest feedback handoff (one-off blocker)."""
         project = tmp_path / "feedback-blocked"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: feedback-blocked
@@ -1062,9 +1064,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: feedback-blocked\nname: Feedback Blocked\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "BLOCKED"
         assert diagnosis.feedback_suggestion == ""
         assert diagnosis.feedback_reason == ""
@@ -1074,7 +1076,7 @@ updated_at: 2026-04-12T10:00:00Z
         """ATTENTION_NEEDED + not_run should NOT suggest feedback handoff."""
         project = tmp_path / "feedback-not-run"
         project.mkdir()
-        
+
         runstate_content = """---
 ```yaml
 project_id: feedback-not-run
@@ -1092,9 +1094,9 @@ updated_at: 2026-04-12T10:00:00Z
 """
         (project / "runstate.md").write_text(runstate_content)
         (project / "product-brief.yaml").write_text("product_id: feedback-not-run\nname: Feedback Not Run\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "ATTENTION_NEEDED"
         assert diagnosis.verification_status == "not_run"
         assert diagnosis.feedback_suggestion == ""
@@ -1112,9 +1114,9 @@ class TestFeedbackHandoffOutput:
             feedback_reason="Verification failure often indicates systemic friction.",
             suggested_feedback_command="asyncdev feedback record --scope product --description 'Verification failure'"
         )
-        
+
         output = format_diagnosis_markdown(diagnosis)
-        
+
         assert "Feedback Suggestion" in output
         assert "This may be worth capturing" in output
         assert "**Why**" in output
@@ -1129,9 +1131,9 @@ class TestFeedbackHandoffOutput:
             feedback_reason="Unknown state often indicates missing artifacts.",
             suggested_feedback_command="asyncdev feedback record --scope system --description 'Unknown state'"
         )
-        
+
         output = format_diagnosis_yaml(diagnosis)
-        
+
         assert "feedback_suggestion:" in output
         assert "feedback_reason:" in output
         assert "suggested_feedback_command:" in output
@@ -1143,9 +1145,9 @@ class TestFeedbackHandoffOutput:
             doctor_status="HEALTHY",
             product_id="healthy-app"
         )
-        
+
         output = format_diagnosis_yaml(diagnosis)
-        
+
         assert "feedback_suggestion:" not in output
         assert "feedback_reason:" not in output
         assert "suggested_feedback_command:" not in output
@@ -1154,7 +1156,7 @@ class TestFeedbackHandoffOutput:
         """Doctor should not automatically create feedback records."""
         project = tmp_path / "feedback-no-auto-create"
         project.mkdir()
-        
+
         (project / "execution-results").mkdir()
         (project / "execution-results" / "exec-001.md").write_text("""---
 ```yaml
@@ -1164,7 +1166,7 @@ completed_items: []
 ```
 ---
 """)
-        
+
         (project / "runstate.md").write_text("""---
 ```yaml
 project_id: feedback-no-auto
@@ -1176,13 +1178,13 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """)
         (project / "product-brief.yaml").write_text("product_id: feedback-no-auto\nname: No Auto\n")
-        
+
         feedback_dir = project / "feedback"
         feedback_dir.mkdir()
         (feedback_dir / "existing.yaml").write_text("feedback_id: existing-001\n")
-        
+
         diagnose_workspace(project)
-        
+
         feedback_files = list(feedback_dir.glob("*.yaml"))
         assert len(feedback_files) == 1
         assert feedback_files[0].name == "existing.yaml"
@@ -1193,7 +1195,7 @@ class TestFeedbackDraft:
         """ATTENTION_NEEDED + verification failed should include draft summary."""
         project = tmp_path / "draft-verify-failed"
         project.mkdir()
-        
+
         (project / "execution-results").mkdir()
         (project / "execution-results" / "exec-001.md").write_text("""---
 ```yaml
@@ -1205,7 +1207,7 @@ issues_found:
 ```
 ---
 """)
-        
+
         (project / "runstate.md").write_text("""---
 ```yaml
 project_id: draft-verify-failed
@@ -1222,9 +1224,9 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """)
         (project / "product-brief.yaml").write_text("product_id: draft-verify-failed\nname: Draft Verify Failed\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "ATTENTION_NEEDED"
         assert diagnosis.verification_status == "failed"
         assert diagnosis.feedback_draft_summary != ""
@@ -1237,9 +1239,9 @@ updated_at: 2026-04-12T10:00:00Z
         """UNKNOWN status should include draft summary."""
         project = tmp_path / "draft-unknown"
         project.mkdir()
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "UNKNOWN"
         assert diagnosis.feedback_draft_summary != ""
         assert diagnosis.feedback_draft_fields != {}
@@ -1251,7 +1253,7 @@ updated_at: 2026-04-12T10:00:00Z
         """HEALTHY status should NOT include draft summary."""
         project = tmp_path / "draft-healthy"
         project.mkdir()
-        
+
         (project / "runstate.md").write_text("""---
 ```yaml
 project_id: draft-healthy
@@ -1269,9 +1271,9 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """)
         (project / "product-brief.yaml").write_text("product_id: draft-healthy\nname: Draft Healthy\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "HEALTHY"
         assert diagnosis.feedback_draft_summary == ""
         assert diagnosis.feedback_draft_fields == {}
@@ -1280,7 +1282,7 @@ updated_at: 2026-04-12T10:00:00Z
         """COMPLETED_PENDING_CLOSEOUT should NOT include draft summary."""
         project = tmp_path / "draft-completed"
         project.mkdir()
-        
+
         (project / "runstate.md").write_text("""---
 ```yaml
 project_id: draft-completed
@@ -1298,9 +1300,9 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """)
         (project / "product-brief.yaml").write_text("product_id: draft-completed\nname: Draft Completed\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "COMPLETED_PENDING_CLOSEOUT"
         assert diagnosis.feedback_draft_summary == ""
         assert diagnosis.feedback_draft_fields == {}
@@ -1309,7 +1311,7 @@ updated_at: 2026-04-12T10:00:00Z
         """BLOCKED status should NOT include draft summary."""
         project = tmp_path / "draft-blocked"
         project.mkdir()
-        
+
         (project / "runstate.md").write_text("""---
 ```yaml
 project_id: draft-blocked
@@ -1328,9 +1330,9 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """)
         (project / "product-brief.yaml").write_text("product_id: draft-blocked\nname: Draft Blocked\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         assert diagnosis.doctor_status == "BLOCKED"
         assert diagnosis.feedback_draft_summary == ""
         assert diagnosis.feedback_draft_fields == {}
@@ -1347,9 +1349,9 @@ class TestFeedbackDraftOutput:
             feedback_draft_summary="Verification failure in direct initialization - likely contract mismatch",
             suggested_feedback_command='asyncdev feedback record --scope product --project my-app --description "Verification failure in direct initialization" --tags verification,contract-mismatch'
         )
-        
+
         output = format_diagnosis_markdown(diagnosis)
-        
+
         assert "Feedback Suggestion" in output
         assert "Feedback Draft Summary" in output
         assert "Verification failure in direct initialization" in output
@@ -1371,9 +1373,9 @@ class TestFeedbackDraftOutput:
             },
             suggested_feedback_command='asyncdev feedback record --scope system --description "Unknown workspace state" --tags state-missing,artifact-corruption'
         )
-        
+
         output = format_diagnosis_yaml(diagnosis)
-        
+
         assert "feedback_draft_summary:" in output
         assert "feedback_draft_fields:" in output
         assert "suggested_tags:" in output
@@ -1385,9 +1387,9 @@ class TestFeedbackDraftOutput:
             doctor_status="HEALTHY",
             product_id="healthy-app"
         )
-        
+
         output = format_diagnosis_yaml(diagnosis)
-        
+
         assert "feedback_draft_summary:" not in output
         assert "feedback_draft_fields:" not in output
 
@@ -1407,7 +1409,7 @@ class TestFeedbackDraftOutput:
             },
             suggested_feedback_command='asyncdev feedback record --scope product --project test-app --description "Verification failure" --tags verification,contract-mismatch,tooling-friction'
         )
-        
+
         assert "--tags verification,contract-mismatch,tooling-friction" in diagnosis.suggested_feedback_command
         assert "--description" in diagnosis.suggested_feedback_command
         assert "--project test-app" in diagnosis.suggested_feedback_command
@@ -1416,7 +1418,7 @@ class TestFeedbackDraftOutput:
         """Draft fields should contain all expected keys."""
         project = tmp_path / "draft-keys-test"
         project.mkdir()
-        
+
         (project / "execution-results").mkdir()
         (project / "execution-results" / "exec-001.md").write_text("""---
 ```yaml
@@ -1436,11 +1438,11 @@ updated_at: 2026-04-12T10:00:00Z
 ---
 """)
         (project / "product-brief.yaml").write_text("product_id: draft-keys\nname: Draft Keys\n")
-        
+
         diagnosis = diagnose_workspace(project)
-        
+
         draft = diagnosis.feedback_draft_fields
-        
+
         assert draft.get("source") == "doctor"
         assert draft.get("doctor_status") == "ATTENTION_NEEDED"
         assert draft.get("verification_status") == "failed"

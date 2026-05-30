@@ -9,47 +9,47 @@ Design based on patterns from:
 - Ops Intelligence Agent dedupe patterns
 """
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any
-import hashlib
-import json
 
 
 class NotificationEventType(StrEnum):
     """Canonical notification event types for async-dev platform.
-    
+
     Based on Feature 080 spec Section 6.1 requirements.
     """
-    
+
     # Decision-related events
     MAJOR_DECISION_REQUIRED = "major_decision_required"
     BLOCKED_WAITING_FOR_HUMAN = "blocked_waiting_for_human"
     DECISION_RESOLVED = "decision_resolved"
-    
+
     # Escalation events
     CRITICAL_ESCALATION_REQUIRED = "critical_escalation_required"
     EXECUTION_FAILED = "execution_failed"
     VERIFICATION_FAILED = "verification_failed"
-    
+
     # Day-end events
     DAY_END_SUMMARY_READY = "day_end_summary_ready"
-    
+
     # Acceptance events
     ACCEPTANCE_READY = "acceptance_ready"
     ACCEPTANCE_BLOCKED = "acceptance_blocked"
-    
+
     # Session events
     SESSION_BLOCKED = "session_blocked"
 
 
 class NotificationSeverity(StrEnum):
     """Severity levels for notification prioritization.
-    
+
     Determines urgency, dedupe window, and routing behavior.
     """
-    
+
     CRITICAL = "critical"    # Always send, no dedupe window, multiple channels
     HIGH = "high"            # Send immediately, 1hr dedupe, email + optional channel
     MEDIUM = "medium"        # Policy-gated send, 4hr dedupe, email only
@@ -59,10 +59,10 @@ class NotificationSeverity(StrEnum):
 
 class NotificationStatus(StrEnum):
     """Delivery status tracking for notifications.
-    
+
     Lifecycle: pending → sent → delivered/failed/skipped.
     """
-    
+
     PENDING = "pending"          # Created, awaiting send
     SENT = "sent"                # Email sent via Resend/other
     DELIVERED = "delivered"      # Delivery confirmed via webhook
@@ -74,7 +74,7 @@ class NotificationStatus(StrEnum):
 
 class NotificationChannel(StrEnum):
     """Delivery channels for notifications."""
-    
+
     EMAIL = "email"
     CONSOLE = "console"
     MOCK_FILE = "mock_file"
@@ -114,7 +114,7 @@ EVENT_TYPE_DEDUPE_WINDOWS: dict[NotificationEventType, int] = {
 @dataclass
 class NotificationEvent:
     """Canonical notification event model for async-dev notifications."""
-    
+
     event_id: str
     event_type: NotificationEventType
     dedupe_key: str
@@ -141,7 +141,7 @@ class NotificationEvent:
     max_retries: int = 3
     related_artifacts: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-    
+
     def __post_init__(self):
         """Set defaults based on event type."""
         # Set severity from event type if not explicitly set
@@ -149,23 +149,23 @@ class NotificationEvent:
             self.severity = EVENT_TYPE_SEVERITY_MAP.get(
                 self.event_type, NotificationSeverity.MEDIUM
             )
-        
+
         # Set dedupe window from event type or severity
         if self.event_type in EVENT_TYPE_DEDUPE_WINDOWS:
             self.dedupe_window_seconds = EVENT_TYPE_DEDUPE_WINDOWS[self.event_type]
         elif self.severity in SEVERITY_DEDUPE_WINDOWS:
             self.dedupe_window_seconds = SEVERITY_DEDUPE_WINDOWS[self.severity]
-        
+
         # Set expires_at based on dedupe window
         if self.expires_at is None and self.dedupe_window_seconds > 0:
             self.expires_at = self.created_at + timedelta(
                 seconds=self.dedupe_window_seconds
             )
-        
+
         # Critical severity always requires email
         if self.severity == NotificationSeverity.CRITICAL:
             self.email_required = True
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict for JSON serialization."""
         return {
@@ -196,7 +196,7 @@ class NotificationEvent:
             "related_artifacts": self.related_artifacts,
             "metadata": self.metadata,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "NotificationEvent":
         """Create from dict loaded from JSON."""
@@ -206,15 +206,15 @@ class NotificationEvent:
             created_at = datetime.fromisoformat(created_at)
         else:
             created_at = datetime.now()
-        
+
         expires_at = data.get("expires_at")
         if expires_at:
             expires_at = datetime.fromisoformat(expires_at)
-        
+
         email_sent_at = data.get("email_sent_at")
         if email_sent_at:
             email_sent_at = datetime.fromisoformat(email_sent_at)
-        
+
         return cls(
             event_id=data["event_id"],
             event_type=NotificationEventType(data["event_type"]),
@@ -251,19 +251,19 @@ def generate_dedupe_key(
     scope: str | None = None,
 ) -> str:
     """Generate dedupe key for notification event.
-    
+
     Format: {event_type}:{scope}:{primary_id}
-    
+
     Examples:
     - major_decision_required:decision:dr-20260425-001
     - day_end_summary_ready:review:2026-04-25
     - blocked_waiting_for_human:blocker:blocker-001
-    
+
     Args:
         event_type: Notification event type
         primary_id: Primary identifier (request_id, date, execution_id, etc.)
         scope: Optional scope qualifier (decision, review, blocker, etc.)
-        
+
     Returns:
         Dedupe key string
     """
@@ -274,13 +274,13 @@ def generate_dedupe_key(
 
 def generate_content_hash(context: dict[str, Any]) -> str:
     """Generate content-based fingerprint for dedupe.
-    
+
     Used when dedupe should be based on content similarity
     rather than entity identity.
-    
+
     Args:
         context: Context dict to hash
-        
+
     Returns:
         16-character hash fingerprint
     """
@@ -292,27 +292,27 @@ def generate_event_id(
     notifications_path: str | None = None,
 ) -> str:
     """Generate unique notification event ID.
-    
+
     Format: notif-{YYYYMMDD}-{###}
-    
+
     Args:
         notifications_path: Path to notifications directory for counter
-        
+
     Returns:
         Unique event ID
     """
     from pathlib import Path
-    
+
     date_str = datetime.now().strftime("%Y%m%d")
     counter = 1
-    
+
     if notifications_path:
         path = Path(notifications_path)
         if path.exists():
             existing = list(path.glob(f"notif-{date_str}-*.json"))
             if existing:
                 counter = len(existing) + 1
-    
+
     return f"notif-{date_str}-{counter:03d}"
 
 
@@ -322,31 +322,31 @@ def should_send_notification(
     existing_pending: list[dict[str, Any]] | None = None,
 ) -> tuple[bool, str | None]:
     """Check if notification should be sent based on policy.
-    
+
     Policy rules:
     - Critical severity: Always send
     - High severity: Send unless similar pending
     - Medium/Low: Check policy mode and dedupe
-    
+
     Args:
         event: Notification event to check
         policy_mode: Policy mode (conservative/balanced/low_interruption)
         existing_pending: List of existing pending notifications
-        
+
     Returns:
         Tuple of (should_send, skip_reason)
     """
     # Critical always sends
     if event.severity == NotificationSeverity.CRITICAL:
         return True, None
-    
+
     # Check for existing pending with same dedupe key
     if existing_pending:
         for pending in existing_pending:
             if pending.get("dedupe_key") == event.dedupe_key:
                 if pending.get("delivery_status") in ["pending", "sent"]:
                     return False, f"Duplicate pending: {event.dedupe_key}"
-    
+
     # Policy mode filtering
     if policy_mode == "low_interruption":
         if event.severity in [NotificationSeverity.LOW, NotificationSeverity.INFORMATIONAL]:
@@ -358,12 +358,12 @@ def should_send_notification(
             blocked = context.get("blocked_items", [])
             if not decisions and not blocked:
                 return False, "Low interruption: day-end has no critical items"
-    
+
     elif policy_mode == "conservative":
         # Conservative sends everything except informational
         if event.severity == NotificationSeverity.INFORMATIONAL:
             return False, "Conservative mode: skipping informational"
-    
+
     # Default: send if email_required
     return event.email_required, None
 
@@ -380,7 +380,7 @@ def get_dedupe_window_for_event(
     severity: NotificationSeverity,
 ) -> int:
     """Get dedupe window in seconds for event.
-    
+
     Event type-specific windows override severity-based.
     """
     if event_type in EVENT_TYPE_DEDUPE_WINDOWS:
@@ -391,11 +391,11 @@ def get_dedupe_window_for_event(
 @dataclass
 class NotificationTriggerResult:
     """Result of notification trigger attempt.
-    
+
     Similar to TriggerResult from auto_email_trigger.py but
     for general notifications.
     """
-    
+
     triggered: bool
     event_id: str | None = None
     resend_message_id: str | None = None
@@ -405,7 +405,7 @@ class NotificationTriggerResult:
     severity: NotificationSeverity | None = None
     policy_mode_at_trigger: str = "balanced"
     triggered_at: datetime = field(default_factory=datetime.now)
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "triggered": self.triggered,

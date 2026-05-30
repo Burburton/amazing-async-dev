@@ -1,26 +1,27 @@
 """Tests for execution policy engine (Feature 020)."""
 
-import pytest
-from pathlib import Path
-import tempfile
 import shutil
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from runtime.execution_policy import (
-    PolicyMode,
+    DEFAULT_POLICY_MODE,
+    RISKY_ACTION_TYPES,
     ActionType,
-    should_auto_continue,
+    PolicyMode,
+    can_auto_proceed_after_execution,
     check_must_pause_conditions,
+    clear_risky_action,
     get_policy_mode,
+    is_risky_action,
+    register_risky_action,
     set_policy_mode,
     set_scope_change_flag,
-    register_risky_action,
-    clear_risky_action,
-    is_risky_action,
-    can_auto_proceed_after_execution,
-    RISKY_ACTION_TYPES,
-    DEFAULT_POLICY_MODE,
+    should_auto_continue,
 )
-from runtime.pause_reason import PauseReason, PauseCategory
+from runtime.pause_reason import PauseCategory, PauseReason
 
 
 class TestPolicyMode:
@@ -72,13 +73,13 @@ class TestScopeChangeFlag:
         """set_scope_change_flag should set true."""
         runstate = {}
         updated = set_scope_change_flag(runstate, True)
-        assert updated["scope_change_flag"] == True
+        assert updated["scope_change_flag"]
 
     def test_set_scope_change_flag_false(self):
         """set_scope_change_flag should set false."""
         runstate = {"scope_change_flag": True}
         updated = set_scope_change_flag(runstate, False)
-        assert updated["scope_change_flag"] == False
+        assert not updated["scope_change_flag"]
 
 
 class TestRiskyActions:
@@ -86,15 +87,15 @@ class TestRiskyActions:
 
     def test_is_risky_action_for_git_push(self):
         """git_push should be risky."""
-        assert is_risky_action(ActionType.GIT_PUSH) == True
+        assert is_risky_action(ActionType.GIT_PUSH)
 
     def test_is_risky_action_for_archive_irreversible(self):
         """archive_irreversible should be risky."""
-        assert is_risky_action(ActionType.ARCHIVE_IRREVERSIBLE) == True
+        assert is_risky_action(ActionType.ARCHIVE_IRREVERSIBLE)
 
     def test_is_risky_action_for_internal_artifact(self):
         """internal_artifact should not be risky."""
-        assert is_risky_action(ActionType.INTERNAL_ARTIFACT) == False
+        assert not is_risky_action(ActionType.INTERNAL_ARTIFACT)
 
     def test_register_risky_action(self):
         """register_risky_action should add to pending list."""
@@ -189,27 +190,27 @@ class TestShouldAutoContinue:
         """Conservative mode should auto-continue execution success."""
         runstate = {"policy_mode": "conservative"}
         result = should_auto_continue(runstate, "execution_success_to_review")
-        assert result == True
+        assert result
 
     def test_conservative_mode_other_transitions(self):
         """Conservative mode should not auto-continue other transitions."""
         runstate = {"policy_mode": "conservative"}
         result = should_auto_continue(runstate, "review_pack_generated")
-        assert result == False
+        assert not result
 
     def test_balanced_mode_safe_transitions(self):
         """Balanced mode should auto-continue safe transitions."""
         runstate = {"policy_mode": "balanced", "next_recommended_action": "Execute next task"}
         execution_result = {"status": "success"}
-        assert should_auto_continue(runstate, "execution_success_to_review", execution_result) == True
-        assert should_auto_continue(runstate, "review_pack_generated", execution_result) == True
-        assert should_auto_continue(runstate, "safe_state_advance") == True
+        assert should_auto_continue(runstate, "execution_success_to_review", execution_result)
+        assert should_auto_continue(runstate, "review_pack_generated", execution_result)
+        assert should_auto_continue(runstate, "safe_state_advance")
 
     def test_low_interruption_mode_more_transitions(self):
         """Low-interruption mode should auto-continue more transitions."""
         runstate = {"policy_mode": "low_interruption"}
-        assert should_auto_continue(runstate, "execution_success_to_review") == True
-        assert should_auto_continue(runstate, "routine_cli_commands") == True
+        assert should_auto_continue(runstate, "execution_success_to_review")
+        assert should_auto_continue(runstate, "routine_cli_commands")
 
     def test_blocked_items_override_policy(self):
         """Blocked items should override policy mode."""
@@ -218,7 +219,7 @@ class TestShouldAutoContinue:
             "blocked_items": [{"item": "test", "reason": "test", "since": "2024-01-01"}],
         }
         result = should_auto_continue(runstate, "execution_success_to_review")
-        assert result == False
+        assert not result
 
 
 class TestCanAutoProceedAfterExecution:
@@ -229,7 +230,7 @@ class TestCanAutoProceedAfterExecution:
         runstate = {"policy_mode": "balanced"}
         execution_result = {"status": "success"}
         can_proceed, pause_reason = can_auto_proceed_after_execution(runstate, execution_result)
-        assert can_proceed == True
+        assert can_proceed
         assert pause_reason is None
 
     def test_cannot_proceed_failed_execution(self):
@@ -237,7 +238,7 @@ class TestCanAutoProceedAfterExecution:
         runstate = {"policy_mode": "balanced"}
         execution_result = {"status": "failed"}
         can_proceed, pause_reason = can_auto_proceed_after_execution(runstate, execution_result)
-        assert can_proceed == False
+        assert not can_proceed
         assert pause_reason.category == PauseCategory.POLICY_BOUNDARY
 
     def test_cannot_proceed_with_blockers(self):
@@ -248,7 +249,7 @@ class TestCanAutoProceedAfterExecution:
         }
         execution_result = {"status": "success"}
         can_proceed, pause_reason = can_auto_proceed_after_execution(runstate, execution_result)
-        assert can_proceed == False
+        assert not can_proceed
         assert pause_reason.category == PauseCategory.BLOCKER
 
 
@@ -338,22 +339,24 @@ class TestPolicyCLI:
     def test_policy_show_default(self, temp_dir):
         """policy show should display current policy."""
         from typer.testing import CliRunner
+
         from cli.commands.policy import app
-        
+
         runner = CliRunner()
         result = runner.invoke(app, ["show", "--path", str(temp_dir)])
-        
+
         assert result.exit_code == 0
         assert "Policy Mode" in result.output
 
     def test_policy_modes(self):
         """policy modes should list available modes."""
         from typer.testing import CliRunner
+
         from cli.commands.policy import app
-        
+
         runner = CliRunner()
         result = runner.invoke(app, ["modes"])
-        
+
         assert result.exit_code == 0
         assert "conservative" in result.output
         assert "balanced" in result.output
@@ -362,18 +365,19 @@ class TestPolicyCLI:
     def test_policy_scope_flag_show(self, temp_dir):
         """policy scope-flag should show current flag."""
         from typer.testing import CliRunner
+
         from cli.commands.policy import app
         from runtime.state_store import StateStore
-        
+
         runner = CliRunner()
-        
+
         project_path = Path(temp_dir) / "demo-product-001"
         project_path.mkdir(parents=True)
         store = StateStore(project_path)
         store.save_runstate({"project_id": "demo-product-001", "scope_change_flag": False})
-        
+
         result = runner.invoke(app, ["scope-flag", "--path", str(temp_dir)])
-        
+
         assert result.exit_code == 0
         assert "scope_change_flag" in result.output.lower() or "False" in result.output
 

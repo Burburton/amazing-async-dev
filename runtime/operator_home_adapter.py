@@ -18,15 +18,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from runtime.evidence_rollup import ProjectEvidenceSummary, LatestTruthResolver
-from runtime.recovery_data_adapter import RecoveryDataAdapter, RecoveryItem
-from runtime.acceptance_recovery_adapter import AcceptanceRecoveryAdapter, AcceptanceRecoverySummary
-from runtime.execution_observer import run_observer, ObserverFinding
+from runtime.acceptance_recovery_adapter import AcceptanceRecoveryAdapter
+from runtime.recovery_data_adapter import RecoveryDataAdapter
 from runtime.state_store import StateStore
 from runtime.unified_blocking import (
-    get_unified_blocking_state,
     UnifiedBlockingState,
-    SessionBlockingState,
+    get_unified_blocking_state,
 )
 
 
@@ -40,7 +37,7 @@ class ActiveRunItem:
     last_updated: str
     health_summary: str
     detail_path: str
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "project_id": self.project_id,
@@ -62,7 +59,7 @@ class AttentionItem:
     reason: str
     suggested_action: str
     destination: str
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "category": self.category,
@@ -84,7 +81,7 @@ class AcceptanceQueueItem:
     completion_blocked: bool
     attempt_count: int
     destination: str
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "project_id": self.project_id,
@@ -106,7 +103,7 @@ class ObserverHighlight:
     recommended_action: str
     project_id: str
     destination: str
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "finding_type": self.finding_type,
@@ -124,7 +121,7 @@ class QuickLink:
     label: str
     command: str
     description: str
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "label": self.label,
@@ -136,7 +133,7 @@ class QuickLink:
 @dataclass
 class OperatorHomeOverview:
     """Complete operator home overview data model.
-    
+
     Per operator-home-platform-overview.md Section 9:
     - active_runs_summary
     - attention_items
@@ -145,24 +142,24 @@ class OperatorHomeOverview:
     - blocked_items
     - quick_links
     """
-    
+
     active_runs: list[ActiveRunItem] = field(default_factory=list)
     attention_items: list[AttentionItem] = field(default_factory=list)
     acceptance_queue: list[AcceptanceQueueItem] = field(default_factory=list)
     observer_highlights: list[ObserverHighlight] = field(default_factory=list)
     blocked_items: list[AttentionItem] = field(default_factory=list)
     quick_links: list[QuickLink] = field(default_factory=list)
-    
+
     total_projects: int = 0
     total_features: int = 0
     healthy_count: int = 0
     blocked_count: int = 0
     attention_count: int = 0
-    
+
     blocking_state: UnifiedBlockingState | None = None
-    
+
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    
+
     def to_dict(self) -> dict[str, Any]:
         result = {
             "active_runs": [r.to_dict() for r in self.active_runs],
@@ -170,7 +167,7 @@ class OperatorHomeOverview:
             "acceptance_queue": [a.to_dict() for a in self.acceptance_queue],
             "observer_highlights": [o.to_dict() for o in self.observer_highlights],
             "blocked_items": [b.to_dict() for b in self.blocked_items],
-            "quick_links": [l.to_dict() for l in self.quick_links],
+            "quick_links": [link.to_dict() for link in self.quick_links],
             "total_projects": self.total_projects,
             "total_features": self.total_features,
             "healthy_count": self.healthy_count,
@@ -181,7 +178,7 @@ class OperatorHomeOverview:
         if self.blocking_state:
             result["blocking_state"] = self.blocking_state.to_dict()
         return result
-    
+
     def is_calm(self) -> bool:
         """Check if platform is in calm state (nothing requiring attention)."""
         if self.blocking_state and not self.blocking_state.is_calm():
@@ -191,7 +188,7 @@ class OperatorHomeOverview:
             and len(self.blocked_items) == 0
             and self.blocked_count == 0
         )
-    
+
     def has_critical(self) -> bool:
         """Check if any critical severity items exist."""
         return any(
@@ -202,7 +199,7 @@ class OperatorHomeOverview:
 
 def build_operator_home_overview(projects_path: Path) -> OperatorHomeOverview:
     """Build complete operator home overview from all projects.
-    
+
     Aggregates from:
     - StateStore (active runs)
     - RecoveryDataAdapter (recovery-needed)
@@ -210,44 +207,44 @@ def build_operator_home_overview(projects_path: Path) -> OperatorHomeOverview:
     - execution_observer (observer findings)
     - ProjectEvidenceSummary (evidence rollup)
     """
-    
+
     overview = OperatorHomeOverview()
-    
+
     if not projects_path.exists():
         return overview
-    
+
     project_dirs = [
         p for p in projects_path.iterdir()
         if p.is_dir() and not p.name.startswith(".")
     ]
-    
+
     overview.total_projects = len(project_dirs)
-    
+
     overview.blocking_state = get_unified_blocking_state(projects_path)
-    
+
     all_attention_items = []
     all_acceptance_items = []
     all_observer_highlights = []
     all_blocked_items = []
-    
+
     for project_path in project_dirs:
         project_id = project_path.name
-        
+
         store = StateStore(project_path)
         runstate = store.load_runstate()
-        
+
         if runstate:
             feature_id = runstate.get("feature_id", "")
             phase = runstate.get("current_phase", "")
             updated_at = runstate.get("updated_at", "")
-            
+
             if feature_id and phase not in ["completed", "archived"]:
                 health = "healthy" if phase in ["planning", "reviewing"] else "active"
                 if runstate.get("acceptance_recovery_pending"):
                     health = "blocked"
                 elif runstate.get("blocked_items"):
                     health = "blocked"
-                
+
                 active_run = ActiveRunItem(
                     project_id=project_id,
                     feature_id=feature_id,
@@ -259,15 +256,15 @@ def build_operator_home_overview(projects_path: Path) -> OperatorHomeOverview:
                 )
                 overview.active_runs.append(active_run)
                 overview.total_features += 1
-                
+
                 if health == "healthy":
                     overview.healthy_count += 1
                 elif health == "blocked":
                     overview.blocked_count += 1
-        
+
         recovery_adapter = RecoveryDataAdapter(project_path)
         recovery_item = recovery_adapter.get_recovery_item_with_observer()
-        
+
         if recovery_item:
             if recovery_item.recovery_required:
                 attention_item = AttentionItem(
@@ -279,7 +276,7 @@ def build_operator_home_overview(projects_path: Path) -> OperatorHomeOverview:
                     destination=f"asyncdev recovery show --execution {recovery_item.execution_id}",
                 )
                 all_attention_items.append(attention_item)
-            
+
             for finding in recovery_item.observer_findings:
                 if finding.severity in ["high", "critical"]:
                     highlight = ObserverHighlight(
@@ -291,14 +288,14 @@ def build_operator_home_overview(projects_path: Path) -> OperatorHomeOverview:
                         destination=f"asyncdev observe-runs run --project {project_id}",
                     )
                     all_observer_highlights.append(highlight)
-        
+
         if runstate and runstate.get("feature_id"):
             acceptance_adapter = AcceptanceRecoveryAdapter(project_path)
             acceptance_summary = acceptance_adapter.get_acceptance_recovery_summary(
                 runstate.get("feature_id"),
                 runstate,
             )
-            
+
             if acceptance_summary:
                 if acceptance_summary.is_blocking_completion or acceptance_summary.needs_reacceptance:
                     accept_item = AcceptanceQueueItem(
@@ -311,7 +308,7 @@ def build_operator_home_overview(projects_path: Path) -> OperatorHomeOverview:
                         destination=f"asyncdev acceptance status --project {project_id}",
                     )
                     all_acceptance_items.append(accept_item)
-                    
+
                     if acceptance_summary.is_blocking_completion:
                         blocked_item = AttentionItem(
                             category="acceptance_blocked",
@@ -322,19 +319,19 @@ def build_operator_home_overview(projects_path: Path) -> OperatorHomeOverview:
                             destination=f"asyncdev acceptance result --project {project_id}",
                         )
                         all_blocked_items.append(blocked_item)
-    
+
     severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     all_attention_items.sort(key=lambda x: severity_order.get(x.severity, 99))
     all_observer_highlights.sort(key=lambda x: severity_order.get(x.severity, 99))
     all_blocked_items.sort(key=lambda x: severity_order.get(x.severity, 99))
-    
+
     overview.attention_items = all_attention_items[:10]
     overview.acceptance_queue = all_acceptance_items[:10]
     overview.observer_highlights = all_observer_highlights[:5]
     overview.blocked_items = all_blocked_items[:10]
-    
+
     overview.attention_count = len(all_attention_items)
-    
+
     overview.quick_links = [
         QuickLink(
             label="Recovery Console",
@@ -362,7 +359,7 @@ def build_operator_home_overview(projects_path: Path) -> OperatorHomeOverview:
             description="Answer canonical evidence questions",
         ),
     ]
-    
+
     return overview
 
 

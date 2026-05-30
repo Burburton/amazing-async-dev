@@ -6,7 +6,7 @@ from enum import Enum
 
 class PauseCategory(str, Enum):
     """Categories of workflow pause reasons."""
-    
+
     DECISION_REQUIRED = "decision_required"
     BLOCKER = "blocker"
     RISKY_ACTION = "risky_action"
@@ -51,7 +51,7 @@ PAUSE_CATEGORY_DISPLAY = {
 @dataclass
 class PauseReason:
     """Structured pause reason for workflow interruption.
-    
+
     Required fields per Feature 020 spec:
     - category: PauseCategory enum
     - summary: Short description
@@ -59,13 +59,13 @@ class PauseReason:
     - required_to_continue: What must happen before continuation
     - suggested_next_action: CLI command suggestion
     """
-    
+
     category: PauseCategory
     summary: str
     why: str
     required_to_continue: str
     suggested_next_action: str
-    
+
     def get_display_info(self) -> dict:
         """Get display information for this pause category."""
         return PAUSE_CATEGORY_DISPLAY.get(self.category, {
@@ -74,7 +74,7 @@ class PauseReason:
             "urgency": "unknown",
             "icon": "?",
         })
-    
+
     def format_for_cli(self) -> str:
         """Format pause reason for CLI display."""
         info = self.get_display_info()
@@ -86,7 +86,7 @@ class PauseReason:
             f"  Suggested: {self.suggested_next_action}",
         ]
         return "\n".join(lines)
-    
+
     def format_for_yaml(self) -> dict:
         """Format pause reason for YAML artifact."""
         return {
@@ -97,7 +97,7 @@ class PauseReason:
             "suggested_next_action": self.suggested_next_action,
             "display": self.get_display_info(),
         }
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
@@ -107,7 +107,7 @@ class PauseReason:
             "required_to_continue": self.required_to_continue,
             "suggested_next_action": self.suggested_next_action,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "PauseReason":
         """Create from dictionary."""
@@ -124,7 +124,7 @@ def format_pause_reasons_table(pause_reasons: list[PauseReason]) -> str:
     """Format multiple pause reasons as a table."""
     if not pause_reasons:
         return "No pause reasons"
-    
+
     lines = ["[bold]Workflow Paused[bold]", ""]
     for reason in pause_reasons:
         info = reason.get_display_info()
@@ -132,5 +132,5 @@ def format_pause_reasons_table(pause_reasons: list[PauseReason]) -> str:
         lines.append(f"  {reason.summary}")
         lines.append(f"  → {reason.suggested_next_action}")
         lines.append("")
-    
+
     return "\n".join(lines)

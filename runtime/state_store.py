@@ -3,7 +3,6 @@
 Includes blocking alert header generation (Feature 065).
 """
 
-import json
 import re
 from datetime import datetime
 from pathlib import Path
@@ -13,20 +12,19 @@ import yaml
 
 from runtime.adapters.filesystem_adapter import FilesystemAdapter
 
-
 BLOCKING_ALERT_TEMPLATE = """
 > **[!WARNING] BLOCKING ALERT**
-> 
+>
 > **Status**: {status}
 > **Request ID**: {request_id}
 > **Sent At**: {sent_at}
-> 
-> **MANDATORY**: 
+>
+> **MANDATORY**:
 > 1. **STOP all execution immediately**
 > 2. **DO NOT proceed with TODO tasks**
 > 3. Poll for decision reply: `asyncdev decision wait --request {request_id}`
 > 4. Or process reply manually: `asyncdev decision reply --request {request_id} --command "DECISION X"`
-> 
+>
 > **Reference**: AGENTS.md Section 3.5A - Decision Email Blocking Protocol
 """
 
@@ -35,21 +33,21 @@ def generate_blocking_alert(runstate: dict[str, Any]) -> str:
     current_phase = runstate.get("current_phase", "")
     request_id = runstate.get("decision_request_pending")
     sent_at = runstate.get("decision_request_sent_at", "")
-    
+
     if current_phase == "blocked" and request_id:
         return BLOCKING_ALERT_TEMPLATE.format(
             status="BLOCKED - Waiting for human decision reply",
             request_id=request_id,
             sent_at=sent_at[:19] if sent_at else "N/A",
         )
-    
+
     if request_id and current_phase != "blocked":
         return BLOCKING_ALERT_TEMPLATE.format(
             status="WAITING_DECISION - Decision request pending",
             request_id=request_id,
             sent_at=sent_at[:19] if sent_at else "N/A",
         )
-    
+
     return ""
 
 
@@ -95,9 +93,9 @@ class StateStore:
         self.fs.ensure_dir(self.reviews_path)
 
         yaml_content = yaml.dump(runstate, default_flow_style=False, sort_keys=False)
-        
+
         blocking_alert = generate_blocking_alert(runstate)
-        
+
         if blocking_alert:
             markdown_content = f"""# RunState
 {blocking_alert}
@@ -273,7 +271,7 @@ def load_project_link(project_path: Path) -> dict[str, Any] | None:
     link_path = project_path / "project-link.yaml"
     if not link_path.exists():
         return None
-    
+
     with open(link_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
@@ -304,12 +302,12 @@ def get_product_repo_path(project_path: Path) -> Path | None:
     project_link = load_project_link(project_path)
     if not project_link:
         return None
-    
+
     if project_link.get("ownership_mode") != "managed_external":
         return None
-    
+
     local_path = project_link.get("repo_local_path")
     if local_path:
         return Path(local_path)
-    
+
     return None

@@ -1,12 +1,12 @@
 """Tests for asyncdev resume-next-day command."""
 
-import pytest
 from datetime import datetime, timedelta
-from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
+
 from cli.commands.resume_next_day import app
 from runtime.state_store import StateStore
-
 
 runner = CliRunner()
 
@@ -15,14 +15,14 @@ runner = CliRunner()
 def setup_product_with_runstate(temp_dir):
     """Create product with runstate for testing."""
     from cli.commands.new_product import app as new_product_app
-    
+
     runner.invoke(new_product_app, [
         "create",
         "--product-id", "test-product",
         "--name", "Test Product",
         "--path", str(temp_dir),
     ])
-    
+
     yield temp_dir / "test-product"
 
 
@@ -373,7 +373,7 @@ class TestDecisionPackAlignment:
     def test_continue_loop_with_healthy_review_pack(self, setup_product_with_runstate):
         """continue_loop should show prior context from healthy review pack."""
         store = StateStore(setup_product_with_runstate)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -389,14 +389,14 @@ class TestDecisionPackAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "continue-loop",
             "--project", "test-product",
             "--decision", "approve",
             "--path", str(setup_product_with_runstate.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "Prior Night Context" in result.output
         assert "HEALTHY" in result.output
@@ -404,7 +404,7 @@ class TestDecisionPackAlignment:
     def test_continue_loop_with_attention_needed_pack(self, setup_product_with_runstate):
         """continue_loop should show recovery guidance from attention-needed pack."""
         store = StateStore(setup_product_with_runstate)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -422,14 +422,14 @@ class TestDecisionPackAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "continue-loop",
             "--project", "test-product",
             "--decision", "approve",
             "--path", str(setup_product_with_runstate.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "ATTENTION_NEEDED" in result.output
         assert "Prior Recovery" in result.output or "Recovery" in result.output
@@ -437,7 +437,7 @@ class TestDecisionPackAlignment:
     def test_continue_loop_with_blocked_pack(self, setup_product_with_runstate):
         """continue_loop should show blocked context from blocked pack."""
         store = StateStore(setup_product_with_runstate)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -450,21 +450,21 @@ class TestDecisionPackAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "continue-loop",
             "--project", "test-product",
             "--decision", "approve",
             "--path", str(setup_product_with_runstate.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "BLOCKED" in result.output
 
     def test_continue_loop_with_closeout_reminder(self, setup_product_with_runstate):
         """continue_loop should show closeout reminder when applicable."""
         store = StateStore(setup_product_with_runstate)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -480,14 +480,14 @@ class TestDecisionPackAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "continue-loop",
             "--project", "test-product",
             "--decision", "approve",
             "--path", str(setup_product_with_runstate.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "Closeout" in result.output or "COMPLETED" in result.output
 
@@ -497,21 +497,21 @@ class TestDecisionPackAlignment:
         runstate = store.load_runstate()
         runstate["decisions_needed"] = []
         store.save_runstate(runstate)
-        
+
         result = runner.invoke(app, [
             "continue-loop",
             "--project", "test-product",
             "--decision", "approve",
             "--path", str(setup_product_with_runstate.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "Resume Summary" in result.output or "Ready to continue" in result.output
 
     def test_continue_loop_with_stale_pack(self, setup_product_with_runstate):
         """continue_loop should warn when review pack is stale."""
         store = StateStore(setup_product_with_runstate)
-        
+
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         review_pack = {
             "date": yesterday,
@@ -522,21 +522,21 @@ class TestDecisionPackAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "continue-loop",
             "--project", "test-product",
             "--decision", "approve",
             "--path", str(setup_product_with_runstate.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "outdated" in result.output.lower() or "stale" in result.output.lower()
 
     def test_status_with_review_pack(self, setup_product_with_runstate):
         """status should show prior review summary."""
         store = StateStore(setup_product_with_runstate)
-        
+
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
             "date": today,
@@ -548,13 +548,13 @@ class TestDecisionPackAlignment:
             },
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = runner.invoke(app, [
             "status",
             "--project", "test-product",
             "--path", str(setup_product_with_runstate.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "Prior Review" in result.output or "HEALTHY" in result.output
 
@@ -565,7 +565,7 @@ class TestDecisionPackAlignment:
             "--project", "test-product",
             "--path", str(setup_product_with_runstate.parent),
         ])
-        
+
         assert result.exit_code == 0
         assert "Phase" in result.output
 
@@ -576,17 +576,17 @@ class TestDecisionPackHelpers:
     def test_load_latest_review_pack_returns_none_when_no_reviews(self, temp_dir):
         """_load_latest_review_pack returns None when no reviews directory."""
         from cli.commands.resume_next_day import _load_latest_review_pack
-        
+
         project_path = temp_dir / "no-reviews"
         project_path.mkdir()
-        
+
         result = _load_latest_review_pack(project_path)
         assert result is None
 
     def test_load_latest_review_pack_returns_pack_when_exists(self, setup_product_with_runstate):
         """_load_latest_review_pack returns pack when valid review exists."""
         from cli.commands.resume_next_day import _load_latest_review_pack
-        
+
         store = StateStore(setup_product_with_runstate)
         today = datetime.now().strftime("%Y-%m-%d")
         review_pack = {
@@ -594,7 +594,7 @@ class TestDecisionPackHelpers:
             "doctor_assessment": {"doctor_status": "HEALTHY"},
         }
         store.save_daily_review_pack(review_pack)
-        
+
         result = _load_latest_review_pack(setup_product_with_runstate)
         assert result is not None
         assert result.get("doctor_assessment") is not None
@@ -602,7 +602,7 @@ class TestDecisionPackHelpers:
     def test_extract_continuation_context_extract_key_fields(self, setup_product_with_runstate):
         """_extract_continuation_context extracts key continuation fields."""
         from cli.commands.resume_next_day import _extract_continuation_context
-        
+
         review_pack = {
             "date": "2026-04-13",
             "doctor_assessment": {
@@ -612,9 +612,9 @@ class TestDecisionPackHelpers:
             },
             "tomorrow_plan": "Execute next task",
         }
-        
+
         context = _extract_continuation_context(review_pack)
-        
+
         assert context.get("prior_doctor_status") == "HEALTHY"
         assert context.get("prior_recommended_action") == "Continue"
         assert context.get("prior_suggested_command") == "asyncdev plan-day"
@@ -622,7 +622,7 @@ class TestDecisionPackHelpers:
     def test_extract_continuation_context_includes_recovery_when_present(self):
         """_extract_continuation_context includes recovery_summary when present."""
         from cli.commands.resume_next_day import _extract_continuation_context
-        
+
         review_pack = {
             "date": "2026-04-13",
             "doctor_assessment": {
@@ -633,16 +633,16 @@ class TestDecisionPackHelpers:
                 },
             },
         }
-        
+
         context = _extract_continuation_context(review_pack)
-        
+
         assert context.get("prior_recovery_summary") is not None
         assert context["prior_recovery_summary"].get("likely_cause") == "Contract mismatch"
 
     def test_extract_continuation_context_includes_feedback_when_present(self):
         """_extract_continuation_context includes feedback_handoff when present."""
         from cli.commands.resume_next_day import _extract_continuation_context
-        
+
         review_pack = {
             "date": "2026-04-13",
             "doctor_assessment": {
@@ -653,7 +653,7 @@ class TestDecisionPackHelpers:
                 },
             },
         }
-        
+
         context = _extract_continuation_context(review_pack)
-        
+
         assert context.get("prior_feedback_handoff") is not None

@@ -8,7 +8,6 @@ This module provides the data layer for querying archived features:
 - Support filters: product, recent, has-patterns, has-lessons
 """
 
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,54 +16,54 @@ import yaml
 
 def load_archive_pack(archive_path: Path) -> dict[str, Any] | None:
     """Load ArchivePack from YAML file.
-    
+
     Args:
         archive_path: Path to archive-pack.yaml
-        
+
     Returns:
         ArchivePack dict or None if not found
     """
     if not archive_path.exists():
         return None
-    
+
     with open(archive_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def discover_all_archives(projects_path: Path) -> list[dict[str, Any]]:
     """Discover all archive packs across all products.
-    
+
     Scans the projects directory for archive directories and loads
     all archive-pack.yaml files.
-    
+
     Args:
         projects_path: Root projects directory
-        
+
     Returns:
         List of archive pack dicts with metadata
     """
     archives = []
-    
+
     if not projects_path.exists():
         return archives
-    
+
     for product_dir in projects_path.iterdir():
         if not product_dir.is_dir():
             continue
         if product_dir.name.startswith("."):
             continue
-        
+
         archive_dir = product_dir / "archive"
         if not archive_dir.exists():
             continue
-        
+
         for feature_dir in archive_dir.iterdir():
             if not feature_dir.is_dir():
                 continue
-            
+
             archive_path = feature_dir / "archive-pack.yaml"
             pack = load_archive_pack(archive_path)
-            
+
             if pack:
                 archives.append({
                     "feature_id": pack.get("feature_id", feature_dir.name),
@@ -79,7 +78,7 @@ def discover_all_archives(projects_path: Path) -> list[dict[str, Any]]:
                     "archive_path": str(archive_path),
                     "pack": pack,
                 })
-    
+
     return archives
 
 
@@ -92,7 +91,7 @@ def filter_archives(
     limit: int | None = None,
 ) -> list[dict[str, Any]]:
     """Filter archive list based on criteria.
-    
+
     Args:
         archives: List of archive metadata dicts
         product: Filter by product ID
@@ -100,31 +99,31 @@ def filter_archives(
         has_patterns: Only archives with reusable patterns
         has_lessons: Only archives with lessons learned
         limit: Maximum number of results
-        
+
     Returns:
         Filtered list of archive metadata dicts
     """
     result = archives
-    
+
     if product:
         result = [a for a in result if a.get("product_id") == product]
-    
+
     if has_patterns:
         result = [a for a in result if a.get("has_patterns", False)]
-    
+
     if has_lessons:
         result = [a for a in result if a.get("has_lessons", False)]
-    
+
     if recent:
         result = sorted(
             result,
             key=lambda a: a.get("archived_at", ""),
             reverse=True,
         )
-    
+
     if limit and limit > 0:
         result = result[:limit]
-    
+
     return result
 
 
@@ -134,12 +133,12 @@ def get_archive_detail(
     product_id: str | None = None,
 ) -> dict[str, Any] | None:
     """Get detailed archive pack for a specific feature.
-    
+
     Args:
         projects_path: Root projects directory
         feature_id: Feature ID to inspect
         product_id: Product ID (optional, helps locate faster)
-        
+
     Returns:
         Full archive pack dict with detail metadata, or None
     """
@@ -148,22 +147,22 @@ def get_archive_detail(
         pack = load_archive_pack(archive_path)
         if pack:
             return enrich_archive_detail(pack, archive_path)
-    
+
     archives = discover_all_archives(projects_path)
     for archive in archives:
         if archive.get("feature_id") == feature_id:
             return enrich_archive_detail(archive.get("pack", {}), Path(archive.get("archive_path", "")))
-    
+
     return None
 
 
 def enrich_archive_detail(pack: dict[str, Any], archive_path: Path) -> dict[str, Any]:
     """Enrich archive pack with additional detail metadata.
-    
+
     Args:
         pack: ArchivePack dict
         archive_path: Path to archive-pack.yaml
-        
+
     Returns:
         Enriched archive detail dict
     """
@@ -192,10 +191,10 @@ def enrich_archive_detail(pack: dict[str, Any], archive_path: Path) -> dict[str,
 
 def get_lessons_summary(archive_detail: dict[str, Any]) -> list[dict[str, str]]:
     """Extract lessons learned from archive detail.
-    
+
     Args:
         archive_detail: Enriched archive detail dict
-        
+
     Returns:
         List of lesson dicts with 'lesson' and 'context' keys
     """
@@ -204,10 +203,10 @@ def get_lessons_summary(archive_detail: dict[str, Any]) -> list[dict[str, str]]:
 
 def get_patterns_summary(archive_detail: dict[str, Any]) -> list[dict[str, str]]:
     """Extract reusable patterns from archive detail.
-    
+
     Args:
         archive_detail: Enriched archive detail dict
-        
+
     Returns:
         List of pattern dicts with 'pattern' and 'applicability' keys
     """
@@ -216,10 +215,10 @@ def get_patterns_summary(archive_detail: dict[str, Any]) -> list[dict[str, str]]
 
 def list_archives_with_patterns(projects_path: Path) -> list[dict[str, Any]]:
     """List all archives that have reusable patterns.
-    
+
     Args:
         projects_path: Root projects directory
-        
+
     Returns:
         List of archive metadata dicts with patterns
     """
@@ -229,10 +228,10 @@ def list_archives_with_patterns(projects_path: Path) -> list[dict[str, Any]]:
 
 def list_archives_with_lessons(projects_path: Path) -> list[dict[str, Any]]:
     """List all archives that have lessons learned.
-    
+
     Args:
         projects_path: Root projects directory
-        
+
     Returns:
         List of archive metadata dicts with lessons
     """
@@ -242,11 +241,11 @@ def list_archives_with_lessons(projects_path: Path) -> list[dict[str, Any]]:
 
 def get_recent_archives(projects_path: Path, limit: int = 10) -> list[dict[str, Any]]:
     """Get most recently archived features.
-    
+
     Args:
         projects_path: Root projects directory
         limit: Maximum number to return
-        
+
     Returns:
         List of archive metadata dicts sorted by archived_at desc
     """
