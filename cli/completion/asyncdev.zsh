@@ -59,7 +59,7 @@ _asyncdev() {
     evidence_cmds=('summary:Evidence summary' 'latest:Latest evidence' 'generate:Generate evidence' 'questions:Evidence questions' 'diff:Diff execution vs acceptance' 'validate:Validate evidence artifacts')
 
     local -a home_cmds
-    home_cmds=('show:Show home overview' 'status:Home status' 'calm:Check if calm')
+    home_cmds=('show:Show home overview' 'status:Home status' 'calm:Check if calm' 'blocking:Show blocking states' 'attention:Attention items navigator' 'recovery:Recovery summary' 'decision:Decision inbox summary' 'navigate:Direct navigation' 'recovery-dashboard:Unified recovery dashboard')
 
     local -a doctor_cmds
     doctor_cmds=('show:Show diagnosis' 'fix:Fix workspace issues')

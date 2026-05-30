@@ -411,10 +411,16 @@ asyncdev evidence latest --project {id} --type {execution_result|acceptance_resu
 asyncdev evidence generate --project {id} [--feature {id}]
 asyncdev evidence questions --project {id}
 
-# Operator Home
+# Operator Home (Phase 4 - Unified Platform Shell)
 asyncdev home show [--project {id}]
 asyncdev home status
 asyncdev home calm
+asyncdev home blocking [--project {id}]
+asyncdev home attention [--project {id}] [-i]
+asyncdev home recovery [--project {id}]
+asyncdev home decision [--project {id}]
+asyncdev home navigate <surface> [--id {id}] [--project {id}]
+asyncdev home recovery-dashboard [--project {id}]
 
 # Starter Pack (advisor integration)
 asyncdev new-product create --product-id {id} --name "{name}" --starter-pack starter-pack.yaml
@@ -490,6 +496,7 @@ asyncdev run-day execute --project <id> --mode external
 | Integration | ✅ Done | Advisor starter pack consumption (022) |
 | UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot, doctor, recovery, feedback handoff, feedback draft, review-night enriched, resume-next-day alignment, plan-day resume context, run-day intent alignment (023-036) |
 | **026–036 Validation** | ✅ **Done** | **Canonical loop verified, dogfooding completed, UX hardened** |
+| **Phase 4: Unified Platform Shell** | ✅ **Done** | Drill-down navigation, cross-surface links, blocking state, unified recovery dashboard (Feature 081) |
 | Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
 
 ---

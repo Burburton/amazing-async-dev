@@ -16,6 +16,7 @@ from runtime.decision_request_store import (
 from runtime.email_sender import create_email_config, EmailSender
 from runtime.decision_sync import sync_decision_to_runstate
 from runtime.state_store import StateStore
+from runtime.latest_pointer_manager import read_latest_pointer
 
 
 class TriggerSource(str, Enum):
@@ -89,6 +90,82 @@ def should_auto_trigger(
     return True, None
 
 
+def _get_execution_context(
+    project_path: Path,
+) -> dict[str, Any]:
+    """Get execution context from latest execution result for email enrichment.
+    
+    Args:
+        project_path: Project path
+        
+    Returns:
+        Dict with execution context (completed_items, artifacts, issues, etc.)
+    """
+    try:
+        exec_id, exec_path = read_latest_pointer(project_path, "execution_result")
+        if not exec_id:
+            return {}
+        
+        state_store = StateStore(project_path)
+        execution_result = state_store.load_execution_result(exec_id)
+        if not execution_result:
+            return {}
+        
+        return {
+            "execution_id": execution_result.get("execution_id", ""),
+            "status": execution_result.get("status", ""),
+            "completed_items": execution_result.get("completed_items", []),
+            "artifacts_created": execution_result.get("artifacts_created", []),
+            "issues_found": execution_result.get("issues_found", []),
+            "duration": execution_result.get("duration", ""),
+            "metrics": execution_result.get("metrics", {}),
+        }
+    except Exception:
+        return {}
+
+
+def _get_project_progress(project_path: Path) -> dict[str, Any]:
+    """Get project progress summary from runstate for email enrichment.
+    
+    Args:
+        project_path: Project path
+        
+    Returns:
+        Dict with project progress info
+    """
+    try:
+        state_store = StateStore(project_path)
+        runstate = state_store.load_runstate()
+        if not runstate:
+            return {}
+        
+        project_status = runstate.get("project_status", "")
+        phases_complete = runstate.get("phases_complete", [])
+        current_phase = runstate.get("current_phase", "")
+        current_feature = runstate.get("current_feature", "")
+        health_status = runstate.get("health_status", "")
+        
+        total_phases = len(phases_complete)
+        
+        progress_pct = "0%"
+        if "COMPLETE" in project_status.upper():
+            progress_pct = "100%"
+        elif total_phases > 0:
+            progress_pct = f"{min(100, total_phases * 10)}%"
+        
+        return {
+            "project_status": project_status,
+            "current_phase": current_phase,
+            "current_feature": current_feature,
+            "phases_complete_count": total_phases,
+            "phases_complete": phases_complete[-5:] if phases_complete else [],
+            "progress_percent": progress_pct,
+            "health_status": health_status,
+        }
+    except Exception:
+        return {}
+
+
 def create_auto_decision_request(
     project_path: Path,
     decision_entry: dict[str, Any],
@@ -127,10 +204,25 @@ def create_auto_decision_request(
             parsed_options.append(opt)
     
     recommendation = decision_entry.get("recommendation", "")
-    if recommendation and len(parsed_options) > 0:
-        recommendation_id = recommendation[0] if isinstance(recommendation, str) else "A"
-    else:
-        recommendation_id = "A" if parsed_options else ""
+    recommendation_id = ""
+    
+    if recommendation and parsed_options:
+        rec_lower = recommendation.lower().strip()
+        
+        if rec_lower in ["a", "b", "c"]:
+            recommendation_id = rec_lower.upper()
+        else:
+            for opt in parsed_options:
+                opt_label_lower = opt.get("label", "").lower()
+                if rec_lower in opt_label_lower or opt_label_lower in rec_lower:
+                    recommendation_id = opt.get("id", "A")
+                    break
+            
+            if not recommendation_id:
+                recommendation_id = "A"
+    
+    elif parsed_options:
+        recommendation_id = "A"
     
     delivery_mode = os.getenv("ASYNCDEV_DELIVERY_MODE", "mock_file")
     if delivery_mode == "resend":
@@ -157,9 +249,23 @@ def create_auto_decision_request(
         delivery_channel=delivery_channel,
     )
     
+    if recommendation_id and parsed_options:
+        for opt in parsed_options:
+            if opt.get("id") == recommendation_id:
+                request["recommendation"] = opt.get("label", recommendation_id)
+                break
+    
     request["trigger_source"] = trigger_source.value
     request["policy_mode_at_trigger"] = policy_mode.value
     request["auto_triggered"] = True
+    
+    exec_context = _get_execution_context(project_path)
+    if exec_context:
+        request["execution_context"] = exec_context
+    
+    project_progress = _get_project_progress(project_path)
+    if project_progress:
+        request["project_progress"] = project_progress
     
     store.save_request(request)
     

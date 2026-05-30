@@ -210,6 +210,54 @@ def build_day_end_email_body(
     return "\n".join(lines)
 
 
+def _extract_project_progress(runstate: dict[str, Any]) -> dict[str, Any]:
+    """Extract project progress summary from runstate.
+    
+    Args:
+        runstate: Current RunState
+        
+    Returns:
+        Dict with project progress info
+    """
+    project_status = runstate.get("project_status", "")
+    phases_complete = runstate.get("phases_complete", [])
+    current_phase = runstate.get("current_phase", "")
+    current_feature = runstate.get("current_feature", "")
+    task_queue = runstate.get("task_queue", [])
+    completed_outputs = runstate.get("completed_outputs", [])
+    health_status = runstate.get("health_status", "")
+    
+    total_phases = len(phases_complete)
+    
+    progress_pct = "0%"
+    if "COMPLETE" in project_status.upper():
+        progress_pct = "100%"
+    elif total_phases > 0:
+        progress_pct = f"{min(100, total_phases * 10)}%"
+    
+    task_status = {}
+    for task in task_queue:
+        if isinstance(task, dict):
+            status = task.get("status", "UNKNOWN")
+        elif isinstance(task, str):
+            status = "COMPLETED" if "COMPLETED" in task else "PENDING"
+        else:
+            status = "UNKNOWN"
+        task_status[status] = task_status.get(status, 0) + 1
+    
+    return {
+        "project_status": project_status,
+        "current_phase": current_phase,
+        "current_feature": current_feature,
+        "phases_complete_count": total_phases,
+        "phases_complete": phases_complete[-5:] if phases_complete else [],
+        "progress_percent": progress_pct,
+        "task_summary": task_status,
+        "completed_outputs_count": len(completed_outputs),
+        "health_status": health_status,
+    }
+
+
 def send_day_end_email(
     project_path: Path,
     notification: NotificationEvent,
@@ -240,49 +288,7 @@ def send_day_end_email(
     
     sender = EmailSender(config)
     
-    subject = build_day_end_email_subject(review_pack, config)
-    body = build_day_end_email_body(review_pack)
-
-    decisions = review_pack.get("decisions_needed", [])
-    parsed_options = []
-    recommendation = ""
-
-    for i, decision in enumerate(decisions):
-        decision_text = decision.get("decision", "")
-        options = decision.get("options", [])
-        rec = decision.get("recommendation", "")
-
-        for j, opt in enumerate(options):
-            if isinstance(opt, str):
-                parsed_options.append({
-                    "id": chr(65 + j),
-                    "label": opt,
-                    "description": ""
-                })
-            elif isinstance(opt, dict):
-                parsed_options.append(opt)
-
-        if rec and not recommendation:
-            recommendation = rec
-
-    defer_impact = ""
-    for decision in decisions:
-        if decision.get("defer_impact"):
-            defer_impact = decision.get("defer_impact", "")
-            break
-
-    email_data = {
-        "decision_request_id": notification.event_id,
-        "product_id": notification.product_id,
-        "feature_id": notification.feature_id,
-        "question": "Daily review summary",
-        "options": parsed_options if parsed_options else [],
-        "recommendation": recommendation,
-        "defer_impact": defer_impact,
-        "reply_format_hint": "DECISION A, DECISION B, or DEFER",
-    }
-
-    success, message_id = sender.send_decision_request(email_data)
+    success, message_id = sender.send_day_end_summary(review_pack)
     
     if success:
         notification.email_sent = True
@@ -345,6 +351,8 @@ def auto_trigger_day_end_email(
             skipped_reason="Failed to create notification record",
             policy_mode_at_trigger=policy_mode,
         )
+    
+    review_pack["project_progress"] = _extract_project_progress(runstate)
     
     success, message_id = send_day_end_email(
         project_path, notification, review_pack

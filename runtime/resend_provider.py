@@ -175,6 +175,35 @@ class ResendProvider:
             text=body,
             headers={"X-Report-Id": report_id} if report_id else None,
         )
+
+    def send_day_end_summary(
+        self,
+        review_pack: dict[str, Any],
+    ) -> tuple[bool, str | None, dict[str, Any] | None]:
+        """Send day-end summary email.
+        
+        Args:
+            review_pack: DailyReviewPack dict
+            
+        Returns:
+            (success, message_id, response_data)
+        """
+        from runtime.email_sender import EmailSender, EmailConfig
+        
+        config = EmailConfig()
+        sender = EmailSender(config)
+        
+        subject = sender._build_day_end_subject(review_pack)
+        body = sender._build_day_end_body(review_pack)
+        
+        date = review_pack.get("date", "")
+        
+        return self.send_email(
+            to=self.config.from_email if self.config.sandbox_mode else (config.to_address or self.config.from_email),
+            subject=subject,
+            text=body,
+            headers={"X-Day-End-Date": date} if date else None,
+        )
     
     def _call_api(
         self,

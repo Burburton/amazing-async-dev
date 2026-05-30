@@ -71,10 +71,23 @@ _asyncdev_completion() {
                 ;;
             home)
                 if [[ ${COMP_CWORD} -eq 2 ]]; then
-                    subcommands="show status calm"
+                    subcommands="show status calm blocking attention recovery decision navigate recovery-dashboard"
                     COMPREPLY=($(compgen -W "${subcommands}" -- "${cur}"))
-                else
-                    COMPREPLY=($(compgen -W "--project --path --help" -- "${cur}"))
+                elif [[ ${COMP_CWORD} -eq 3 && "${COMP_WORDS[COMP_CWORD-2]}" == "home" ]]; then
+                    case "${COMP_WORDS[2]}" in
+                        show|status|calm|blocking|recovery|recovery-dashboard)
+                            COMPREPLY=($(compgen -W "--project --path --help" -- "${cur}"))
+                            ;;
+                        attention)
+                            COMPREPLY=($(compgen -W "--project --interactive --path --help" -- "${cur}"))
+                            ;;
+                        decision)
+                            COMPREPLY=($(compgen -W "--project --status --path --help" -- "${cur}"))
+                            ;;
+                        navigate)
+                            COMPREPLY=($(compgen -W "--id --project --path --help" -- "${cur}"))
+                            ;;
+                    esac
                 fi
                 ;;
             doctor)

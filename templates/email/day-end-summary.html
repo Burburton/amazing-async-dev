@@ -24,6 +24,46 @@
     </div>
 </div>
 
+{% if project_progress %}
+<div class="section">
+    <div class="section-title">📊 Project Progress</div>
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        {% if project_progress.project_status %}
+        <div style="flex: 1; min-width: 150px;">
+            <strong>Status</strong><br>
+            <span class="status-badge status-{{ project_progress.health_status|default('unknown') }}">{{ project_progress.project_status }}</span>
+        </div>
+        {% endif %}
+        {% if project_progress.progress_percent %}
+        <div style="flex: 1; min-width: 150px;">
+            <strong>Progress</strong><br>
+            <span style="font-size: 24px; font-weight: bold;">{{ project_progress.progress_percent }}</span>
+        </div>
+        {% endif %}
+        {% if project_progress.phases_complete_count %}
+        <div style="flex: 1; min-width: 150px;">
+            <strong>Phases Done</strong><br>
+            {{ project_progress.phases_complete_count }}
+        </div>
+        {% endif %}
+        {% if project_progress.current_phase %}
+        <div style="flex: 1; min-width: 150px;">
+            <strong>Current Phase</strong><br>
+            {{ project_progress.current_phase }}
+        </div>
+        {% endif %}
+    </div>
+    {% if project_progress.phases_complete %}
+    <div style="margin-top: 10px;">
+        <strong>Recent Phases:</strong>
+        {% for phase in project_progress.phases_complete %}
+        <span style="background: #e8f5e9; padding: 2px 8px; border-radius: 4px; margin: 2px; display: inline-block;">{{ phase }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
 {% if completed %}
 <div class="section">
     <div class="section-title">✓ Completed Items</div>

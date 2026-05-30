@@ -279,6 +279,34 @@ def show(
     else:
         console.print(f"  [dim]Status: {status_val}[/dim]")
     
+    from runtime.cross_surface_links import (
+        get_decision_to_recovery_link,
+        format_cross_link,
+    )
+    from runtime.recovery_data_adapter import RecoveryDataAdapter
+    
+    cross_links = []
+    
+    if status_val == "resolved":
+        adapter = RecoveryDataAdapter(found_project)
+        recovery_item = adapter.get_recovery_item()
+        
+        if recovery_item:
+            link = get_decision_to_recovery_link(
+                project_id=found_project.name,
+                decision_request_id=request_id,
+                unblocked_execution_id=recovery_item.execution_id,
+                reason=f"Decision resolved, {recovery_item.execution_id} may now be unblocked",
+            )
+            if link:
+                cross_links.append(link)
+    
+    if cross_links:
+        console.print("\n[bold magenta]Cross-Surface Links[/bold magenta]")
+        formatted = format_cross_link(cross_links)
+        for link_str in formatted:
+            console.print(f"  {link_str}")
+    
     console.print(f"\n[dim]Run: asyncdev decision reply --request {request_id} --command \"DECISION A\"[/dim]")
     console.print(f"[dim]Run: asyncdev decision wait --request {request_id}[/dim]")
 
@@ -378,6 +406,18 @@ def reply(
     blocking_status, _ = check_blocking_state(found_project)
     if blocking_status == "CLEAR":
         console.print(f"\n[green]All decisions resolved - no longer blocked[/green]")
+        
+        from runtime.recovery_data_adapter import RecoveryDataAdapter
+        
+        adapter = RecoveryDataAdapter(found_project)
+        recovery_item = adapter.get_recovery_item()
+        
+        if recovery_item and recovery_item.recovery_required:
+            console.print(f"\n[bold magenta]State-Aware Navigation:[/bold magenta]")
+            console.print(f"  Decision resolved, but recovery still needed:")
+            console.print(f"  [cyan]{recovery_item.execution_id}[/cyan]: {recovery_item.recovery_reason[:50]}")
+            console.print(f"  Suggested: {recovery_item.suggested_command}")
+            console.print(f"\n  [green]asyncdev recovery show --execution {recovery_item.execution_id}[/green]")
     else:
         console.print(f"\n[yellow]Still blocked: {blocking_status}[/yellow]")
         console.print("[dim]Check for other pending decisions[/dim]")

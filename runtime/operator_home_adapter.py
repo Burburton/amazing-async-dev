@@ -23,6 +23,11 @@ from runtime.recovery_data_adapter import RecoveryDataAdapter, RecoveryItem
 from runtime.acceptance_recovery_adapter import AcceptanceRecoveryAdapter, AcceptanceRecoverySummary
 from runtime.execution_observer import run_observer, ObserverFinding
 from runtime.state_store import StateStore
+from runtime.unified_blocking import (
+    get_unified_blocking_state,
+    UnifiedBlockingState,
+    SessionBlockingState,
+)
 
 
 @dataclass
@@ -154,10 +159,12 @@ class OperatorHomeOverview:
     blocked_count: int = 0
     attention_count: int = 0
     
+    blocking_state: UnifiedBlockingState | None = None
+    
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
     
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "active_runs": [r.to_dict() for r in self.active_runs],
             "attention_items": [a.to_dict() for a in self.attention_items],
             "acceptance_queue": [a.to_dict() for a in self.acceptance_queue],
@@ -171,9 +178,14 @@ class OperatorHomeOverview:
             "attention_count": self.attention_count,
             "updated_at": self.updated_at,
         }
+        if self.blocking_state:
+            result["blocking_state"] = self.blocking_state.to_dict()
+        return result
     
     def is_calm(self) -> bool:
         """Check if platform is in calm state (nothing requiring attention)."""
+        if self.blocking_state and not self.blocking_state.is_calm():
+            return False
         return (
             len(self.attention_items) == 0
             and len(self.blocked_items) == 0
@@ -210,6 +222,8 @@ def build_operator_home_overview(projects_path: Path) -> OperatorHomeOverview:
     ]
     
     overview.total_projects = len(project_dirs)
+    
+    overview.blocking_state = get_unified_blocking_state(projects_path)
     
     all_attention_items = []
     all_acceptance_items = []

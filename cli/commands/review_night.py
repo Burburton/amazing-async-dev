@@ -73,9 +73,39 @@ def generate(
     if review_pack["decisions_needed"]:
         console.print("\n[bold yellow]Decisions Needed:[/bold yellow]")
         for i, d in enumerate(review_pack["decisions_needed"], 1):
-            console.print(f"  {i}. {d['decision']}")
-            console.print(f"     Options: {d['options']}")
-            console.print(f"     Recommendation: {d['recommendation']}")
+            console.print(f"\n  {i}. {d['decision']}")
+            
+            decision_context = d.get("decision_context", "")
+            if decision_context:
+                console.print(f"     Context: {decision_context}")
+            
+            urgency = d.get("urgency", "medium")
+            blocking = d.get("blocking_tomorrow", False)
+            console.print(f"     [Urgency: {urgency}]" + (" [BLOCKING]" if blocking else ""))
+            
+            console.print(f"     Options:")
+            options = d.get("options", [])
+            for opt in options:
+                if isinstance(opt, dict):
+                    opt_id = opt.get("id", "?")
+                    label = opt.get("label", "")
+                    effort = opt.get("effort", "")
+                    risk = opt.get("risk", "")
+                    console.print(f"       [{opt_id}] {label}")
+                    if effort or risk:
+                        console.print(f"           Effort: {effort} | Risk: {risk}")
+                else:
+                    console.print(f"       - {opt}")
+            
+            recommendation = d.get("recommendation", "")
+            if recommendation:
+                console.print(f"     Recommendation: {recommendation}")
+                reason = d.get("recommendation_reason", "")
+                if reason:
+                    console.print(f"     Reason: {reason}")
+                confidence = d.get("recommendation_confidence", "")
+                if confidence:
+                    console.print(f"     Confidence: {confidence}")
 
     if dry_run:
         console.print("[yellow]Dry run - not saving[/yellow]")

@@ -436,6 +436,41 @@ def show(
         else:
             console.print("[green]No observer findings[/green]")
     
+    from runtime.cross_surface_links import (
+        get_recovery_to_decision_link,
+        get_recovery_to_acceptance_link,
+        format_cross_link,
+    )
+    
+    cross_links = []
+    
+    if classification == RecoveryClassification.AWAITING_DECISION:
+        decision_request_id = runstate.get("decision_request_pending")
+        link = get_recovery_to_decision_link(
+            project_id=project_id,
+            execution_id=execution,
+            decision_request_id=decision_request_id,
+            reason="Recovery blocked by pending decision",
+        )
+        if link:
+            cross_links.append(link)
+    
+    if classification == RecoveryClassification.AWAITING_ACCEPTANCE or acceptance_recovery_pending:
+        link = get_recovery_to_acceptance_link(
+            project_id=project_id,
+            feature_id=feature_id,
+            execution_id=execution,
+            reason="Recovery needs acceptance retry",
+        )
+        if link:
+            cross_links.append(link)
+    
+    if cross_links:
+        console.print("\n[bold magenta]Cross-Surface Links[/bold magenta]")
+        formatted = format_cross_link(cross_links)
+        for link_str in formatted:
+            console.print(f"  {link_str}")
+    
     console.print(f"\n[dim]Run: asyncdev recovery resume --execution {execution} --action <action>[/dim]")
 
 

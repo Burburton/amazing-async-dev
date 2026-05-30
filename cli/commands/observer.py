@@ -107,6 +107,49 @@ def run(
     
     if total_findings > 0:
         console.print(f"\n[yellow]Recommended: Use 'asyncdev recovery list' to see recovery actions[/yellow]")
+        
+        from runtime.cross_surface_links import (
+            get_observer_to_recovery_link,
+            get_observer_to_decision_link,
+            format_cross_link,
+        )
+        from runtime.state_store import StateStore
+        
+        for project_path in projects_to_observe:
+            project_findings = run_observer(project_path)
+            recovery_links = []
+            decision_links = []
+            
+            for f in project_findings.findings:
+                if f.recovery_significant:
+                    link = get_observer_to_recovery_link(
+                        project_id=project_path.name,
+                        finding_type=f.finding_type.value,
+                        reason=f.reason[:50],
+                    )
+                    if link:
+                        recovery_links.append(link)
+                
+                if f.finding_type.value == "DECISION_OVERDUE":
+                    store = StateStore(project_path)
+                    runstate = store.load_runstate()
+                    if runstate:
+                        decision_id = runstate.get("decision_request_pending")
+                        link = get_observer_to_decision_link(
+                            project_id=project_path.name,
+                            finding_type=f.finding_type.value,
+                            decision_request_id=decision_id,
+                            reason="Decision overdue, human response needed",
+                        )
+                        if link:
+                            decision_links.append(link)
+            
+            if recovery_links or decision_links:
+                console.print(f"\n[bold magenta]Cross-Surface Links ({project_path.name}):[/bold magenta]")
+                all_links = recovery_links + decision_links
+                formatted = format_cross_link(all_links)
+                for link_str in formatted:
+                    console.print(f"  {link_str}")
 
 
 @app.command()

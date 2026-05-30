@@ -264,21 +264,28 @@ def _convert_decisions(execution_result: dict[str, Any]) -> list[dict[str, Any]]
     """Convert decisions_required to enhanced decision inbox format with template matching."""
     decisions_required = execution_result.get("decisions_required", [])
     decisions_needed = []
+    metrics = execution_result.get("metrics", {})
+    duration = execution_result.get("duration", "")
     
     for i, decision in enumerate(decisions_required):
         decision_id = f"dec-{i+1:03d}"
+        
+        options = decision.get("options", [])
+        enhanced_options = _analyze_options(options, decision)
         
         base_decision = {
             "decision_id": decision_id,
             "decision": decision.get("decision", ""),
             "decision_type": _infer_decision_type(decision),
-            "options": decision.get("options", []),
+            "options": enhanced_options,
             "recommendation": decision.get("recommendation", ""),
-            "recommendation_reason": _infer_recommendation_reason(decision),
+            "recommendation_reason": _infer_recommendation_reason(decision, metrics, duration),
+            "recommendation_confidence": _infer_recommendation_confidence(decision, metrics),
             "impact": decision.get("context", ""),
             "blocking_tomorrow": _is_blocking_tomorrow(decision),
             "defer_impact": _infer_defer_impact(decision),
             "urgency": decision.get("urgency", "medium"),
+            "decision_context": _generate_decision_context(decision, execution_result),
         }
         
         enhanced = enhance_decision_with_template(base_decision)
@@ -291,6 +298,143 @@ def _convert_decisions(execution_result: dict[str, Any]) -> list[dict[str, Any]]
         decisions_needed.append(enhanced)
     
     return decisions_needed
+
+
+def _analyze_options(options: list, decision: dict[str, Any]) -> list[dict[str, Any]]:
+    """Analyze each option and add effort, risk, and impact metadata."""
+    if not options:
+        return []
+    
+    decision_text = decision.get("decision", "").lower()
+    enhanced = []
+    
+    for i, opt in enumerate(options):
+        if isinstance(opt, str):
+            label = opt
+            opt_id = chr(65 + i) if i < 26 else str(i)
+        elif isinstance(opt, dict):
+            label = opt.get("label", "")
+            opt_id = opt.get("id", chr(65 + i) if i < 26 else str(i))
+        else:
+            label = str(opt)
+            opt_id = chr(65 + i) if i < 26 else str(i)
+        
+        effort, risk, time_impact, quality_impact = _estimate_option_attributes(label, decision_text)
+        
+        enhanced_opt = {
+            "id": opt_id,
+            "label": label,
+            "effort": effort,
+            "risk": risk,
+            "time_impact": time_impact,
+            "quality_impact": quality_impact,
+        }
+        
+        if isinstance(opt, dict):
+            enhanced_opt["description"] = opt.get("description", "")
+        
+        enhanced.append(enhanced_opt)
+    
+    return enhanced
+
+
+def _estimate_option_attributes(label: str, decision_text: str) -> tuple[str, str, str, str]:
+    """Estimate effort, risk, time_impact, and quality_impact for an option."""
+    label_lower = label.lower()
+    
+    effort = "medium"
+    risk = "medium"
+    time_impact = "medium"
+    quality_impact = "neutral"
+    
+    if any(kw in label_lower for kw in ["simple", "basic", "minimal", "MVP", "fast", "quick", "temporary"]):
+        effort = "low"
+        risk = "low"
+        time_impact = "low"
+        quality_impact = "neutral"
+    
+    if any(kw in label_lower for kw in ["robust", "complete", "full", "proper", "enterprise"]):
+        effort = "high"
+        risk = "low"
+        time_impact = "high"
+        quality_impact = "positive"
+    
+    if any(kw in label_lower for kw in ["defer", "skip", "ignore", "postpone", "later"]):
+        effort = "none"
+        risk = "medium"
+        time_impact = "none"
+        quality_impact = "negative"
+    
+    if any(kw in label_lower for kw in ["experimental", "new", "cutting", "untested"]):
+        effort = "medium"
+        risk = "high"
+        time_impact = "unknown"
+        quality_impact = "unknown"
+    
+    if any(kw in label_lower for kw in ["multi", "several", "multiple", "all"]):
+        effort = "high"
+        time_impact = "high"
+    
+    if any(kw in label_lower for kw in ["single", "one", "only", "google-only"]):
+        effort = "low"
+        time_impact = "low"
+    
+    return effort, risk, time_impact, quality_impact
+
+
+def _infer_recommendation_reason(decision: dict[str, Any], metrics: dict, duration: str) -> str:
+    """Generate detailed recommendation reason based on context."""
+    recommendation = decision.get("recommendation", "")
+    decision_type = decision.get("decision_type", "technical")
+    impact = decision.get("context", "")
+    
+    if not recommendation:
+        return "Based on execution analysis"
+    
+    reason_parts = []
+    
+    if decision_type == "technical":
+        if "simple" in recommendation.lower() or "basic" in recommendation.lower():
+            reason_parts.append("Fastest path to MVP")
+        elif "robust" in recommendation.lower() or "complete" in recommendation.lower():
+            reason_parts.append("Long-term maintainability")
+        elif "defer" in recommendation.lower():
+            reason_parts.append("Preserve current momentum")
+    
+    if impact:
+        reason_parts.append(f"Impact: {impact[:50]}")
+    
+    if duration:
+        reason_parts.append(f"Execution took {duration}")
+    
+    files_read = metrics.get("files_read", 0)
+    if files_read > 50:
+        reason_parts.append("Deep context gathered - ready to decide")
+    
+    if not reason_parts:
+        reason_parts.append("Recommended based on project patterns and constraints")
+    
+    return " | ".join(reason_parts)
+
+
+def _infer_recommendation_confidence(decision: dict, metrics: dict) -> str:
+    """Infer confidence level for the recommendation."""
+    confidence = "medium"
+    
+    decision_type = decision.get("decision_type", "")
+    has_context = bool(decision.get("context"))
+    has_options = bool(decision.get("options"))
+    
+    if decision_type in ["scope", "priority"]:
+        confidence = "high"
+    elif has_context and has_options:
+        confidence = "high"
+    
+    issues = len(decision.get("issues_found", []))
+    if issues > 3:
+        confidence = "low"
+    
+    return confidence
 
 
 def _infer_decision_type(decision: dict[str, Any]) -> str:
@@ -311,13 +455,30 @@ def _infer_decision_type(decision: dict[str, Any]) -> str:
     return "technical"
 
 
-def _infer_recommendation_reason(decision: dict[str, Any]) -> str:
-    """Generate recommendation reason."""
-    recommendation = decision.get("recommendation", "")
-    if not recommendation:
-        return "Based on execution analysis"
+def _generate_decision_context(decision: dict[str, Any], execution_result: dict[str, Any]) -> str:
+    """Generate context for why this decision is needed now."""
+    context_parts = []
     
-    return f"Recommended based on project patterns and constraints"
+    completed_items = execution_result.get("completed_items", [])
+    if completed_items:
+        context_parts.append(f"After completing {len(completed_items)} items")
+    
+    issues = execution_result.get("issues_found", [])
+    if issues:
+        context_parts.append(f"encountered {len(issues)} issue(s)")
+    
+    status = execution_result.get("status", "")
+    if status:
+        context_parts.append(f"execution status: {status}")
+    
+    blocked = execution_result.get("blocked_reasons", [])
+    if blocked:
+        context_parts.append(f"blocked by: {blocked[0]}")
+    
+    if not context_parts:
+        return "Decision needed to proceed with implementation"
+    
+    return " | ".join(context_parts)
 
 
 def _is_blocking_tomorrow(decision: dict[str, Any]) -> bool:
@@ -354,7 +515,7 @@ def _build_recommendations(execution_result: dict[str, Any]) -> list[dict[str, A
                 "decision_id": f"dec-{i+1:03d}",
                 "decision": decision.get("decision", ""),
                 "recommended": rec,
-                "reason": _infer_recommendation_reason(decision),
+                "reason": _infer_recommendation_reason(decision, {}, ""),
             })
     
     return recommendations

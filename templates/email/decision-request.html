@@ -71,6 +71,100 @@
 </div>
 {% endif %}
 
+{% if execution_context %}
+<div class="section">
+    <div class="section-title">📋 Today's Progress</div>
+    {% if execution_context.completed_items %}
+    <div class="context-block">
+        <strong>Completed:</strong>
+        <ul>
+        {% for item in execution_context.completed_items[:5] %}
+            <li>{{ item }}</li>
+        {% endfor %}
+        {% if execution_context.completed_items|length > 5 %}
+            <li><em>... and {{ execution_context.completed_items|length - 5 }} more</em></li>
+        {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+    
+    {% if execution_context.artifacts_created %}
+    <div class="context-block">
+        <strong>Artifacts Created:</strong>
+        <ul>
+        {% for artifact in execution_context.artifacts_created[:5] %}
+            {% if artifact is mapping %}
+            <li>{{ artifact.name }} ({{ artifact.type }})</li>
+            {% else %}
+            <li>{{ artifact }}</li>
+            {% endif %}
+        {% endfor %}
+        {% if execution_context.artifacts_created|length > 5 %}
+            <li><em>... and {{ execution_context.artifacts_created|length - 5 }} more</em></li>
+        {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+    
+    {% if execution_context.issues_found %}
+    <div class="context-block">
+        <strong>⚠️ Issues Found:</strong>
+        <ul>
+        {% for issue in execution_context.issues_found[:3] %}
+            <li>{{ issue }}</li>
+        {% endfor %}
+        {% if execution_context.issues_found|length > 3 %}
+            <li><em>... and {{ execution_context.issues_found|length - 3 }} more</em></li>
+        {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+    
+    {% if execution_context.status %}
+    <p><em>Execution status: {{ execution_context.status }} | Duration: {{ execution_context.duration }}</em></p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if project_progress %}
+<div class="section">
+    <div class="section-title">📊 Project Progress</div>
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        {% if project_progress.project_status %}
+        <div style="flex: 1; min-width: 120px;">
+            <strong>Status</strong><br>
+            <span class="status-badge status-{{ project_progress.health_status|default('unknown') }}">{{ project_progress.project_status }}</span>
+        </div>
+        {% endif %}
+        {% if project_progress.progress_percent %}
+        <div style="flex: 1; min-width: 120px;">
+            <strong>Progress</strong><br>
+            <span style="font-size: 20px; font-weight: bold;">{{ project_progress.progress_percent }}</span>
+        </div>
+        {% endif %}
+        {% if project_progress.phases_complete_count %}
+        <div style="flex: 1; min-width: 120px;">
+            <strong>Phases</strong><br>
+            {{ project_progress.phases_complete_count }} done
+        </div>
+        {% endif %}
+        {% if project_progress.current_feature %}
+        <div style="flex: 1; min-width: 120px;">
+            <strong>Feature</strong><br>
+            {{ project_progress.current_feature }}
+        </div>
+        {% endif %}
+    </div>
+    {% if project_progress.phases_complete %}
+    <div style="margin-top: 10px;">
+        {% for phase in project_progress.phases_complete %}
+        <span style="background: #e3f2fd; padding: 2px 8px; border-radius: 4px; margin: 2px; display: inline-block; font-size: 12px;">{{ phase }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
 {% if next_action %}
 <div class="section">
     <h3>Next Action After Reply</h3>
