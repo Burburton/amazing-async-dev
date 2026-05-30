@@ -1,6 +1,10 @@
 """Amazing Async Dev - Personal Async AI Development OS CLI."""
 
+import sys
 from pathlib import Path
+
+# Add project root to Python path so 'runtime' and other packages can be imported
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import typer
 import yaml
