@@ -24,6 +24,16 @@ venv/
 ENV/
 env/
 .venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.editorconfig
 
 # Node.js
 node_modules/
@@ -102,9 +112,14 @@ projects/*/execution-packs/
 projects/*/execution-results/
 projects/*/reviews/
 projects/*/runstate.md
+projects/*/decision-requests/
+projects/*/notifications/
+projects/*/*.log
 projects/
 .runtime/
 runtime/state.db
+runtime/*.db
+*.workspace
 
 screenshots/
 
