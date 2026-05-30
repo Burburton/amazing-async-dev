@@ -11,17 +11,17 @@ Design based on patterns from:
 
 import hashlib
 import json
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-import sys
+from enum import Enum
+from typing import Any
+
 if sys.version_info >= (3, 11):
     from enum import StrEnum
 else:
-    # Python 3.10 compatibility - StrEnum was added in 3.11
-    from enum import Enum
     class StrEnum(str, Enum):
         pass
-from typing import Any
 
 
 class NotificationEventType(StrEnum):

@@ -5,7 +5,6 @@ import pytest
 from typer.testing import CliRunner
 
 from cli.commands.journal import app
-from tests.conftest import strip_ansi
 from runtime.journal_viewer.artifact_reader import (
     CANONICAL_LOOP_ORDER,
     DAY_DETAIL_ORDER,
@@ -25,6 +24,7 @@ from runtime.journal_viewer.tui_viewer import (
     group_entries_by_day,
     group_entries_by_feature,
 )
+from tests.conftest import strip_ansi
 
 runner = CliRunner()
 
