@@ -1,6 +1,6 @@
 # amazing-async-dev
 
-**Personal Async AI Development OS**
+**Personal Async AI Development OS** | v0.1.0.dev0
 
 A lightweight system for solo builders: AI works during the day, you review at night.
 
@@ -432,10 +432,12 @@ asyncdev new-product create --product-id {id} --name "{name}" --starter-pack sta
 
 | Metric | Value |
 |--------|-------|
+| Version | 0.1.0.dev0 |
 | Platform Layers | Execution Kernel (Layer A) + Operator Surfaces (Layer B) + Policy/Recipe (Layer C) |
-| Package State | Functional alpha |
+| Package State | **Beta** - Functional, tested, suitable for early adopters |
 | Canonical Loop | ✅ Verified (3-day dogfooding) |
 | Kernel Stability | Hardened (026-036 milestone complete) |
+| Phase 4 | ✅ Complete (Feature 081 - Unified Platform Shell) |
 
 **What this means:**
 - Execution kernel is stable and verified through real dogfooding
@@ -497,7 +499,7 @@ asyncdev run-day execute --project <id> --mode external
 | UX Docs | ✅ Done | First-run, drift repair, onboarding, positioning, verification, snapshot, doctor, recovery, feedback handoff, feedback draft, review-night enriched, resume-next-day alignment, plan-day resume context, run-day intent alignment (023-036) |
 | **026–036 Validation** | ✅ **Done** | **Canonical loop verified, dogfooding completed, UX hardened** |
 | **Phase 4: Unified Platform Shell** | ✅ **Done** | Drill-down navigation, cross-surface links, blocking state, unified recovery dashboard (Feature 081) |
-| Formal Release | 🔲 Future | PyPI package, version tagging, CHANGELOG |
+| **v0.1.0 Release** | ✅ **Done** | PyPI-ready, version tagged, CHANGELOG created |
 
 ---
 
