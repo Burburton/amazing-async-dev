@@ -141,6 +141,10 @@ python cli/asyncdev.py new-product create --product-id test-verify --name "Test"
 | [examples/doctor-output.md](examples/doctor-output.md) | Doctor diagnosis examples for all health states |
 | [docs/doctor.md](docs/doctor.md) | Workspace diagnosis and next-action recommendations |
 | [docs/quick-start.md](docs/quick-start.md) | 5-minute guide with execution modes explained |
+| [docs/quick-start-user.md](docs/quick-start-user.md) | **Simplified Chinese quick-start** |
+| [docs/cli-reference.md](docs/cli-reference.md) | Complete CLI command reference |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Common errors and solutions |
+| [docs/api-reference.md](docs/api-reference.md) | Developer API reference |
 | [docs/verify.md](docs/verify.md) | Smoke-verification for initialization |
 | [docs/operating-model.md](docs/operating-model.md) | Day loop phases and responsibilities |
 | [AGENTS.md](AGENTS.md) | Rules for AI execution |

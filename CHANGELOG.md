@@ -84,6 +84,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Architecture overview
 - Terminology guide
 - Examples directory with single-feature day loop
+- **CLI reference** - Complete command reference (695 lines)
+- **User quick-start (Chinese)** - Simplified Chinese quick-start guide
+- **Troubleshooting guide** - Common errors and solutions
+- **API reference** - Developer API documentation
 
 ## [0.0.1] - 2026-04-11
 
