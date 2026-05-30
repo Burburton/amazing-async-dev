@@ -3,7 +3,6 @@
 import sys
 from pathlib import Path
 
-# Add project root to Python path so 'runtime' and other packages can be imported
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import typer
@@ -11,11 +10,44 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from cli.commands import plan_day, run_day, review_night, resume_next_day
-from cli.commands import init, new_product, new_feature
-from cli.commands import complete_feature, archive_feature
-from cli.commands import sqlite_status, inspect_stop, recovery, decision, session_start, verification, observer, acceptance, evidence, home
-from cli.commands import backfill, archive, summary, feedback, policy, email_decision, snapshot, doctor, journal, gmail_auth, resend_auth, check_inbox, config, project_link, browser_test, frontend_verify_run, notification
+from cli.commands import (
+    acceptance,
+    archive,
+    archive_feature,
+    backfill,
+    browser_test,
+    check_inbox,
+    complete_feature,
+    config,
+    decision,
+    doctor,
+    email_decision,
+    evidence,
+    feedback,
+    frontend_verify_run,
+    gmail_auth,
+    home,
+    init,
+    inspect_stop,
+    journal,
+    new_feature,
+    new_product,
+    notification,
+    observer,
+    plan_day,
+    policy,
+    project_link,
+    recovery,
+    resend_auth,
+    resume_next_day,
+    review_night,
+    run_day,
+    session_start,
+    snapshot,
+    sqlite_status,
+    summary,
+    verification,
+)
 from cli.utils.output_formatter import print_next_step, print_phase_indicator
 from cli.utils.path_formatter import get_relative_path
 
@@ -62,7 +94,7 @@ app.add_typer(snapshot.app, name="snapshot", help="Workspace snapshot - comprehe
 app.add_typer(doctor.app, name="doctor", help="Diagnose workspace health and recommend next action (Feature 029)")
 
 app.add_typer(journal.app, name="journal", help="View async-dev loop artifact timeline (Feature 036 dogfooding)")
- 
+
 app.add_typer(gmail_auth.app, name="gmail-auth", help="Gmail OAuth2 authentication setup")
 
 app.add_typer(resend_auth.app, name="resend-auth", help="Resend email provider setup")
@@ -103,7 +135,7 @@ def status(
     path: Path = typer.Option(Path("projects"), help="Projects root path"),
 ):
     """Show current RunState status.
-    
+
     Levels:
     - Default: Current RunState
     - --all: All products and features summary
@@ -111,7 +143,7 @@ def status(
     - --feature <id>: Specific feature details
     """
     root = Path.cwd() if path == Path("projects") else path
-    
+
     if all:
         _show_all_status(path, root)
     elif all_features:
@@ -128,27 +160,27 @@ def _show_all_features_status(project: str | None, path: Path, root: Path) -> No
         console.print("[red]--project required when using --all-features[/red]")
         console.print("[yellow]Example: asyncdev status --all-features --project my-app[/yellow]")
         raise typer.Exit(1)
-    
+
     project_path = path / project
-    
+
     if not project_path.exists():
         console.print(f"[red]Project not found: {project}[/red]")
         raise typer.Exit(1)
-    
+
     console.print(f"[bold cyan]All Features in: {project}[/bold cyan]\n")
-    
-    from runtime.state_store import StateStore
+
     from runtime.sqlite_state_store import SQLiteStateStore
-    
+    from runtime.state_store import StateStore
+
     store = StateStore(project_path)
     runstate = store.load_runstate()
-    
+
     sqlite_store = SQLiteStateStore(project_path)
     features = sqlite_store.list_features(project)
-    
+
     features_dir = project_path / "features"
     archive_dir = project_path / "archive"
-    
+
     phase_style = {
         "planning": "blue",
         "executing": "yellow",
@@ -157,7 +189,7 @@ def _show_all_features_status(project: str | None, path: Path, root: Path) -> No
         "completed": "green",
         "archived": "dim",
     }
-    
+
     if features:
         table = Table(title="Features (SQLite)")
         table.add_column("Feature ID", style="cyan")
@@ -170,16 +202,16 @@ def _show_all_features_status(project: str | None, path: Path, root: Path) -> No
         table.add_column("Status", style="yellow")
         table.add_column("In RunState", style="green")
         table.add_column("Archived", style="dim")
-    
+
     if features:
         for f in features:
             feature_id = f.get("feature_id", "")
             name = f.get("name", feature_id)
             phase = f.get("phase", "unknown")
             active_task = f.get("active_task", "")[:30] if f.get("active_task") else ""
-            
+
             style = phase_style.get(phase, "white")
-            
+
             table.add_row(
                 feature_id,
                 name[:30],
@@ -188,20 +220,20 @@ def _show_all_features_status(project: str | None, path: Path, root: Path) -> No
             )
     elif features_dir.exists():
         feature_dirs = [f for f in features_dir.iterdir() if f.is_dir()]
-        
+
         for feature_dir in sorted(feature_dirs):
             feature_id = feature_dir.name
-            
+
             in_runstate = "Y" if runstate and runstate.get("feature_id") == feature_id else "N"
             archived = "Y" if archive_dir.exists() and (archive_dir / feature_id).exists() else "N"
-            
+
             status_text = "archived" if archived == "Y" else ("active" if in_runstate == "Y" else "defined")
             style = phase_style.get(status_text, "white")
-            
+
             table.add_row(feature_id, f"[{style}]{status_text}[/{style}]", in_runstate, archived)
-    
+
     console.print(table)
-    
+
     phase_summary = {"planning": 0, "executing": 0, "reviewing": 0, "blocked": 0, "completed": 0, "archived": 0}
     if features:
         for f in features:
@@ -218,17 +250,17 @@ def _show_all_features_status(project: str | None, path: Path, root: Path) -> No
                     phase_summary[phase] += 1
             else:
                 phase_summary["defined"] = phase_summary.get("defined", 0) + 1
-    
-    console.print(f"\n[bold]Phase Distribution:[/bold]")
+
+    console.print("\n[bold]Phase Distribution:[/bold]")
     for phase, count in phase_summary.items():
         if count > 0:
             console.print(f"  {phase}: {count}")
-    
+
     sqlite_store.close()
-    
+
     console.print(f"\n[dim]Project: {project}[/dim]")
     console.print(f"[dim]root: {root}[/dim]")
-    
+
     print_next_step(
         action="Inspect specific feature",
         command="asyncdev status --feature <id> --project " + project,
@@ -237,10 +269,10 @@ def _show_all_features_status(project: str | None, path: Path, root: Path) -> No
 
 def _show_current_status(path: Path, root: Path) -> None:
     from runtime.state_store import StateStore
-    
+
     store = StateStore(path)
     runstate = store.load_runstate()
-    
+
     if runstate is None:
         console.print("[yellow]No active RunState found[/yellow]")
         print_next_step(
@@ -249,14 +281,14 @@ def _show_current_status(path: Path, root: Path) -> None:
             hints=["Run asyncdev new-product to create a product"],
         )
         return
-    
+
     phase = runstate.get("current_phase", "planning")
     print_phase_indicator(phase)
-    
+
     table = Table(title="Current RunState", show_header=False)
     table.add_column("Field", style="cyan")
     table.add_column("Value", style="green")
-    
+
     table.add_row("Project", runstate.get("project_id", "N/A"))
     table.add_row("Feature", runstate.get("feature_id", "N/A"))
     table.add_row("Phase", phase)
@@ -265,15 +297,15 @@ def _show_current_status(path: Path, root: Path) -> None:
     table.add_row("Completed", f"{len(runstate.get('completed_outputs', []))} outputs")
     table.add_row("Blocked", f"{len(runstate.get('blocked_items', []))} items")
     table.add_row("Decisions", f"{len(runstate.get('decisions_needed', []))} pending")
-    
+
     console.print(table)
-    
+
     if store.project_path:
         runstate_path = store.project_path / "runstate.md"
         relative = get_relative_path(runstate_path, root)
         console.print(f"\n[dim]RunState file: {relative}[/dim]")
         console.print(f"[dim]root: {root}[/dim]")
-    
+
     next_action = runstate.get("next_recommended_action", "")
     if next_action:
         console.print()
@@ -285,40 +317,40 @@ def _show_current_status(path: Path, root: Path) -> None:
 
 def _show_all_status(path: Path, root: Path) -> None:
     console.print("[bold]All Products and Features[/bold]\n")
-    
+
     if not path.exists():
         console.print("[yellow]No projects directory[/yellow]")
         console.print(f"[dim]path: {get_relative_path(path, root)}[/dim]")
         return
-    
+
     products = [p for p in path.iterdir() if p.is_dir() and not p.name.startswith(".")]
-    
+
     if not products:
         console.print("[dim]No products yet[/dim]")
         console.print(f"[dim]root: {root}[/dim]")
         return
-    
+
     for product_dir in sorted(products):
         brief_path = product_dir / "product-brief.yaml"
         runstate_path = product_dir / "runstate.md"
-        
+
         product_name = product_dir.name
         if brief_path.exists():
             with open(brief_path, encoding="utf-8") as f:
                 brief = yaml.safe_load(f)
             product_name = brief.get("name", product_dir.name)
-        
+
         console.print(f"\n[bold cyan]{product_dir.name}[/bold cyan]: {product_name}")
-        
+
         if runstate_path.exists():
             from runtime.state_store import StateStore
             store = StateStore(product_dir)
             runstate = store.load_runstate()
-            
+
             if runstate:
                 phase = runstate.get("current_phase", "N/A")
                 feature_id = runstate.get("feature_id", "")
-                
+
                 phase_style = {
                     "planning": "blue",
                     "executing": "yellow",
@@ -328,26 +360,26 @@ def _show_all_status(path: Path, root: Path) -> None:
                     "archived": "dim",
                 }
                 style = phase_style.get(phase, "white")
-                
+
                 console.print(f"  [{style}]Phase: {phase}[/{style}]")
                 console.print(f"  Feature: {feature_id or '[dim]none[/dim]'}")
                 console.print(f"  Blocked: {len(runstate.get('blocked_items', []))}")
                 console.print(f"  Decisions: {len(runstate.get('decisions_needed', []))}")
         else:
             console.print("  [dim]No RunState[/dim]")
-        
+
         features_dir = product_dir / "features"
         if features_dir.exists():
             features = [f for f in features_dir.iterdir() if f.is_dir()]
             if features:
                 console.print(f"  Features: {len(features)} defined")
-        
+
         archive_dir = product_dir / "archive"
         if archive_dir.exists():
             archived = [f for f in archive_dir.iterdir() if f.is_dir()]
             if archived:
                 console.print(f"  Archived: {len(archived)}")
-    
+
     console.print(f"\n[dim]root: {root}[/dim]")
 
 
@@ -356,29 +388,29 @@ def _show_feature_status(feature_id: str, project: str | None, path: Path, root:
         console.print("[red]--project required when using --feature[/red]")
         console.print("[yellow]Example: asyncdev status --feature 001-auth --project my-app[/yellow]")
         raise typer.Exit(1)
-    
+
     project_path = path / project
-    
+
     if not project_path.exists():
         console.print(f"[red]Project not found: {project}[/red]")
         raise typer.Exit(1)
-    
-    from runtime.state_store import StateStore
+
     from runtime.sqlite_state_store import SQLiteStateStore
-    
+    from runtime.state_store import StateStore
+
     store = StateStore(project_path)
     runstate = store.load_runstate()
-    
+
     console.print(f"[bold]Feature: {feature_id}[/bold] (project: {project})\n")
-    
+
     table = Table(title="Feature Status")
     table.add_column("Field", style="cyan")
     table.add_column("Value", style="green")
-    
+
     if runstate and runstate.get("feature_id") == feature_id:
         phase = runstate.get("current_phase", "N/A")
         print_phase_indicator(phase)
-        
+
         table.add_row("Phase", phase)
         table.add_row("Active Task", runstate.get("active_task", "N/A"))
         table.add_row("Queue", f"{len(runstate.get('task_queue', []))} pending")
@@ -390,32 +422,32 @@ def _show_feature_status(feature_id: str, project: str | None, path: Path, root:
     else:
         table.add_row("Phase", "[dim]Not active[/dim]")
         table.add_row("Status", "Feature exists but not in current RunState")
-    
+
     console.print(table)
-    
+
     sqlite_store = SQLiteStateStore(project_path)
     events = sqlite_store.get_recent_events(feature_id, limit=10)
-    
+
     if events:
         console.print("\n[bold]Recent Events:[/bold]")
         events_table = Table()
         events_table.add_column("Event", style="cyan")
         events_table.add_column("Time", style="dim")
-        
+
         for e in events[:5]:
             event_type = e.get("event_type", "unknown")
             event_time = e.get("occurred_at", "N/A")
             events_table.add_row(event_type, event_time[:19] if len(event_time) > 19 else event_time)
-        
+
         console.print(events_table)
-    
+
     sqlite_store.close()
-    
+
     runstate_path = project_path / "runstate.md"
     relative = get_relative_path(runstate_path, root)
     console.print(f"\n[dim]RunState: {relative}[/dim]")
     console.print(f"[dim]root: {root}[/dim]")
-    
+
     if runstate and runstate.get("feature_id") == feature_id:
         print_next_step(
             action=runstate.get("next_recommended_action", "Continue execution"),
