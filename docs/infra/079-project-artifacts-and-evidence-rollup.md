@@ -6,7 +6,7 @@
 - **Feature Name**: `Project Artifacts and Evidence Rollup`
 - **Feature Type**: `platform foundation / artifact coherence / evidence layer consolidation`
 - **Priority**: `High`
-- **Status**: `Proposed`
+- **Status**: `Implemented`
 - **Owner**: `async-dev`
 - **Target Branch**: `platform/foundation`
 - **Related Features**:

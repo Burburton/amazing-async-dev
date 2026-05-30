@@ -6,7 +6,7 @@
 - **Feature Name**: `Acceptance CLI and Mainflow Integration`
 - **Feature Type**: `platform integration / operator interface / execution flow wiring`
 - **Priority**: `High`
-- **Status**: `Proposed`
+- **Status**: `Implemented`
 - **Owner**: `async-dev`
 - **Target Branch**: `platform/foundation`
 - **Related Features**:

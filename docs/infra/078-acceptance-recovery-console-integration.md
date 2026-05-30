@@ -6,7 +6,7 @@
 - **Feature Name**: `Acceptance × Recovery Console Integration`
 - **Feature Type**: `operator surface integration / platform productization / acceptance recovery UX`
 - **Priority**: `High`
-- **Status**: `Proposed`
+- **Status**: `Implemented`
 - **Owner**: `async-dev`
 - **Target Branch**: `platform/foundation`
 - **Related Features**:
