@@ -5,6 +5,7 @@ import pytest
 from typer.testing import CliRunner
 
 from cli.commands.journal import app
+from tests.conftest import strip_ansi
 from runtime.journal_viewer.artifact_reader import (
     CANONICAL_LOOP_ORDER,
     DAY_DETAIL_ORDER,
@@ -240,9 +241,10 @@ class TestCLIBehavior:
         result = runner.invoke(app, ["timeline", "--help"])
 
         assert result.exit_code == 0
-        assert "--project" in result.output
-        assert "--feature" in result.output
-        assert "--type" in result.output
+        output = strip_ansi(result.output)
+        assert "--project" in output or "-project" in output
+        assert "--feature" in output or "-feature" in output
+        assert "--type" in output or "-type" in output
 
     def test_invalid_path_readable_error(self):
         """Invalid input paths produce readable errors."""

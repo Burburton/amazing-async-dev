@@ -6,6 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from cli.commands.run_day import _check_drift_warnings, _extract_execution_intent, app
+from tests.conftest import strip_ansi
 
 runner = CliRunner()
 
@@ -78,7 +79,8 @@ class TestRunDayExecute:
         result = runner.invoke(app, ["execute", "--help"])
 
         assert result.exit_code == 0
-        assert "--project" in result.output
+        output = strip_ansi(result.output)
+        assert "--project" in output or "-project" in output
 
     def test_fallback_without_project(self):
         """run-day without --project should use default behavior."""

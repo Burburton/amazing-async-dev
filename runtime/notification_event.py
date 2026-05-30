@@ -13,7 +13,14 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import StrEnum
+import sys
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+    # Python 3.10 compatibility - StrEnum was added in 3.11
+    from enum import Enum
+    class StrEnum(str, Enum):
+        pass
 from typing import Any
 
 

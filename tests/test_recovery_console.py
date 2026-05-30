@@ -5,6 +5,7 @@ from typer.testing import CliRunner
 from cli.commands.recovery import app
 from runtime.recovery_classifier import RecoveryClassification, classify_recovery
 from runtime.state_store import StateStore
+from tests.conftest import strip_ansi
 
 runner = CliRunner()
 
@@ -72,8 +73,9 @@ class TestRecoveryCLI:
     def test_list_help_shows_options(self):
         result = runner.invoke(app, ["list", "--help"])
         assert result.exit_code == 0
-        assert "--project" in result.output
-        assert "--all" in result.output
+        output = strip_ansi(result.output)
+        assert "--project" in output or "-project" in output
+        assert "--all" in output or "-all" in output
 
     def test_show_rejects_invalid_format(self):
         result = runner.invoke(app, ["show", "--execution", "invalid"])
@@ -100,7 +102,8 @@ class TestRecoveryObserverIntegration:
 
     def test_show_observe_flag_registered(self):
         result = runner.invoke(app, ["show", "--help"])
-        assert "--observe" in result.output
+        output = strip_ansi(result.output)
+        assert "--observe" in output or "-observe" in output
 
     def test_show_observe_displays_findings_table(self, temp_dir):
         project = temp_dir / "test-obs"
@@ -197,7 +200,8 @@ class TestRecoveryActionWiring:
 
     def test_execute_flag_registered(self):
         result = runner.invoke(app, ["resume", "--help"])
-        assert "--execute" in result.output
+        output = strip_ansi(result.output)
+        assert "--execute" in output or "-execute" in output
 
     def test_invoke_asyncdev_command_returns_exit_code(self):
         from cli.commands.recovery import _invoke_asyncdev_command

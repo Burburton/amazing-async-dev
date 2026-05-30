@@ -1,10 +1,16 @@
 """Test configuration and fixtures."""
 
+import re
 import shutil
 import tempfile
 from pathlib import Path
 
 import pytest
+
+
+def strip_ansi(text: str) -> str:
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+    return ansi_escape.sub('', text)
 
 
 @pytest.fixture

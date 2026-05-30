@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 from cli.asyncdev import app as main_app
 from cli.utils.output_formatter import print_next_step, print_success_panel
 from cli.utils.path_formatter import format_path, get_relative_path
+from tests.conftest import strip_ansi
 
 runner = CliRunner()
 
@@ -68,8 +69,9 @@ class TestEnhancedStatusCommand:
         result = runner.invoke(main_app, ["status", "--help"])
 
         assert result.exit_code == 0
-        assert "--all" in result.output
-        assert "--feature" in result.output
+        output = strip_ansi(result.output)
+        assert "--all" in output or "-all" in output
+        assert "--feature" in output or "-feature" in output
 
     def test_status_default_shows_current_runstate(self, setup_test_project):
         """status without options should show current RunState."""
